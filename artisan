@@ -9,6 +9,10 @@ define('LARAVEL_START', microtime(true));
 // Register the Composer autoloader...
 require __DIR__.'/vendor/autoload.php';
 
+// ADD THESE 2 LINES:
+error_reporting(E_ALL);
+ini_set('display_errors', '1');
+
 // Bootstrap Laravel and handle the command...
 /** @var Application $app */
 $app = require_once __DIR__.'/bootstrap/app.php';
