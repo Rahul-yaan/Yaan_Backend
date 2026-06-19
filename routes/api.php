@@ -6,11 +6,15 @@ use App\Http\Controllers\AuthController;
 
 // ============================================================
 // PUBLIC ROUTES — no token needed
+// FIX: Added throttle middleware to prevent OTP brute-force
+//      and registration spam (5 attempts per minute per IP)
 // ============================================================
 
-Route::post('/register',   [AuthController::class, 'register']);
-Route::post('/verify-otp', [AuthController::class, 'verifyOtp']);
-Route::post('/login',      [AuthController::class, 'login']);
+Route::middleware('throttle:5,1')->group(function () {
+    Route::post('/register',   [AuthController::class, 'register']);
+    Route::post('/verify-otp', [AuthController::class, 'verifyOtp']);
+    Route::post('/login',      [AuthController::class, 'login']);
+});
 
 // ============================================================
 // PROTECTED ROUTES — token required in Authorization header
@@ -25,7 +29,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('role:user')->group(function () {
         Route::get('/user/dashboard', function () {
             return response()->json([
-                'message' => 'Welcome to User Dashboard!'
+                'message' => 'Welcome to User Dashboard!',
             ]);
         });
     });
@@ -34,7 +38,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('role:owner')->group(function () {
         Route::get('/owner/dashboard', function () {
             return response()->json([
-                'message' => 'Welcome to Owner Dashboard!'
+                'message' => 'Welcome to Owner Dashboard!',
             ]);
         });
     });

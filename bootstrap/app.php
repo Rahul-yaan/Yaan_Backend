@@ -38,7 +38,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ) {
             if ($request->is('api/*')) {
                 return response()->json([
-                    'error' => 'Unauthenticated. Please login first.'
+                    'error' => 'Unauthenticated. Please login first.',
                 ], 401);
             }
         });

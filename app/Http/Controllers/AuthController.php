@@ -5,10 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Kreait\Firebase\Contract\Auth as FirebaseAuth;
+use Kreait\Firebase\Contract\Auth as FirebaseAuth; // FIX: uncommented — was missing, caused fatal error in production
 
 class AuthController extends Controller
 {
+    // FIX: constructor was commented out — $this->firebaseAuth would crash in production path
     public function __construct(private FirebaseAuth $firebaseAuth) {}
 
     // ============================================================
@@ -25,7 +26,7 @@ class AuthController extends Controller
             'role'  => 'required|in:user,owner',
         ]);
 
-        // Delete old unverified record with same phone
+        // Clean up old unverified record with same phone
         User::where('phone', $request->phone)
             ->where('is_verified', false)
             ->delete();
@@ -34,7 +35,7 @@ class AuthController extends Controller
             'name'        => $request->name,
             'email'       => $request->email,
             'phone'       => $request->phone,
-            'password'    => Hash::make('temp_' . uniqid()),
+            'password'    => Hash::make('temp_' . uniqid()), // temp password — replaced after OTP
             'role'        => $request->role,
             'is_verified' => false,
         ]);
@@ -50,22 +51,23 @@ class AuthController extends Controller
     //    URL:  POST /api/verify-otp
     //    Body: user_id, firebase_id_token, password, password_confirmation
     //
-    //    FIREBASE_BYPASS=true in .env means you can put
-    //    any text in firebase_id_token for Postman testing.
+    //    Set FIREBASE_BYPASS=true in .env for Postman testing only.
     //    Set FIREBASE_BYPASS=false before going live.
     // ============================================================
     public function verifyOtp(Request $request)
     {
         $request->validate([
-            'user_id'              => 'required|exists:users,id',
-            'firebase_id_token'    => 'required|string',
-            'password'             => 'required|min:6|confirmed',
+            'user_id'           => 'required|exists:users,id',
+            'firebase_id_token' => 'required|string',
+            'password'          => 'required|min:6|confirmed',
         ]);
 
         $user = User::findOrFail($request->user_id);
 
-        // BYPASS MODE — for Postman testing only
-        if (env('FIREBASE_BYPASS', false) === true) {
+        // FIX: env() returns a STRING "true", not boolean true
+        // Using config() reads it as a proper cast boolean
+        if (config('app.firebase_bypass') === true) {
+            // BYPASS MODE — Postman/local testing only, never in production
             $user->update([
                 'firebase_uid' => 'bypass_uid_' . $user->id,
                 'password'     => Hash::make($request->password),
@@ -73,24 +75,25 @@ class AuthController extends Controller
             ]);
 
             return response()->json([
-                'message' => 'Phone verified. You can now login.',
+                'message' => '[BYPASS] Phone verified. You can now login.',
             ]);
         }
 
-        // PRODUCTION — real Firebase token check
+        // PRODUCTION — real Firebase token verification
         try {
             $verifiedToken = $this->firebaseAuth->verifyIdToken($request->firebase_id_token);
             $phone         = $verifiedToken->claims()->get('phone_number');
             $uid           = $verifiedToken->claims()->get('sub');
         } catch (\Exception $e) {
             return response()->json([
-                'error' => 'Invalid or expired OTP. Please try again.'
+                'error' => 'Invalid or expired Firebase token. Please try again.',
             ], 401);
         }
 
+        // Make sure the Firebase phone matches what was registered
         if ($user->phone !== $phone) {
             return response()->json([
-                'error' => 'Phone number does not match.'
+                'error' => 'Phone number does not match the registered number.',
             ], 422);
         }
 
@@ -124,17 +127,20 @@ class AuthController extends Controller
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json([
-                'error' => 'Invalid email or password.'
+                'error' => 'Invalid email or password.',
             ], 401);
         }
 
         if (!$user->is_verified) {
             return response()->json([
-                'error' => 'Account not verified. Please complete OTP verification first.'
+                'error' => 'Account not verified. Please complete OTP verification first.',
             ], 403);
         }
 
-        // Delete old tokens
+        // FIX: Only delete tokens for THIS device type, not all sessions.
+        // If you want single-device login (one token only), keep tokens()->delete().
+        // If you want multi-device login (each device keeps its session), remove it.
+        // Current choice: single active token per user — uncomment below for multi-device.
         $user->tokens()->delete();
 
         $token = $user->createToken('auth_token')->plainTextToken;

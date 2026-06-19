@@ -12,6 +12,7 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('email')->unique();
+            $table->timestamp('email_verified_at')->nullable(); // FIX: was missing, needed by Sanctum/Laravel internals
             $table->string('phone', 15)->unique();
             $table->string('password');
             $table->enum('role', ['user', 'owner'])->default('user');
