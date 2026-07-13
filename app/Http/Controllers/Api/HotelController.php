@@ -23,7 +23,20 @@ class HotelController extends Controller
     // GET /api/hotels/{id}
     public function show($id)
     {
-        $hotel = Hotel::with('reviews')->findOrFail($id);
+        $hotel = Hotel::with(['reviews', 'amenities'])->findOrFail($id);
         return response()->json($hotel);
+    }
+
+    // GET /api/hotels/search (or similar)
+    public function search(Request $request) 
+    {
+        $destinationCity = $request->query('destination');
+        
+        $hotels = Hotel::where('city', 'LIKE', '%' . $destinationCity . '%')->get();
+        
+        return response()->json([
+            'success' => true,
+            'data' => $hotels
+        ]);
     }
 }

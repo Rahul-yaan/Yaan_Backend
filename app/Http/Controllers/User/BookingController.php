@@ -18,10 +18,13 @@ class BookingController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'hotel_id'   => 'required|exists:hotels,id',
-            'check_in'   => 'required|date|after_or_equal:today',
-            'check_out'  => 'required|date|after:check_in',
-            'guests'     => 'required|integer|min:1|max:10',
+            'hotel_id'         => 'required|exists:hotels,id',
+            'booking_date'     => 'required|date|after_or_equal:today',
+            'truck_type'       => 'required|string',
+            'truck_no'         => 'required|string',
+            'logistics_name'   => 'required|string',
+            'logistics_number' => 'required|string',
+            'payment_method'   => 'required|string',
         ]);
 
         $hotel = Hotel::where('id', $request->hotel_id)
@@ -31,40 +34,32 @@ class BookingController extends Controller
         // Check availability
         if ($hotel->available_rooms < 1) {
             return response()->json([
-                'error' => 'No rooms available for this hotel.',
+                'error' => 'No parking slots available for this location.',
             ], 422);
         }
 
-        // Check for overlapping bookings
-        $overlap = Booking::where('hotel_id', $request->hotel_id)
-            ->where('status', '!=', 'cancelled')
-            ->where(function ($q) use ($request) {
-                $q->whereBetween('check_in', [$request->check_in, $request->check_out])
-                  ->orWhereBetween('check_out', [$request->check_in, $request->check_out]);
-            })->exists();
-
-        if ($overlap) {
-            return response()->json([
-                'error' => 'Hotel is already booked for selected dates.',
-            ], 422);
-        }
-
-        $checkIn    = Carbon::parse($request->check_in);
-        $checkOut   = Carbon::parse($request->check_out);
-        $totalNights = $checkIn->diffInDays($checkOut);
-        $totalAmount = $totalNights * $hotel->price_per_night;
+        $price = $hotel->price_per_night;
+        $gstAmount = $price * 0.18;
+        $totalPayable = $price + $gstAmount;
 
         $booking = Booking::create([
-            'user_id'         => $request->user()->id,
-            'hotel_id'        => $request->hotel_id,
-            'check_in'        => $request->check_in,
-            'check_out'       => $request->check_out,
-            'total_nights'    => $totalNights,
-            'guests'          => $request->guests,
-            'price_per_night' => $hotel->price_per_night,
-            'total_amount'    => $totalAmount,
-            'status'          => 'pending',
-            'payment_status'  => 'pending',
+            'user_id'          => $request->user()->id,
+            'hotel_id'         => $request->hotel_id,
+            'booking_date'     => $request->booking_date,
+            'truck_type'       => $request->truck_type,
+            'truck_no'         => $request->truck_no,
+            'logistics_name'   => $request->logistics_name,
+            'logistics_number' => $request->logistics_number,
+            'payment_method'   => $request->payment_method,
+            
+            'price_per_night'  => $price,
+            'total_amount'     => $price,
+            'promotion_applied'=> 0.00,
+            'gst_amount'       => $gstAmount,
+            'total_payable'    => $totalPayable,
+            
+            'status'           => 'pending',
+            'payment_status'   => 'pending',
         ]);
 
         // Decrease available rooms

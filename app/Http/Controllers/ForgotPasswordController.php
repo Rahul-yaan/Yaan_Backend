@@ -25,7 +25,6 @@ class ForgotPasswordController extends Controller
 
         $user = User::where('email', $request->email)->first();
 
-        // Block unverified accounts
         if (!$user->is_verified) {
             return response()->json([
                 'error' => 'Account not verified. Complete phone verification first.',
@@ -35,7 +34,6 @@ class ForgotPasswordController extends Controller
         $today = Carbon::today()->toDateString();
         $existing = PasswordResetToken::where('user_id', $user->id)->first();
 
-        // Check daily limit
         if ($existing) {
             $isToday = $existing->attempts_date === $today;
 
@@ -48,17 +46,14 @@ class ForgotPasswordController extends Controller
             }
         }
 
-        // Track attempts before deleting old record
         $attemptsToday = ($existing && $existing->attempts_date === $today)
             ? $existing->attempts_today + 1
             : 1;
 
-        // Delete old token if exists
         if ($existing) {
             $existing->delete();
         }
 
-        // Generate new token
         $plainToken = Str::random(64);
 
         PasswordResetToken::create([
@@ -69,20 +64,26 @@ class ForgotPasswordController extends Controller
             'attempts_date'  => $today,
         ]);
 
-        // Build reset link
         $resetLink = config('app.frontend_url')
             . '/reset-password?token=' . $plainToken
             . '&email=' . urlencode($user->email);
 
-        // Send email
-        Mail::send(
-            'emails.reset_password',
-            ['user' => $user, 'resetLink' => $resetLink],
-            function ($message) use ($user) {
-                $message->to($user->email)
-                        ->subject('Reset Your StayEase Password');
-            }
-        );
+        try {
+            Mail::send(
+                'emails.reset_password',
+                ['user' => $user, 'resetLink' => $resetLink],
+                function ($message) use ($user) {
+                    $message->to($user->email)
+                            ->subject('Reset Your Yaan Password');
+                }
+            );
+            \Log::info('Email sent successfully to: ' . $user->email);
+        } catch (\Exception $e) {
+            \Log::error('Mail failed: ' . $e->getMessage());
+            return response()->json([
+                'error' => 'Mail failed: ' . $e->getMessage(),
+            ], 500);
+        }
 
         return response()->json([
             'message'       => 'Password reset link sent to your email.',
@@ -106,14 +107,12 @@ class ForgotPasswordController extends Controller
         $user = User::where('email', $request->email)->first();
         $record = PasswordResetToken::where('user_id', $user->id)->first();
 
-        // No record found
         if (!$record) {
             return response()->json([
                 'error' => 'Invalid or expired reset link.',
             ], 422);
         }
 
-        // Token expired
         if (Carbon::now()->isAfter($record->expires_at)) {
             $record->delete();
             return response()->json([
@@ -121,22 +120,17 @@ class ForgotPasswordController extends Controller
             ], 422);
         }
 
-        // Token mismatch
         if (!Hash::check($request->token, $record->token)) {
             return response()->json([
                 'error' => 'Invalid reset token.',
             ], 422);
         }
 
-        // All good — update password
         $user->update([
             'password' => Hash::make($request->password),
         ]);
 
-        // Revoke all active sessions so old password can't be reused
         $user->tokens()->delete();
-
-        // Delete used token
         $record->delete();
 
         return response()->json([

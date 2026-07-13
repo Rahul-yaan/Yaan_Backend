@@ -19,30 +19,24 @@ class ReviewController extends Controller
     {
         $request->validate([
             'hotel_id'   => 'required|exists:hotels,id',
-            'booking_id' => 'required|exists:bookings,id',
+            'booking_id' => 'nullable|exists:bookings,id',
             'rating'     => 'required|integer|min:1|max:5',
             'comment'    => 'nullable|string|max:500',
         ]);
 
-        // Check booking belongs to user
-        $booking = Booking::where('id', $request->booking_id)
-            ->where('user_id', $request->user()->id)
-            ->where('hotel_id', $request->hotel_id)
-            ->where('status', 'completed')
-            ->first();
+        if ($request->booking_id) {
+            // Check booking belongs to user
+            $booking = Booking::where('id', $request->booking_id)
+                ->where('user_id', $request->user()->id)
+                ->where('hotel_id', $request->hotel_id)
+                ->where('status', 'completed')
+                ->first();
 
-        if (!$booking) {
-            return response()->json([
-                'error' => 'You can only review hotels you have completed a stay at.',
-            ], 403);
-        }
-
-        // Check if already reviewed
-        $existing = Review::where('booking_id', $request->booking_id)->first();
-        if ($existing) {
-            return response()->json([
-                'error' => 'You have already reviewed this booking.',
-            ], 422);
+            if (!$booking) {
+                return response()->json([
+                    'error' => 'You can only review hotels you have completed a stay at.',
+                ], 403);
+            }
         }
 
         $review = Review::create([

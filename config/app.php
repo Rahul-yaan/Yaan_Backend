@@ -125,5 +125,6 @@ return [
 
 
     'firebase_bypass' => env('FIREBASE_BYPASS', false),  // ← ADD THIS LINE
+    'frontend_url' => env('APP_FRONTEND_URL', 'http://localhost:8000'),
 
 ];

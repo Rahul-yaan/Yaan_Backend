@@ -11,10 +11,12 @@ class HotelController extends Controller
     public function search(Request $request)
     {
         $request->validate([
-            'from_lat' => 'required|numeric',
-            'from_lng' => 'required|numeric',
-            'to_lat'   => 'required|numeric',
-            'to_lng'   => 'required|numeric',
+            'from_lat'  => 'required|numeric',
+            'from_lng'  => 'required|numeric',
+            'to_lat'    => 'required|numeric',
+            'to_lng'    => 'required|numeric',
+            'amenities' => 'nullable|array',
+            'amenities.*' => 'string',
         ]);
 
         $fromLat = $request->from_lat;
@@ -28,7 +30,7 @@ class HotelController extends Controller
         $routeDistance = $this->haversine($fromLat, $fromLng, $toLat, $toLng);
         $radius = ($routeDistance / 2) + 50;
 
-        $hotels = Hotel::where('status', 'active')
+        $query = Hotel::where('status', 'active')
             ->selectRaw("
                 *,
                 (6371 * acos(
@@ -38,9 +40,18 @@ class HotelController extends Controller
                 )) AS distance
             ", [$midLat, $midLng, $midLat])
             ->having('distance', '<=', $radius)
-            ->orderBy('distance')
-            ->with(['primaryImage', 'amenities'])
-            ->get();
+            ->with(['primaryImage', 'amenities']);
+
+        if ($request->filled('amenities')) {
+            $requestedAmenities = $request->input('amenities');
+            foreach ($requestedAmenities as $amenityName) {
+                $query->whereHas('amenities', function ($q) use ($amenityName) {
+                    $q->where('name', $amenityName);
+                });
+            }
+        }
+
+        $hotels = $query->orderBy('distance')->get();
 
         return response()->json([
             'hotels'        => $hotels,

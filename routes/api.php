@@ -26,37 +26,33 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me',      [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
+    // User routes
     Route::middleware('role:user')->group(function () {
         Route::get('/user/dashboard', function () {
             return response()->json(['message' => 'Welcome to User Dashboard!']);
         });
-        
-        // search must be before {ID}
-
-        Route::get('/hotels/search', [App\Http\Controllers\User\HotelController::class, 'search']);
+        Route::get('/hotels/search',           [App\Http\Controllers\User\HotelController::class, 'search']);
         Route::get('/hotels/{id}/reviews',     [App\Http\Controllers\User\ReviewController::class, 'index']);
-        Route::get('/hotels/{id}',   [App\Http\Controllers\User\HotelController::class, 'show']);
-        Route::post('/bookings',              [App\Http\Controllers\User\BookingController::class, 'store']);
-        Route::get('/bookings/my',            [App\Http\Controllers\User\BookingController::class, 'myBookings']);
-        Route::post('/bookings/{id}/cancel',  [App\Http\Controllers\User\BookingController::class, 'cancel']);
-
+        Route::get('/hotels/{id}',             [App\Http\Controllers\User\HotelController::class, 'show']);
+        Route::post('/bookings',               [App\Http\Controllers\User\BookingController::class, 'store']);
+        Route::get('/bookings/my',             [App\Http\Controllers\User\BookingController::class, 'myBookings']);
+        Route::post('/bookings/{id}/cancel',   [App\Http\Controllers\User\BookingController::class, 'cancel']);
         Route::post('/reviews',                [App\Http\Controllers\User\ReviewController::class, 'store']);
-        
-    });
-
-    Route::middleware('role:owner')->group(function () {
-        Route::get('/owner/dashboard', function () {
-            return response()->json(['message' => 'Welcome to Owner Dashboard!']);
-        });
     });
 
     // Owner routes
     Route::middleware('role:owner')->prefix('owner')->group(function () {
-    Route::get('/hotels',                    [App\Http\Controllers\Owner\HotelController::class, 'index']);
-    Route::post('/hotels',                   [App\Http\Controllers\Owner\HotelController::class, 'store']);
-    Route::put('/hotels/{id}',               [App\Http\Controllers\Owner\HotelController::class, 'update']);
-    Route::delete('/hotels/{id}',            [App\Http\Controllers\Owner\HotelController::class, 'destroy']);
-    Route::post('/hotels/{id}/images',       [App\Http\Controllers\Owner\HotelController::class, 'uploadImages']);
-});
+        Route::get('/hotels',              [App\Http\Controllers\Owner\HotelController::class, 'index']);
+        Route::post('/hotels',             [App\Http\Controllers\Owner\HotelController::class, 'store']);
+        Route::put('/hotels/{id}',         [App\Http\Controllers\Owner\HotelController::class, 'update']);
+        Route::delete('/hotels/{id}',      [App\Http\Controllers\Owner\HotelController::class, 'destroy']);
+        Route::post('/hotels/{id}/images', [App\Http\Controllers\Owner\HotelController::class, 'uploadImages']);
+        Route::get('/dashboard',           [App\Http\Controllers\Owner\DashboardController::class, 'index']);
+        Route::get('/bookings',            [App\Http\Controllers\Owner\BookingController::class, 'index']);
+        Route::get('/bookings/{id}',       [App\Http\Controllers\Owner\BookingController::class, 'show']);
+        Route::put('/bookings/{id}/status',[App\Http\Controllers\Owner\BookingController::class, 'updateStatus']);
+        Route::get('/profile',             [App\Http\Controllers\Owner\ProfileController::class, 'show']);
+        Route::post('/profile',            [App\Http\Controllers\Owner\ProfileController::class, 'update']);
+    });
 
 });

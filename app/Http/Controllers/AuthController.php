@@ -19,17 +19,25 @@ class AuthController extends Controller
     // ============================================================
     public function register(Request $request)
     {
+        // Clean up old unverified record with same phone or email before validation checks uniqueness
+        if ($request->phone) {
+            User::where('phone', $request->phone)
+                ->where('is_verified', false)
+                ->delete();
+        }
+
+        if ($request->email) {
+            User::where('email', $request->email)
+                ->where('is_verified', false)
+                ->delete();
+        }
+
         $request->validate([
             'name'  => 'required|string|max:100',
             'email' => 'required|email|unique:users,email',
             'phone' => 'required|string|unique:users,phone',
             'role'  => 'required|in:user,owner',
         ]);
-
-        // Clean up old unverified record with same phone
-        User::where('phone', $request->phone)
-            ->where('is_verified', false)
-            ->delete();
 
         $user = User::create([
             'name'        => $request->name,
@@ -90,8 +98,10 @@ class AuthController extends Controller
             ], 401);
         }
 
-        // Make sure the Firebase phone matches what was registered
-        if ($user->phone !== $phone) {
+        // Make sure the Firebase phone matches what was registered.
+        // Note: Firebase returns phone numbers with country code (e.g., +91...), 
+        // so we check if it ends with the user's registered phone.
+        if (!str_ends_with($phone, ltrim($user->phone, '+'))) {
             return response()->json([
                 'error' => 'Phone number does not match the registered number.',
             ], 422);
@@ -161,6 +171,39 @@ class AuthController extends Controller
     {
         return response()->json([
             'user' => $request->user(),
+        ]);
+    }
+
+    // ============================================================
+    // 4.5 UPDATE PROFILE
+    //     URL:    POST /api/user/update-profile
+    //     Header: Authorization: Bearer YOUR_TOKEN
+    // ============================================================
+    public function updateProfile(Request $request)
+    {
+        $user = $request->user();
+
+        $request->validate([
+            'name'  => 'nullable|string|max:100',
+            'email' => 'nullable|email|unique:users,email,' . $user->id,
+            'phone' => 'nullable|string|unique:users,phone,' . $user->id,
+            'avatar'=> 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+        ]);
+
+        if ($request->has('name'))  $user->name = $request->name;
+        if ($request->has('email')) $user->email = $request->email;
+        if ($request->has('phone')) $user->phone = $request->phone;
+
+        if ($request->hasFile('avatar')) {
+            $path = $request->file('avatar')->store('avatars', 'public');
+            $user->avatar = url('storage/' . $path);
+        }
+
+        $user->save();
+
+        return response()->json([
+            'message' => 'Profile updated successfully.',
+            'user'    => $user,
         ]);
     }
 

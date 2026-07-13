@@ -17,35 +17,55 @@ public function index(Request $request)
 public function store(Request $request)
 {
     $request->validate([
-        'hotel_id' => 'required|exists:hotels,id',
-        'customer_name' => 'required',
-        'booking_date' => 'required|date',
-        'from_time' => 'required',
-        'to_time' => 'required',
+        'hotel_id'         => 'required|exists:hotels,id',
+        'booking_date'     => 'required|date|after_or_equal:today',
+        'truck_type'       => 'required|string',
+        'truck_no'         => 'required|string',
+        'logistics_name'   => 'required|string',
+        'logistics_number' => 'required|string',
+        'payment_method'   => 'required|string',
     ]);
 
-    $booking = Booking::create($request->all());
+    $hotel = \App\Models\Hotel::where('id', $request->hotel_id)
+        ->where('status', 'active')
+        ->firstOrFail();
+
+    if ($hotel->available_rooms < 1) {
+        return response()->json([
+            'error' => 'No parking slots available for this location.',
+        ], 422);
+    }
+
+    $price = $hotel->price_per_night;
+    $gstAmount = $price * 0.18;
+    $totalPayable = $price + $gstAmount;
+
+    $booking = Booking::create([
+        'user_id'          => $request->user() ? $request->user()->id : 1, // Fallback if used without auth
+        'hotel_id'         => $request->hotel_id,
+        'booking_date'     => $request->booking_date,
+        'truck_type'       => $request->truck_type,
+        'truck_no'         => $request->truck_no,
+        'logistics_name'   => $request->logistics_name,
+        'logistics_number' => $request->logistics_number,
+        'payment_method'   => $request->payment_method,
+        
+        'price_per_night'  => $price,
+        'total_amount'     => $price,
+        'promotion_applied'=> 0.00,
+        'gst_amount'       => $gstAmount,
+        'total_payable'    => $totalPayable,
+        
+        'status'           => 'pending',
+        'payment_status'   => 'pending',
+    ]);
+
+    $hotel->decrement('available_rooms');
 
     return response()->json([
         'message' => 'Booking Confirmed',
-        'data' => $booking
-    ]);
+        'booking' => $booking->load('hotel')
+    ], 201);
 }
-    // POST /api/bookings
-    public function store(Request $request)
-    {
-        $booking = Booking::create([
-            'hotel_id' => $request->hotel_id,
-            'customer_name' => $request->customer_name,
-            'booking_date' => $request->booking_date,
-            'from_time' => $request->from_time,
-            'to_time' => $request->to_time,
-            'total_price' => $request->total_price,
-        ]);
+}
 
-        return response()->json([
-            'message' => 'Booking Confirmed',
-            'data' => $booking
-        ]);
-    }
-}
