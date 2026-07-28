@@ -95,11 +95,22 @@ class HotelController extends Controller
             'amenities.*'    => 'exists:amenities,id',
         ]);
 
-        $hotel->update($request->only([
+        $updateData = $request->only([
             'name', 'description', 'city', 'address',
             'latitude', 'longitude', 'price_per_night',
             'total_rooms', 'status',
-        ]));
+        ]);
+
+        if (isset($updateData['total_rooms'])) {
+            $today = \Carbon\Carbon::today()->toDateString();
+            $todayBookingsCount = $hotel->bookings()
+                ->whereIn('status', ['pending', 'confirmed'])
+                ->whereDate('booking_date', $today)
+                ->count();
+            $updateData['available_rooms'] = max(0, (int)$updateData['total_rooms'] - $todayBookingsCount);
+        }
+
+        $hotel->update($updateData);
 
         if ($request->has('amenities')) {
             $hotel->amenities()->sync($request->amenities);
@@ -150,10 +161,13 @@ class HotelController extends Controller
 
         $uploaded = [];
 
+        // Make the newly uploaded first image the primary one
+        $hotel->images()->update(['is_primary' => false]);
+
         foreach ($request->file('images') as $index => $file) {
             $path = $file->store('hotels', 'public');
 
-            $isPrimary = $index === 0 && $hotel->images()->count() === 0;
+            $isPrimary = $index === 0;
 
             $image = HotelImage::create([
                 'hotel_id'   => $hotel->id,

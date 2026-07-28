@@ -11,7 +11,7 @@ class HotelController extends Controller
     // GET /api/hotels
     public function index(Request $request)
     {
-        $query = Hotel::withAvg('reviews', 'rating');
+        $query = Hotel::with(['primaryImage', 'amenities'])->withAvg('reviews', 'rating');
 
         if ($request->city) {
             $query->where('city', $request->city);

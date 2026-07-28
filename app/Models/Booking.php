@@ -18,6 +18,7 @@ class Booking extends Model
         'status',
         'razorpay_order_id',
         'razorpay_payment_id',
+        'transaction_id',
         'payment_status',
         'booking_date',
         'truck_type',

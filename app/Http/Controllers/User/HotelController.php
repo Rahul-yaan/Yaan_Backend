@@ -52,6 +52,15 @@ class HotelController extends Controller
         }
 
         $hotels = $query->orderBy('distance')->get();
+        $today = \Carbon\Carbon::today()->toDateString();
+
+        foreach ($hotels as $h) {
+            $todayBooked = \App\Models\Booking::where('hotel_id', $h->id)
+                ->whereIn('status', ['pending', 'confirmed'])
+                ->whereDate('booking_date', $today)
+                ->count();
+            $h->available_rooms = max(0, $h->total_rooms - $todayBooked);
+        }
 
         return response()->json([
             'hotels'        => $hotels,
@@ -67,8 +76,15 @@ class HotelController extends Controller
     {
         $hotel = Hotel::where('id', $id)
             ->where('status', 'active')
-            ->with(['images', 'amenities', 'reviews'])
+            ->with(['images', 'primaryImage', 'amenities', 'reviews'])
             ->firstOrFail();
+
+        $today = \Carbon\Carbon::today()->toDateString();
+        $todayBooked = \App\Models\Booking::where('hotel_id', $hotel->id)
+            ->whereIn('status', ['pending', 'confirmed'])
+            ->whereDate('booking_date', $today)
+            ->count();
+        $hotel->available_rooms = max(0, $hotel->total_rooms - $todayBooked);
 
         return response()->json(['hotel' => $hotel]);
     }

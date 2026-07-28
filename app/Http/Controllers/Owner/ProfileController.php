@@ -82,6 +82,14 @@ class ProfileController extends Controller
 
         $profile->update($data);
 
+        // Sync hotel name with the core hotels table
+        if (!empty($data['hotel_name'])) {
+            $hotel = \App\Models\Hotel::where('owner_id', $request->user()->id)->first();
+            if ($hotel) {
+                $hotel->update(['name' => $data['hotel_name']]);
+            }
+        }
+
         return response()->json([
             'message' => 'Profile updated successfully.',
             'profile' => $profile,

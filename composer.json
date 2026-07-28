@@ -12,6 +12,7 @@
         "laravel/framework": "^12.0",
         "laravel/sanctum": "^4.3",
         "laravel/tinker": "^2.10.1",
+        "razorpay/razorpay": "*",
         "twilio/sdk": "^8.11"
     },
     "require-dev": {
