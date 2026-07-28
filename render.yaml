@@ -15,6 +15,20 @@ services:
       - key: LOG_CHANNEL
         value: stderr
       - key: DB_CONNECTION
-        value: mysql
+        value: pgsql
+      - key: DB_HOST
+        value: ep-curly-brook-axbavkx0.c-4.us-east-2.aws.neon.tech
+      - key: DB_PORT
+        value: "5432"
+      - key: DB_DATABASE
+        value: neondb
+      - key: DB_USERNAME
+        value: neondb_owner
+      - key: DB_PASSWORD
+        value: npg_b3qmYRF8jKlr
+      - key: DB_SSLMODE
+        value: require
+      - key: DB_URL
+        value: postgresql://neondb_owner:npg_b3qmYRF8jKlr@ep-curly-brook-axbavkx0.c-4.us-east-2.aws.neon.tech/neondb?sslmode=require
       - key: RUN_MIGRATIONS
         value: "true"
