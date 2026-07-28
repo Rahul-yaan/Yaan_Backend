@@ -22,8 +22,8 @@ php artisan config:cache
 php artisan route:cache
 php artisan view:cache
 
-# Execute migrations if DB environment variables are present or RUN_MIGRATIONS=true
-if [ "${RUN_MIGRATIONS:-true}" = "true" ] && [ -n "${DB_HOST}" ]; then
+# Execute migrations if RUN_MIGRATIONS is true (default: true)
+if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
     echo "Running database migrations..."
     php artisan migrate --force || echo "Migration command returned non-zero status."
 fi
