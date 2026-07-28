@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: yaan-backend
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: singapore # Options: oregon, frankfurt, singapore, ohio
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_KEY
+        generateValue: true
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: DB_CONNECTION
+        value: mysql
+      - key: RUN_MIGRATIONS
+        value: "true"
