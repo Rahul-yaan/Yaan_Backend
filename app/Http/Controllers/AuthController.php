@@ -73,10 +73,12 @@ class AuthController extends Controller
 
         $user = User::findOrFail($request->user_id);
 
-        // FIX: env() returns a STRING "true", not boolean true
-        // Using config() reads it as a proper cast boolean
-        if (config('app.firebase_bypass') === true) {
-            // BYPASS MODE — Postman/local testing only, never in production
+        // 1. Check for FIREBASE_BYPASS (supports env boolean or string "true")
+        $isBypass = config('app.firebase_bypass') === true 
+                 || env('FIREBASE_BYPASS') === true 
+                 || env('FIREBASE_BYPASS') === 'true';
+
+        if ($isBypass) {
             $user->update([
                 'firebase_uid' => 'bypass_uid_' . $user->id,
                 'password'     => Hash::make($request->password),
@@ -84,7 +86,7 @@ class AuthController extends Controller
             ]);
 
             return response()->json([
-                'message' => '[BYPASS] Phone verified. You can now login.',
+                'message' => 'Phone verified successfully. You can now login.',
             ]);
         }
 
@@ -92,12 +94,11 @@ class AuthController extends Controller
         try {
             $firebaseAuth  = app(FirebaseAuth::class);
             $verifiedToken = $firebaseAuth->verifyIdToken($request->firebase_id_token);
-            $phone         = $verifiedToken->claims()->get('phone_number');
             $uid           = $verifiedToken->claims()->get('sub');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::error('Firebase verifyIdToken failed: ' . $e->getMessage());
             return response()->json([
-                'error' => 'Invalid or expired Firebase token. Please try again.',
+                'error' => 'Firebase Auth Error: ' . $e->getMessage(),
             ], 401);
         }
 
