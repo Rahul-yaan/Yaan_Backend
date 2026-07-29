@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Kreait\Firebase\Contract\Auth as FirebaseAuth; // FIX: uncommented — was missing, caused fatal error in production
 
 class AuthController extends Controller
@@ -94,6 +95,7 @@ class AuthController extends Controller
             $phone         = $verifiedToken->claims()->get('phone_number');
             $uid           = $verifiedToken->claims()->get('sub');
         } catch (\Exception $e) {
+            Log::error('Firebase verifyIdToken failed: ' . $e->getMessage());
             return response()->json([
                 'error' => 'Invalid or expired Firebase token. Please try again.',
             ], 401);

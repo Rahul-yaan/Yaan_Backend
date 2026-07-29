@@ -50,7 +50,25 @@ return [
              *
              */
 
-            'credentials' => env('FIREBASE_CREDENTIALS', env('GOOGLE_APPLICATION_CREDENTIALS')),
+            'credentials' => (function () {
+                $credentials = env('FIREBASE_CREDENTIALS');
+                if (!$credentials) {
+                    $credentials = env('GOOGLE_APPLICATION_CREDENTIALS');
+                }
+                if (!$credentials) {
+                    return storage_path('app/firebase-credentials.json');
+                }
+                if (is_string($credentials) && str_starts_with(trim($credentials), '{')) {
+                    return json_decode($credentials, true);
+                }
+                if (is_string($credentials) && !file_exists($credentials)) {
+                    $storagePath = storage_path('app/' . basename($credentials));
+                    if (file_exists($storagePath)) {
+                        return $storagePath;
+                    }
+                }
+                return $credentials;
+            })(),
 
             /*
              * ------------------------------------------------------------------------
