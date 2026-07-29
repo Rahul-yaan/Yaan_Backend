@@ -9,8 +9,8 @@ use Kreait\Firebase\Contract\Auth as FirebaseAuth; // FIX: uncommented — was m
 
 class AuthController extends Controller
 {
-    // FIX: constructor was commented out — $this->firebaseAuth would crash in production path
-    public function __construct(private FirebaseAuth $firebaseAuth) {}
+    // Note: FirebaseAuth is lazy-resolved in verifyOtp() so routes like /register and /login
+    // will not crash if Firebase credentials are missing or bypassed.
 
     // ============================================================
     // 1. REGISTER
@@ -89,7 +89,8 @@ class AuthController extends Controller
 
         // PRODUCTION — real Firebase token verification
         try {
-            $verifiedToken = $this->firebaseAuth->verifyIdToken($request->firebase_id_token);
+            $firebaseAuth  = app(FirebaseAuth::class);
+            $verifiedToken = $firebaseAuth->verifyIdToken($request->firebase_id_token);
             $phone         = $verifiedToken->claims()->get('phone_number');
             $uid           = $verifiedToken->claims()->get('sub');
         } catch (\Exception $e) {
