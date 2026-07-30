@@ -101,13 +101,31 @@ class BookingController extends Controller
                     $booking->razorpay_order_id = $razorpayOrderId;
                     $booking->save();
                 } else {
+                    $errorDesc = $response->json('error.description') ?? 'Authentication failed';
                     \Illuminate\Support\Facades\Log::error('Razorpay Order Creation Failed', [
                         'status' => $response->status(),
                         'body'   => $response->body(),
                     ]);
+
+                    // Rollback room decrement & delete pending booking
+                    $hotel->increment('available_rooms');
+                    $booking->delete();
+
+                    return response()->json([
+                        'error'   => 'Razorpay Error: ' . $errorDesc,
+                        'message' => 'Your Razorpay Key ID or Secret is invalid. Please update RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in your .env file.',
+                    ], 400);
                 }
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::error('Razorpay Order Exception: ' . $e->getMessage());
+
+                $hotel->increment('available_rooms');
+                $booking->delete();
+
+                return response()->json([
+                    'error'   => 'Razorpay Exception',
+                    'message' => $e->getMessage(),
+                ], 400);
             }
         }
 
