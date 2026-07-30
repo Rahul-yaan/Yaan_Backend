@@ -30,16 +30,15 @@ class HotelController extends Controller
         $routeDistance = $this->haversine($fromLat, $fromLng, $toLat, $toLng);
         $radius = ($routeDistance / 2) + 50;
 
+        $distanceSql = "(6371 * acos(
+            LEAST(1.0, cos(radians(?)) * cos(radians(latitude))
+            * cos(radians(longitude) - radians(?))
+            + sin(radians(?)) * sin(radians(latitude)))
+        ))";
+
         $query = Hotel::where('status', 'active')
-            ->selectRaw("
-                *,
-                (6371 * acos(
-                    LEAST(1.0, cos(radians(?)) * cos(radians(latitude))
-                    * cos(radians(longitude) - radians(?))
-                    + sin(radians(?)) * sin(radians(latitude)))
-                )) AS distance
-            ", [$midLat, $midLng, $midLat])
-            ->having('distance', '<=', $radius)
+            ->selectRaw("*, {$distanceSql} AS distance", [$midLat, $midLng, $midLat])
+            ->whereRaw("{$distanceSql} <= ?", [$midLat, $midLng, $midLat, $radius])
             ->with(['primaryImage', 'amenities']);
 
         if ($request->filled('amenities')) {
