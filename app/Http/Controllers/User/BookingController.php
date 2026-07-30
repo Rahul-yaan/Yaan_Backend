@@ -132,9 +132,14 @@ class BookingController extends Controller
         return response()->json([
             'message'           => 'Booking created successfully.',
             'booking'           => $booking->load('hotel'),
+            'order_id'          => $booking->razorpay_order_id,
             'razorpay_order_id' => $booking->razorpay_order_id,
+            'key'               => env('RAZORPAY_KEY_ID'),
             'razorpay_key_id'   => env('RAZORPAY_KEY_ID'),
+            'amount'            => (int) round($totalPayable * 100),
             'amount_in_paise'   => (int) round($totalPayable * 100),
+            'amount_in_rupees'  => (float) $totalPayable,
+            'currency'          => 'INR',
         ], 201);
     }
 
