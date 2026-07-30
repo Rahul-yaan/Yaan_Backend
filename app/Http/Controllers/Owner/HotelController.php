@@ -58,6 +58,23 @@ class HotelController extends Controller
         return array_values(array_unique($resolvedIds));
     }
 
+    private function extractAndResolveAmenities(Request $request)
+    {
+        $input = $request->input('amenities')
+              ?? $request->input('amenity_ids')
+              ?? $request->input('amenities_ids')
+              ?? $request->input('selected_amenities')
+              ?? $request->input('selectedAmenities')
+              ?? $request->input('amenity_names')
+              ?? $request->input('amenities_list');
+
+        if ($input === null) {
+            return null;
+        }
+
+        return $this->resolveAmenities($input);
+    }
+
     // ============================================================
     // 2. ADD HOTEL
     //    URL:    POST /api/owner/hotels
@@ -65,8 +82,9 @@ class HotelController extends Controller
     // ============================================================
     public function store(Request $request)
     {
-        if ($request->has('amenities')) {
-            $request->merge(['amenities' => $this->resolveAmenities($request->amenities)]);
+        $resolvedAmenities = $this->extractAndResolveAmenities($request);
+        if ($resolvedAmenities !== null) {
+            $request->merge(['amenities' => $resolvedAmenities]);
         }
 
         $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
@@ -110,8 +128,8 @@ class HotelController extends Controller
         ]);
 
         // Attach amenities if provided
-        if (!empty($request->amenities)) {
-            $hotel->amenities()->attach($request->amenities);
+        if (!empty($resolvedAmenities)) {
+            $hotel->amenities()->attach($resolvedAmenities);
         }
 
         return response()->json([
@@ -131,8 +149,9 @@ class HotelController extends Controller
             ->where('owner_id', $request->user()->id)
             ->firstOrFail();
 
-        if ($request->has('amenities')) {
-            $request->merge(['amenities' => $this->resolveAmenities($request->amenities)]);
+        $resolvedAmenities = $this->extractAndResolveAmenities($request);
+        if ($resolvedAmenities !== null) {
+            $request->merge(['amenities' => $resolvedAmenities]);
         }
 
         $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
@@ -179,8 +198,8 @@ class HotelController extends Controller
 
         $hotel->update($updateData);
 
-        if ($request->has('amenities')) {
-            $hotel->amenities()->sync($request->amenities);
+        if ($resolvedAmenities !== null) {
+            $hotel->amenities()->sync($resolvedAmenities);
         }
 
         return response()->json([

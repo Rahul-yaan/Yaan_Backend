@@ -59,6 +59,7 @@ class HotelController extends Controller
                 ->whereDate('booking_date', $today)
                 ->count();
             $h->available_rooms = max(0, $h->total_rooms - $todayBooked);
+            $h->amenity_names = $h->amenities->pluck('name')->toArray();
         }
 
         return response()->json([
@@ -84,6 +85,7 @@ class HotelController extends Controller
             ->whereDate('booking_date', $today)
             ->count();
         $hotel->available_rooms = max(0, $hotel->total_rooms - $todayBooked);
+        $hotel->amenity_names = $hotel->amenities->pluck('name')->toArray();
 
         return response()->json(['hotel' => $hotel]);
     }
