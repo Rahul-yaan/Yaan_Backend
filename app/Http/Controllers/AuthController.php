@@ -95,6 +95,7 @@ class AuthController extends Controller
             $firebaseAuth  = app(FirebaseAuth::class);
             $verifiedToken = $firebaseAuth->verifyIdToken($request->firebase_id_token);
             $uid           = $verifiedToken->claims()->get('sub');
+            $phone         = $verifiedToken->claims()->get('phone_number') ?? '';
         } catch (\Throwable $e) {
             Log::error('Firebase verifyIdToken failed: ' . $e->getMessage());
             return response()->json([
@@ -105,7 +106,7 @@ class AuthController extends Controller
         // Make sure the Firebase phone matches what was registered.
         // Note: Firebase returns phone numbers with country code (e.g., +91...), 
         // so we check if it ends with the user's registered phone.
-        if (!str_ends_with($phone, ltrim($user->phone, '+'))) {
+        if ($phone && !str_ends_with($phone, ltrim($user->phone, '+'))) {
             return response()->json([
                 'error' => 'Phone number does not match the registered number.',
             ], 422);
