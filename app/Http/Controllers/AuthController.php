@@ -17,28 +17,50 @@ class AuthController extends Controller
     // 1. REGISTER
     //    URL:  POST /api/register
     //    Body: name, email, phone, role
-    // ============================================================
-    public function register(Request $request)
+        public function register(Request $request)
     {
-        // Clean up old unverified record with same phone or email before validation checks uniqueness
+        // Normalize inputs and default role to 'owner' if omitted or sent as variant
+        $role = strtolower($request->input('role', 'owner'));
+        if ($role === 'hotel_owner' || $role === 'hotelowner' || empty($role)) {
+            $role = 'owner';
+        }
+        $request->merge(['role' => $role]);
+
         if ($request->phone) {
-            User::where('phone', $request->phone)
+            $phone = trim($request->phone);
+            $request->merge(['phone' => $phone]);
+            User::where('phone', $phone)
                 ->where('is_verified', false)
                 ->delete();
         }
 
         if ($request->email) {
-            User::where('email', $request->email)
+            $email = trim(strtolower($request->email));
+            $request->merge(['email' => $email]);
+            User::where('email', $email)
                 ->where('is_verified', false)
                 ->delete();
         }
 
-        $request->validate([
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
             'name'  => 'required|string|max:100',
             'email' => 'required|email|unique:users,email',
             'phone' => 'required|string|unique:users,phone',
             'role'  => 'required|in:user,owner',
         ]);
+
+        if ($validator->fails()) {
+            Log::warning('Registration Validation Failed', [
+                'input'  => $request->except(['password']),
+                'errors' => $validator->errors()->toArray(),
+            ]);
+
+            return response()->json([
+                'error'   => 'Validation failed.',
+                'message' => 'The given data was invalid.',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
 
         $user = User::create([
             'name'        => $request->name,
