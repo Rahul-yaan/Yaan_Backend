@@ -142,9 +142,12 @@ class HotelController extends Controller
             $hotel->amenities()->attach($resolvedAmenities);
         }
 
+        // Process any uploaded images sent during hotel creation
+        $this->processUploadedImages($request, $hotel);
+
         return response()->json([
             'message' => 'Hotel added successfully.',
-            'hotel'   => $hotel->load('amenities'),
+            'hotel'   => $hotel->load(['images', 'primaryImage', 'amenities']),
         ], 201);
     }
 
@@ -212,9 +215,12 @@ class HotelController extends Controller
             $hotel->amenities()->sync($resolvedAmenities);
         }
 
+        // Process any uploaded images sent during hotel update
+        $this->processUploadedImages($request, $hotel);
+
         return response()->json([
             'message' => 'Hotel updated successfully.',
-            'hotel'   => $hotel->load('amenities'),
+            'hotel'   => $hotel->load(['images', 'primaryImage', 'amenities']),
         ]);
     }
 
@@ -239,6 +245,49 @@ class HotelController extends Controller
         return response()->json(['message' => 'Hotel deleted successfully.']);
     }
 
+    private function processUploadedImages(Request $request, Hotel $hotel)
+    {
+        $files = [];
+
+        if ($request->hasFile('images')) {
+            $raw = $request->file('images');
+            $files = is_array($raw) ? $raw : [$raw];
+        } elseif ($request->hasFile('image')) {
+            $files = [$request->file('image')];
+        } elseif ($request->hasFile('photos')) {
+            $raw = $request->file('photos');
+            $files = is_array($raw) ? $raw : [$raw];
+        } elseif ($request->hasFile('photo')) {
+            $files = [$request->file('photo')];
+        } elseif ($request->hasFile('file')) {
+            $files = [$request->file('file')];
+        }
+
+        if (empty($files)) {
+            return [];
+        }
+
+        $hasPrimary = $hotel->images()->where('is_primary', true)->exists();
+        $uploaded = [];
+
+        foreach ($files as $index => $file) {
+            if (!$file->isValid()) continue;
+
+            $path = $file->store('hotels', 'public');
+            $isPrimary = !$hasPrimary && ($index === 0);
+
+            $image = HotelImage::create([
+                'hotel_id'   => $hotel->id,
+                'image_path' => $path,
+                'is_primary' => $isPrimary,
+            ]);
+
+            $uploaded[] = $image;
+        }
+
+        return $uploaded;
+    }
+
     // ============================================================
     // 5. UPLOAD HOTEL IMAGES
     //    URL:    POST /api/owner/hotels/{id}/images
@@ -250,33 +299,12 @@ class HotelController extends Controller
             ->where('owner_id', $request->user()->id)
             ->firstOrFail();
 
-        $request->validate([
-            'images'   => 'required|array|max:5',
-            'images.*' => 'image|mimes:jpg,jpeg,png|max:2048',
-        ]);
-
-        $uploaded = [];
-
-        // Make the newly uploaded first image the primary one
-        $hotel->images()->update(['is_primary' => false]);
-
-        foreach ($request->file('images') as $index => $file) {
-            $path = $file->store('hotels', 'public');
-
-            $isPrimary = $index === 0;
-
-            $image = HotelImage::create([
-                'hotel_id'   => $hotel->id,
-                'image_path' => $path,
-                'is_primary' => $isPrimary,
-            ]);
-
-            $uploaded[] = $image;
-        }
+        $uploaded = $this->processUploadedImages($request, $hotel);
 
         return response()->json([
             'message' => 'Images uploaded successfully.',
-            'images'  => $uploaded,
+            'images'  => $hotel->images()->get(),
+            'hotel'   => $hotel->load(['images', 'primaryImage', 'amenities']),
         ]);
     }
 }
