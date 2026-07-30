@@ -50,6 +50,11 @@ class BookingController extends Controller
         $gstAmount = $price * 0.18;
         $totalPayable = $price + $gstAmount;
 
+        $rawPayment = strtolower(trim($request->payment_method));
+        $isOnlinePayment = in_array($rawPayment, [
+            'online payment', 'online_payment', 'online', 'razorpay', 'upi', 'card', 'netbanking'
+        ]);
+
         $booking = Booking::create([
             'user_id'          => $request->user()->id,
             'hotel_id'         => $request->hotel_id,
@@ -61,7 +66,7 @@ class BookingController extends Controller
             'truck_no'         => $request->truck_no,
             'logistics_name'   => $request->logistics_name,
             'logistics_number' => $request->logistics_number,
-            'payment_method'   => $request->payment_method,
+            'payment_method'   => $isOnlinePayment ? 'Online Payment' : $request->payment_method,
             
             'price_per_night'  => $price,
             'total_amount'     => $price,
@@ -76,27 +81,42 @@ class BookingController extends Controller
         // Decrease available rooms
         $hotel->decrement('available_rooms');
 
+        $razorpayOrderId = null;
+
         // Generate Razorpay Order if Online Payment
-        if ($booking->payment_method === 'Online Payment') {
+        if ($isOnlinePayment) {
             $razorpayKeyId = env('RAZORPAY_KEY_ID');
             $razorpayKeySecret = env('RAZORPAY_KEY_SECRET');
 
-            $response = Http::withBasicAuth($razorpayKeyId, $razorpayKeySecret)
-                ->post('https://api.razorpay.com/v1/orders', [
-                    'amount' => (int) ($totalPayable * 100), // in paise
-                    'currency' => 'INR',
-                    'receipt' => (string) $booking->id,
-                ]);
+            try {
+                $response = Http::withBasicAuth($razorpayKeyId, $razorpayKeySecret)
+                    ->post('https://api.razorpay.com/v1/orders', [
+                        'amount'   => (int) round($totalPayable * 100), // in paise
+                        'currency' => 'INR',
+                        'receipt'  => 'booking_' . $booking->id,
+                    ]);
 
-            if ($response->successful()) {
-                $booking->razorpay_order_id = $response->json('id');
-                $booking->save();
+                if ($response->successful()) {
+                    $razorpayOrderId = $response->json('id');
+                    $booking->razorpay_order_id = $razorpayOrderId;
+                    $booking->save();
+                } else {
+                    \Illuminate\Support\Facades\Log::error('Razorpay Order Creation Failed', [
+                        'status' => $response->status(),
+                        'body'   => $response->body(),
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error('Razorpay Order Exception: ' . $e->getMessage());
             }
         }
 
         return response()->json([
-            'message' => 'Booking created successfully.',
-            'booking' => $booking->load('hotel'),
+            'message'           => 'Booking created successfully.',
+            'booking'           => $booking->load('hotel'),
+            'razorpay_order_id' => $booking->razorpay_order_id,
+            'razorpay_key_id'   => env('RAZORPAY_KEY_ID'),
+            'amount_in_paise'   => (int) round($totalPayable * 100),
         ], 201);
     }
 
