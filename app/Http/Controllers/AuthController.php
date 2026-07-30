@@ -19,10 +19,12 @@ class AuthController extends Controller
     //    Body: name, email, phone, role
         public function register(Request $request)
     {
-        // Normalize inputs and default role to 'owner' if omitted or sent as variant
-        $role = strtolower($request->input('role', 'owner'));
-        if ($role === 'hotel_owner' || $role === 'hotelowner' || empty($role)) {
+        // Normalize role: User App gets 'user', Hotel Owner App gets 'owner'
+        $rawRole = strtolower($request->input('role', 'user'));
+        if (in_array($rawRole, ['owner', 'hotel_owner', 'hotelowner'])) {
             $role = 'owner';
+        } else {
+            $role = 'user';
         }
         $request->merge(['role' => $role]);
 
