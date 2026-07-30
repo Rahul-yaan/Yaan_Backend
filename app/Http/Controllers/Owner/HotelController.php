@@ -25,7 +25,7 @@ class HotelController extends Controller
         return response()->json(['hotels' => $hotels]);
     }
 
-    // Helper to resolve amenities from IDs, names, or strings
+    // Helper to resolve amenities from IDs, names, objects, or strings
     private function resolveAmenities($amenitiesInput)
     {
         if (is_string($amenitiesInput)) {
@@ -43,6 +43,16 @@ class HotelController extends Controller
 
         $resolvedIds = [];
         foreach ($amenitiesInput as $item) {
+            if (is_array($item)) {
+                if (isset($item['id']) && is_numeric($item['id']) && (int)$item['id'] > 0) {
+                    $item = (int)$item['id'];
+                } elseif (isset($item['name']) && !empty(trim($item['name']))) {
+                    $item = trim($item['name']);
+                } elseif (isset($item['title']) && !empty(trim($item['title']))) {
+                    $item = trim($item['title']);
+                }
+            }
+
             if (is_numeric($item) && (int)$item > 0) {
                 $id = (int)$item;
                 if (Amenity::where('id', $id)->exists()) {
