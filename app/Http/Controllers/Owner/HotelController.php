@@ -25,6 +25,39 @@ class HotelController extends Controller
         return response()->json(['hotels' => $hotels]);
     }
 
+    // Helper to resolve amenities from IDs, names, or strings
+    private function resolveAmenities($amenitiesInput)
+    {
+        if (is_string($amenitiesInput)) {
+            $decoded = json_decode($amenitiesInput, true);
+            if (is_array($decoded)) {
+                $amenitiesInput = $decoded;
+            } else {
+                $amenitiesInput = array_map('trim', explode(',', $amenitiesInput));
+            }
+        }
+
+        if (!is_array($amenitiesInput)) {
+            return [];
+        }
+
+        $resolvedIds = [];
+        foreach ($amenitiesInput as $item) {
+            if (is_numeric($item) && (int)$item > 0) {
+                $id = (int)$item;
+                if (Amenity::where('id', $id)->exists()) {
+                    $resolvedIds[] = $id;
+                }
+            } elseif (is_string($item) && !empty(trim($item))) {
+                $name = trim($item);
+                $amenity = Amenity::firstOrCreate(['name' => $name]);
+                $resolvedIds[] = $amenity->id;
+            }
+        }
+
+        return array_values(array_unique($resolvedIds));
+    }
+
     // ============================================================
     // 2. ADD HOTEL
     //    URL:    POST /api/owner/hotels
@@ -32,7 +65,11 @@ class HotelController extends Controller
     // ============================================================
     public function store(Request $request)
     {
-        $request->validate([
+        if ($request->has('amenities')) {
+            $request->merge(['amenities' => $this->resolveAmenities($request->amenities)]);
+        }
+
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
             'name'           => 'required|string|max:200',
             'description'    => 'nullable|string',
             'city'           => 'required|string',
@@ -44,6 +81,19 @@ class HotelController extends Controller
             'amenities'      => 'nullable|array',
             'amenities.*'    => 'exists:amenities,id',
         ]);
+
+        if ($validator->fails()) {
+            \Illuminate\Support\Facades\Log::warning('Add Hotel Validation Failed', [
+                'input'  => $request->all(),
+                'errors' => $validator->errors()->toArray(),
+            ]);
+
+            return response()->json([
+                'error'   => 'Validation failed.',
+                'message' => 'The given data was invalid.',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
 
         $hotel = Hotel::create([
             'owner_id'       => $request->user()->id,
@@ -60,7 +110,7 @@ class HotelController extends Controller
         ]);
 
         // Attach amenities if provided
-        if ($request->amenities) {
+        if (!empty($request->amenities)) {
             $hotel->amenities()->attach($request->amenities);
         }
 
@@ -81,7 +131,11 @@ class HotelController extends Controller
             ->where('owner_id', $request->user()->id)
             ->firstOrFail();
 
-        $request->validate([
+        if ($request->has('amenities')) {
+            $request->merge(['amenities' => $this->resolveAmenities($request->amenities)]);
+        }
+
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
             'name'           => 'sometimes|string|max:200',
             'description'    => 'nullable|string',
             'city'           => 'sometimes|string',
@@ -94,6 +148,19 @@ class HotelController extends Controller
             'amenities'      => 'nullable|array',
             'amenities.*'    => 'exists:amenities,id',
         ]);
+
+        if ($validator->fails()) {
+            \Illuminate\Support\Facades\Log::warning('Update Hotel Validation Failed', [
+                'input'  => $request->all(),
+                'errors' => $validator->errors()->toArray(),
+            ]);
+
+            return response()->json([
+                'error'   => 'Validation failed.',
+                'message' => 'The given data was invalid.',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
 
         $updateData = $request->only([
             'name', 'description', 'city', 'address',
