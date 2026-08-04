@@ -39,7 +39,7 @@ class HotelController extends Controller
         $query = Hotel::where('status', 'active')
             ->selectRaw("*, {$distanceSql} AS distance", [$midLat, $midLng, $midLat])
             ->whereRaw("{$distanceSql} <= ?", [$midLat, $midLng, $midLat, $radius])
-            ->with(['primaryImage', 'amenities']);
+            ->with(['images', 'primaryImage', 'amenities']);
 
         if ($request->filled('amenities')) {
             $requestedAmenities = $request->input('amenities');

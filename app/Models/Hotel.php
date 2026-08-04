@@ -44,6 +44,20 @@ class Hotel extends Model
         return $this->hasOne(HotelImage::class)->where('is_primary', true);
     }
 
+    public function getPrimaryImageAttribute()
+    {
+        if ($this->relationLoaded('primaryImage') && $this->getRelation('primaryImage') !== null) {
+            return $this->getRelation('primaryImage');
+        }
+
+        if ($this->relationLoaded('images') && $this->images->isNotEmpty()) {
+            return $this->images->first();
+        }
+
+        return $this->images()->where('is_primary', true)->first()
+            ?? $this->images()->first();
+    }
+
     public function amenities()
     {
         return $this->belongsToMany(Amenity::class, 'hotel_amenities');

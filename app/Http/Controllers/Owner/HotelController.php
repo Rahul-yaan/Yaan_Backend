@@ -248,19 +248,26 @@ class HotelController extends Controller
     private function processUploadedImages(Request $request, Hotel $hotel)
     {
         $files = [];
+        $excludeKeys = [
+            'pan_card', 'gst_image', 'fssai_license', 'business_proof',
+            'aadhar_front', 'aadhar_back', 'aadhaar_front', 'aadhaar_back'
+        ];
 
-        if ($request->hasFile('images')) {
-            $raw = $request->file('images');
-            $files = is_array($raw) ? $raw : [$raw];
-        } elseif ($request->hasFile('image')) {
-            $files = [$request->file('image')];
-        } elseif ($request->hasFile('photos')) {
-            $raw = $request->file('photos');
-            $files = is_array($raw) ? $raw : [$raw];
-        } elseif ($request->hasFile('photo')) {
-            $files = [$request->file('photo')];
-        } elseif ($request->hasFile('file')) {
-            $files = [$request->file('file')];
+        $allUploadedFiles = $request->allFiles();
+        foreach ($allUploadedFiles as $key => $fileInput) {
+            if (in_array(strtolower($key), $excludeKeys)) {
+                continue;
+            }
+
+            if (is_array($fileInput)) {
+                foreach ($fileInput as $file) {
+                    if ($file instanceof \Illuminate\Http\UploadedFile) {
+                        $files[] = $file;
+                    }
+                }
+            } elseif ($fileInput instanceof \Illuminate\Http\UploadedFile) {
+                $files[] = $fileInput;
+            }
         }
 
         if (empty($files)) {
@@ -283,6 +290,9 @@ class HotelController extends Controller
             ]);
 
             $uploaded[] = $image;
+            if ($isPrimary) {
+                $hasPrimary = true;
+            }
         }
 
         return $uploaded;
