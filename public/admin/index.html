@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Yaan Admin Portal - Mobile & Web</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app" class="app-container">
+
+        <!-- ========================================== -->
+        <!-- 1. LOGIN SCREEN -->
+        <!-- ========================================== -->
+        <section id="login-screen" class="screen active">
+            <div class="login-wrapper">
+                <div class="brand-card">
+                    <div class="brand-logo">
+                        <i class="fa-solid fa-hotel"></i>
+                    </div>
+                    <h1>Yaan Admin</h1>
+                    <p class="brand-sub">Platform Control Center</p>
+                </div>
+
+                <form id="login-form" class="login-form" onsubmit="handleLogin(event)">
+                    <div class="form-group">
+                        <label for="login-email"><i class="fa-regular fa-envelope"></i> Email Address</label>
+                        <input type="email" id="login-email" placeholder="admin@yaan.com" required value="admin@yaan.com">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="login-password"><i class="fa-solid fa-lock"></i> Password</label>
+                        <input type="password" id="login-password" placeholder="••••••••" required value="admin123456">
+                    </div>
+
+                    <div class="form-group hidden">
+                        <input type="text" id="login-role" value="admin">
+                    </div>
+
+                    <div id="login-error" class="error-banner hidden">
+                        <i class="fa-solid fa-circle-exclamation"></i> <span id="login-error-text">Invalid login credentials</span>
+                    </div>
+
+                    <button type="submit" id="btn-login" class="btn-primary">
+                        <span>Sign In to Admin App</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </form>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- 2. MAIN ADMIN SHELL (Header, Drawer, Content, Bottom Nav) -->
+        <!-- ========================================== -->
+        <div id="main-shell" class="main-shell hidden">
+
+            <!-- Sticky Top Header Bar -->
+            <header class="app-header">
+                <div class="header-left">
+                    <button class="icon-btn mobile-only" onclick="toggleDrawer()">
+                        <i class="fa-solid fa-bars-staggered"></i>
+                    </button>
+                    <div class="header-brand">
+                        <i class="fa-solid fa-hotel"></i>
+                        <span>Yaan Admin</span>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <div class="admin-badge">
+                        <i class="fa-solid fa-shield-halved"></i>
+                        <span id="admin-name-display">Admin</span>
+                    </div>
+                    <button class="icon-btn logout-btn" onclick="handleLogout()" title="Logout">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Navigation Drawer (Desktop Sidebar / Mobile Overlay Drawer) -->
+            <aside id="app-drawer" class="app-drawer">
+                <div class="drawer-header">
+                    <div class="brand-mini">
+                        <i class="fa-solid fa-hotel"></i>
+                        <span>Yaan Portal</span>
+                    </div>
+                    <button class="icon-btn mobile-only" onclick="toggleDrawer()">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <nav class="drawer-nav">
+                    <a href="#" class="nav-item active" data-tab="dashboard" onclick="switchTab('dashboard', event)">
+                        <i class="fa-solid fa-chart-pie"></i> <span>Dashboard</span>
+                    </a>
+                    <a href="#" class="nav-item" data-tab="hotels" onclick="switchTab('hotels', event)">
+                        <i class="fa-solid fa-building-user"></i> <span>Hotels</span>
+                        <span id="badge-pending-hotels" class="nav-badge alert hidden">0</span>
+                    </a>
+                    <a href="#" class="nav-item" data-tab="owners" onclick="switchTab('owners', event)">
+                        <i class="fa-solid fa-id-card"></i> <span>Owner KYC</span>
+                        <span id="badge-pending-owners" class="nav-badge info hidden">0</span>
+                    </a>
+                    <a href="#" class="nav-item" data-tab="bookings" onclick="switchTab('bookings', event)">
+                        <i class="fa-solid fa-calendar-check"></i> <span>Bookings</span>
+                    </a>
+                    <a href="#" class="nav-item" data-tab="users" onclick="switchTab('users', event)">
+                        <i class="fa-solid fa-users"></i> <span>Customers</span>
+                    </a>
+                    <a href="#" class="nav-item" data-tab="reviews" onclick="switchTab('reviews', event)">
+                        <i class="fa-solid fa-star"></i> <span>Reviews</span>
+                    </a>
+                </nav>
+            </aside>
+            <div id="drawer-overlay" class="drawer-overlay" onclick="toggleDrawer()"></div>
+
+            <!-- Content Body -->
+            <main class="app-content">
+
+                <!-- -------------------------------------- -->
+                <!-- TAB 1: DASHBOARD -->
+                <!-- -------------------------------------- -->
+                <section id="tab-dashboard" class="tab-content active">
+                    <div class="section-title">
+                        <h2>Overview & Analytics</h2>
+                        <button class="btn-sm" onclick="loadDashboardData()">
+                            <i class="fa-solid fa-rotate-right"></i> Refresh
+                        </button>
+                    </div>
+
+                    <!-- Metrics Grid -->
+                    <div class="metrics-grid">
+                        <div class="metric-card gradient-purple">
+                            <div class="metric-icon"><i class="fa-solid fa-indian-rupee-sign"></i></div>
+                            <div class="metric-info">
+                                <span class="metric-label">Total Revenue</span>
+                                <h3 id="stat-revenue">₹0.00</h3>
+                            </div>
+                        </div>
+
+                        <div class="metric-card gradient-blue">
+                            <div class="metric-icon"><i class="fa-solid fa-bookmark"></i></div>
+                            <div class="metric-info">
+                                <span class="metric-label">Total Bookings</span>
+                                <h3 id="stat-bookings">0</h3>
+                            </div>
+                        </div>
+
+                        <div class="metric-card gradient-amber">
+                            <div class="metric-icon"><i class="fa-solid fa-hotel"></i></div>
+                            <div class="metric-info">
+                                <span class="metric-label">Hotels Pending</span>
+                                <h3 id="stat-pending-hotels">0</h3>
+                            </div>
+                        </div>
+
+                        <div class="metric-card gradient-teal">
+                            <div class="metric-icon"><i class="fa-solid fa-user-check"></i></div>
+                            <div class="metric-info">
+                                <span class="metric-label">Owners Pending KYC</span>
+                                <h3 id="stat-pending-owners">0</h3>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Additional Secondary Metrics -->
+                    <div class="sub-metrics">
+                        <div class="sub-card">
+                            <i class="fa-solid fa-users"></i>
+                            <div>
+                                <strong id="stat-users">0</strong>
+                                <span>Customers</span>
+                            </div>
+                        </div>
+                        <div class="sub-card">
+                            <i class="fa-solid fa-user-tie"></i>
+                            <div>
+                                <strong id="stat-owners">0</strong>
+                                <span>Hotel Owners</span>
+                            </div>
+                        </div>
+                        <div class="sub-card">
+                            <i class="fa-solid fa-circle-check"></i>
+                            <div>
+                                <strong id="stat-approved-hotels">0</strong>
+                                <span>Approved Hotels</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Activity Lists -->
+                    <div class="dashboard-lists-grid">
+                        <div class="panel-card">
+                            <div class="panel-header">
+                                <h3><i class="fa-solid fa-clock-rotate-left"></i> Recent Bookings</h3>
+                            </div>
+                            <div id="recent-bookings-list" class="list-container">
+                                <div class="empty-state">Loading recent bookings...</div>
+                            </div>
+                        </div>
+
+                        <div class="panel-card">
+                            <div class="panel-header">
+                                <h3><i class="fa-solid fa-plus-circle"></i> Newest Hotels</h3>
+                            </div>
+                            <div id="recent-hotels-list" class="list-container">
+                                <div class="empty-state">Loading newest hotels...</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- -------------------------------------- -->
+                <!-- TAB 2: HOTELS MANAGEMENT -->
+                <!-- -------------------------------------- -->
+                <section id="tab-hotels" class="tab-content">
+                    <div class="section-title">
+                        <h2>Hotel Management</h2>
+                        <div class="filter-group">
+                            <select id="filter-hotel-status" onchange="loadHotelsData()">
+                                <option value="">All Statuses</option>
+                                <option value="pending">Pending Approval</option>
+                                <option value="approved">Approved</option>
+                                <option value="rejected">Rejected</option>
+                                <option value="suspended">Suspended</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="search-bar">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" id="search-hotels" placeholder="Search hotel name, city, or address..." onkeyup="debounce(loadHotelsData, 400)()">
+                    </div>
+
+                    <div id="hotels-container" class="data-cards-grid">
+                        <div class="empty-state">Loading hotels...</div>
+                    </div>
+                </section>
+
+                <!-- -------------------------------------- -->
+                <!-- TAB 3: OWNER KYC VERIFICATION -->
+                <!-- -------------------------------------- -->
+                <section id="tab-owners" class="tab-content">
+                    <div class="section-title">
+                        <h2>Hotel Owners & KYC</h2>
+                        <div class="filter-group">
+                            <select id="filter-owner-verified" onchange="loadOwnersData()">
+                                <option value="">All Verification</option>
+                                <option value="false">Pending / Unverified</option>
+                                <option value="true">Verified Owners</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="search-bar">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" id="search-owners" placeholder="Search owner name, email, or phone..." onkeyup="debounce(loadOwnersData, 400)()">
+                    </div>
+
+                    <div id="owners-container" class="data-cards-grid">
+                        <div class="empty-state">Loading hotel owners...</div>
+                    </div>
+                </section>
+
+                <!-- -------------------------------------- -->
+                <!-- TAB 4: BOOKINGS LEDGER -->
+                <!-- -------------------------------------- -->
+                <section id="tab-bookings" class="tab-content">
+                    <div class="section-title">
+                        <h2>Booking Ledger</h2>
+                        <div class="filter-group">
+                            <select id="filter-booking-status" onchange="loadBookingsData()">
+                                <option value="">All Status</option>
+                                <option value="confirmed">Confirmed</option>
+                                <option value="pending">Pending</option>
+                                <option value="completed">Completed</option>
+                                <option value="cancelled">Cancelled</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="search-bar">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" id="search-bookings" placeholder="Search transaction ID, order ID, or customer..." onkeyup="debounce(loadBookingsData, 400)()">
+                    </div>
+
+                    <div id="bookings-container" class="table-responsive">
+                        <table class="custom-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Customer</th>
+                                    <th>Hotel</th>
+                                    <th>Dates</th>
+                                    <th>Amount</th>
+                                    <th>Payment</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bookings-table-body">
+                                <tr><td colspan="8" class="text-center">Loading bookings...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- -------------------------------------- -->
+                <!-- TAB 5: CUSTOMER MANAGEMENT -->
+                <!-- -------------------------------------- -->
+                <section id="tab-users" class="tab-content">
+                    <div class="section-title">
+                        <h2>Customer Accounts</h2>
+                    </div>
+
+                    <div class="search-bar">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" id="search-users" placeholder="Search customer name, email, or phone..." onkeyup="debounce(loadUsersData, 400)()">
+                    </div>
+
+                    <div id="users-container" class="table-responsive">
+                        <table class="custom-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Contact</th>
+                                    <th>Bookings</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-table-body">
+                                <tr><td colspan="6" class="text-center">Loading users...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- -------------------------------------- -->
+                <!-- TAB 6: REVIEWS MODERATION -->
+                <!-- -------------------------------------- -->
+                <section id="tab-reviews" class="tab-content">
+                    <div class="section-title">
+                        <h2>Review Moderation</h2>
+                    </div>
+
+                    <div id="reviews-container" class="data-cards-grid">
+                        <div class="empty-state">Loading reviews...</div>
+                    </div>
+                </section>
+
+            </main>
+
+            <!-- Bottom App Navigation (Mobile Only) -->
+            <nav class="bottom-nav mobile-only">
+                <button class="bottom-nav-item active" data-tab="dashboard" onclick="switchTab('dashboard', event)">
+                    <i class="fa-solid fa-chart-pie"></i>
+                    <span>Home</span>
+                </button>
+                <button class="bottom-nav-item" data-tab="hotels" onclick="switchTab('hotels', event)">
+                    <i class="fa-solid fa-building-user"></i>
+                    <span>Hotels</span>
+                </button>
+                <button class="bottom-nav-item" data-tab="owners" onclick="switchTab('owners', event)">
+                    <i class="fa-solid fa-id-card"></i>
+                    <span>Owners</span>
+                </button>
+                <button class="bottom-nav-item" data-tab="bookings" onclick="switchTab('bookings', event)">
+                    <i class="fa-solid fa-calendar-check"></i>
+                    <span>Bookings</span>
+                </button>
+            </nav>
+
+        </div>
+
+        <!-- Toast Notifications -->
+        <div id="toast-container" class="toast-container"></div>
+
+    </div>
+
+    <!-- Application JS Script -->
+    <script src="app.js"></script>
+</body>
+</html>

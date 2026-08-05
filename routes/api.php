@@ -56,4 +56,31 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/profile',            [App\Http\Controllers\Owner\ProfileController::class, 'update']);
     });
 
+    // Admin routes
+    Route::middleware('role:admin')->prefix('admin')->group(function () {
+        Route::get('/dashboard',           [App\Http\Controllers\Admin\DashboardController::class, 'index']);
+        
+        // Hotels
+        Route::get('/hotels',              [App\Http\Controllers\Admin\HotelController::class, 'index']);
+        Route::get('/hotels/{id}',         [App\Http\Controllers\Admin\HotelController::class, 'show']);
+        Route::put('/hotels/{id}/status',  [App\Http\Controllers\Admin\HotelController::class, 'updateStatus']);
+
+        // Owners
+        Route::get('/owners',              [App\Http\Controllers\Admin\OwnerController::class, 'index']);
+        Route::put('/owners/{id}/verify',  [App\Http\Controllers\Admin\OwnerController::class, 'verifyOwner']);
+
+        // Users / Customers
+        Route::get('/users',               [App\Http\Controllers\Admin\UserController::class, 'index']);
+        Route::put('/users/{id}/status',   [App\Http\Controllers\Admin\UserController::class, 'toggleStatus']);
+
+        // Bookings
+        Route::get('/bookings',            [App\Http\Controllers\Admin\BookingController::class, 'index']);
+        Route::get('/bookings/{id}',       [App\Http\Controllers\Admin\BookingController::class, 'show']);
+        Route::put('/bookings/{id}/status',[App\Http\Controllers\Admin\BookingController::class, 'updateStatus']);
+
+        // Reviews
+        Route::get('/reviews',             [App\Http\Controllers\Admin\ReviewController::class, 'index']);
+        Route::delete('/reviews/{id}',      [App\Http\Controllers\Admin\ReviewController::class, 'destroy']);
+    });
+
 });

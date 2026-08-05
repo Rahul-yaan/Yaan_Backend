@@ -158,6 +158,8 @@ class AuthController extends Controller
         $rawRole = strtolower($request->input('role', 'owner'));
         if (in_array($rawRole, ['owner', 'hotel_owner', 'hotelowner'])) {
             $role = 'owner';
+        } else if (in_array($rawRole, ['admin', 'administrator', 'superadmin'])) {
+            $role = 'admin';
         } else {
             $role = 'user';
         }
@@ -166,7 +168,7 @@ class AuthController extends Controller
         $request->validate([
             'email'    => 'required|email',
             'password' => 'required|string',
-            'role'     => 'required|in:user,owner',
+            'role'     => 'required|in:user,owner,admin',
         ]);
 
         $user = User::where('email', $request->email)
