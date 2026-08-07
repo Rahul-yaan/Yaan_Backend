@@ -31,9 +31,14 @@ class AuthController extends Controller
         if ($request->phone) {
             $phone = trim($request->phone);
             $request->merge(['phone' => $phone]);
-            User::where('phone', $phone)
-                ->where('is_verified', false)
-                ->delete();
+            $rawDigits = preg_replace('/[^0-9]/', '', $phone);
+            $last10 = strlen($rawDigits) >= 10 ? substr($rawDigits, -10) : $rawDigits;
+            User::where(function($q) use ($phone, $rawDigits, $last10) {
+                $q->where('phone', $phone)
+                  ->orWhere('phone', $rawDigits)
+                  ->orWhere('phone', '+' . $rawDigits)
+                  ->orWhere('phone', 'LIKE', '%' . $last10);
+            })->where('is_verified', false)->delete();
         }
 
         if ($request->email) {
