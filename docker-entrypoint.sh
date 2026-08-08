@@ -26,8 +26,9 @@ php artisan view:cache
 if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
     echo "Running database migrations..."
     php artisan migrate --force || echo "Migration command returned non-zero status."
-    echo "Seeding admin user..."
+    echo "Seeding admin user and amenities..."
     php artisan db:seed --class=AdminUserSeeder --force || echo "Admin seeder completed."
+    php artisan db:seed --class=AmenitySeeder --force || echo "Amenity seeder completed."
 fi
 
 echo "Starting Apache server on port ${PORT}..."

@@ -41,6 +41,29 @@ class HotelController extends Controller
             return [];
         }
 
+        $idToNameMap = [
+            1  => "Free WiFi",
+            2  => "Air Conditioning",
+            3  => "Room Service",
+            4  => "Swimming Pool",
+            5  => "Free Parking",
+            6  => "Wifi",
+            7  => "Rest Rooms",
+            8  => "Fuel Stations",
+            9  => "Dining Facilities",
+            10 => "Comfortable Rooms",
+            11 => "ATM",
+            12 => "Convenience Stores",
+            13 => "First Aid",
+            14 => "Fitness center",
+            15 => "Food Outlets",
+            16 => "Showers",
+            17 => "Laundry Services",
+            18 => "Seating Areas",
+            19 => "Men",
+            20 => "Women",
+        ];
+
         $resolvedIds = [];
         foreach ($amenitiesInput as $item) {
             if (is_array($item)) {
@@ -55,8 +78,13 @@ class HotelController extends Controller
 
             if (is_numeric($item) && (int)$item > 0) {
                 $id = (int)$item;
-                if (Amenity::where('id', $id)->exists()) {
-                    $resolvedIds[] = $id;
+                $amenity = Amenity::find($id);
+                if ($amenity) {
+                    $resolvedIds[] = $amenity->id;
+                } elseif (isset($idToNameMap[$id])) {
+                    $name = $idToNameMap[$id];
+                    $amenity = Amenity::firstOrCreate(['name' => $name]);
+                    $resolvedIds[] = $amenity->id;
                 }
             } elseif (is_string($item) && !empty(trim($item))) {
                 $name = trim($item);
