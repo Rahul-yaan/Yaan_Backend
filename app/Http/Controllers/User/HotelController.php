@@ -36,7 +36,7 @@ class HotelController extends Controller
             + sin(radians(?)) * sin(radians(latitude)))
         ))";
 
-        $query = Hotel::where('status', 'active')
+        $query = Hotel::whereIn('status', ['active', 'approved'])
             ->selectRaw("*, {$distanceSql} AS distance", [$midLat, $midLng, $midLat])
             ->whereRaw("{$distanceSql} <= ?", [$midLat, $midLng, $midLat, $radius])
             ->with(['images', 'primaryImage', 'amenities']);
@@ -88,7 +88,7 @@ class HotelController extends Controller
     public function show($id)
     {
         $hotel = Hotel::where('id', $id)
-            ->where('status', 'active')
+            ->whereIn('status', ['active', 'approved'])
             ->with(['images', 'primaryImage', 'amenities', 'reviews'])
             ->firstOrFail();
 
