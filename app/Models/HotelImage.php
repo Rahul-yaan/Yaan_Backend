@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 class HotelImage extends Model
 {
@@ -17,6 +18,12 @@ class HotelImage extends Model
     ];
 
     protected $appends = ['url'];
+
+    public function setIsPrimaryAttribute($value)
+    {
+        $isTrue = filter_var($value, FILTER_VALIDATE_BOOLEAN);
+        $this->attributes['is_primary'] = $isTrue ? DB::raw('true') : DB::raw('false');
+    }
 
     public function getUrlAttribute()
     {

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
@@ -31,4 +32,10 @@ class User extends Authenticatable
         'is_verified' => 'boolean',
         'password'    => 'hashed',
     ];
+
+    public function setIsVerifiedAttribute($value)
+    {
+        $isTrue = filter_var($value, FILTER_VALIDATE_BOOLEAN);
+        $this->attributes['is_verified'] = $isTrue ? DB::raw('true') : DB::raw('false');
+    }
 }

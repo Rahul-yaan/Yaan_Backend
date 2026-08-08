@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 class OwnerProfile extends Model
 {
@@ -31,6 +32,12 @@ class OwnerProfile extends Model
     protected $casts = [
         'is_profile_complete' => 'boolean',
     ];
+
+    public function setIsProfileCompleteAttribute($value)
+    {
+        $isTrue = filter_var($value, FILTER_VALIDATE_BOOLEAN);
+        $this->attributes['is_profile_complete'] = $isTrue ? DB::raw('true') : DB::raw('false');
+    }
 
     public function user()
     {
