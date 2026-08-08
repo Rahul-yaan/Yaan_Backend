@@ -22,10 +22,14 @@ class OwnerController extends Controller
             });
         }
 
-        if ($request->has('verified')) {
+        if ($request->has('verified') && $request->verified !== '' && $request->verified !== null) {
             $isVerified = filter_var($request->verified, FILTER_VALIDATE_BOOLEAN);
             $query->whereHas('ownerProfile', function($q) use ($isVerified) {
-                $q->where('is_profile_complete', $isVerified);
+                if ($isVerified) {
+                    $q->whereRaw('("is_profile_complete" = true OR "is_profile_complete" IS TRUE)');
+                } else {
+                    $q->whereRaw('("is_profile_complete" = false OR "is_profile_complete" IS FALSE OR "is_profile_complete" IS NULL)');
+                }
             });
         }
 
