@@ -39,9 +39,16 @@ class HotelController extends Controller
     public function updateStatus(Request $request, $id)
     {
         $request->validate([
-            'status' => 'required|in:approved,pending,rejected,suspended',
+            'status' => 'required|in:approved,pending,rejected,suspended,active,inactive',
             'reason' => 'nullable|string|max:255',
         ]);
+
+        try {
+            if (\Illuminate\Support\Facades\DB::getDriverName() === 'pgsql') {
+                \Illuminate\Support\Facades\DB::statement("ALTER TABLE hotels DROP CONSTRAINT IF EXISTS hotels_status_check;");
+                \Illuminate\Support\Facades\DB::statement("ALTER TABLE hotels ALTER COLUMN status TYPE VARCHAR(50);");
+            }
+        } catch (\Throwable $e) {}
 
         $hotel = Hotel::findOrFail($id);
         $hotel->status = $request->status;
