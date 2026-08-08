@@ -154,17 +154,17 @@ function debounce(func, wait) {
 async function loadDashboardData() {
     try {
         const res = await fetch(`${API_BASE}/admin/dashboard`, { headers: getHeaders() });
-        if (!res.ok) handleApiError(res);
+        if (!res.ok) await handleApiError(res);
         const data = await res.json();
-        const m = data.metrics;
+        const m = data.metrics || {};
 
-        document.getElementById('stat-revenue').textContent = `₹${m.total_revenue.toLocaleString('en-IN')}`;
-        document.getElementById('stat-bookings').textContent = m.total_bookings;
-        document.getElementById('stat-pending-hotels').textContent = m.pending_hotels;
-        document.getElementById('stat-pending-owners').textContent = m.pending_owners;
-        document.getElementById('stat-users').textContent = m.users_count;
-        document.getElementById('stat-owners').textContent = m.owners_count;
-        document.getElementById('stat-approved-hotels').textContent = m.approved_hotels;
+        document.getElementById('stat-revenue').textContent = `₹${(m.total_revenue || 0).toLocaleString('en-IN')}`;
+        document.getElementById('stat-bookings').textContent = m.total_bookings || 0;
+        document.getElementById('stat-pending-hotels').textContent = m.pending_hotels || 0;
+        document.getElementById('stat-pending-owners').textContent = m.pending_owners || 0;
+        document.getElementById('stat-users').textContent = m.users_count || 0;
+        document.getElementById('stat-owners').textContent = m.owners_count || 0;
+        document.getElementById('stat-approved-hotels').textContent = m.approved_hotels || 0;
 
         // Badges in drawer
         const bHotels = document.getElementById('badge-pending-hotels');
@@ -241,7 +241,7 @@ async function loadHotelsData() {
     try {
         let url = `${API_BASE}/admin/hotels?status=${status}&search=${encodeURIComponent(search)}`;
         const res = await fetch(url, { headers: getHeaders() });
-        if (!res.ok) handleApiError(res);
+        if (!res.ok) await handleApiError(res);
         const data = await res.json();
         const hotels = data.data || [];
 
@@ -259,7 +259,7 @@ async function loadHotelsData() {
                     </div>
                     <span class="badge ${h.status}">${h.status}</span>
                 </div>
-                <div style="font-size:13px; color: var(--text-secondary);">
+                <div style="font-size:13px; color: var(--text-secondary); margin: 8px 0;">
                     <div><strong>Owner:</strong> ${h.owner ? h.owner.name : 'Unknown'} (${h.owner ? h.owner.email : ''})</div>
                     <div><strong>Rooms:</strong> ${h.total_rooms || 0} Total • ₹${h.price_per_night}/night</div>
                 </div>
@@ -271,7 +271,7 @@ async function loadHotelsData() {
             </div>
         `).join('');
     } catch (err) {
-        container.innerHTML = `<div class="empty-state">Error loading hotels</div>`;
+        container.innerHTML = `<div class="empty-state text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading hotels'}</div>`;
     }
 }
 
@@ -285,9 +285,9 @@ async function updateHotelStatus(id, newStatus) {
             body: JSON.stringify({ status: newStatus })
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Failed to update hotel status');
+        if (!res.ok) throw new Error(data.error || data.message || 'Failed to update hotel status');
 
-        showToast(`Hotel status updated to ${newStatus}`, 'success');
+        showToast(data.message || `Hotel status updated to ${newStatus}`, 'success');
         loadHotelsData();
     } catch (err) {
         showToast(err.message, 'danger');
@@ -307,7 +307,7 @@ async function loadOwnersData() {
     try {
         let url = `${API_BASE}/admin/owners?verified=${verified}&search=${encodeURIComponent(search)}`;
         const res = await fetch(url, { headers: getHeaders() });
-        if (!res.ok) handleApiError(res);
+        if (!res.ok) await handleApiError(res);
         const data = await res.json();
         const owners = data.data || [];
 
@@ -317,7 +317,8 @@ async function loadOwnersData() {
         }
 
         container.innerHTML = owners.map(o => {
-            const isVerified = o.owner_profile ? o.owner_profile.is_verified : o.is_verified;
+            const profile = o.owner_profile || o.ownerProfile || {};
+            const isVerified = profile.is_profile_complete !== undefined ? profile.is_profile_complete : o.is_verified;
             return `
             <div class="data-card">
                 <div class="data-card-header">
@@ -327,8 +328,17 @@ async function loadOwnersData() {
                     </div>
                     <span class="badge ${isVerified ? 'verified' : 'pending'}">${isVerified ? 'Verified KYC' : 'Pending KYC'}</span>
                 </div>
-                <div style="font-size:13px; color: var(--text-secondary);">
+                <div style="font-size:13px; color: var(--text-secondary); display:flex; flex-direction:column; gap:4px; background:#f9f9f9; padding:8px; border-radius:6px; margin: 8px 0;">
                     <div><strong>Hotels Listed:</strong> ${o.hotels_count || 0}</div>
+                    ${profile.gst_number ? `<div><strong>GST No:</strong> ${profile.gst_number}</div>` : ''}
+                    ${profile.fssai_number ? `<div><strong>FSSAI No:</strong> ${profile.fssai_number}</div>` : ''}
+                    ${profile.bank_name ? `<div><strong>Bank:</strong> ${profile.bank_name} (${profile.account_number || ''}) - ${profile.ifsc_code || ''}</div>` : ''}
+                    ${(profile.aadhaar_front || profile.pan_card || profile.business_proof) ? `
+                    <div style="margin-top:4px;"><strong>Docs:</strong> 
+                        ${profile.aadhaar_front ? `<a href="${profile.aadhaar_front}" target="_blank" style="color:var(--primary); margin-right:8px;"><i class="fa-solid fa-id-card"></i> Aadhaar</a>` : ''}
+                        ${profile.pan_card ? `<a href="${profile.pan_card}" target="_blank" style="color:var(--primary); margin-right:8px;"><i class="fa-solid fa-credit-card"></i> PAN</a>` : ''}
+                        ${profile.business_proof ? `<a href="${profile.business_proof}" target="_blank" style="color:var(--primary);"><i class="fa-solid fa-file-contract"></i> Proof</a>` : ''}
+                    </div>` : ''}
                 </div>
                 <div style="display:flex; gap: 8px; margin-top: auto;">
                     ${!isVerified ? 
@@ -340,7 +350,7 @@ async function loadOwnersData() {
             `;
         }).join('');
     } catch (err) {
-        container.innerHTML = `<div class="empty-state">Error loading owners</div>`;
+        container.innerHTML = `<div class="empty-state text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading owners'}</div>`;
     }
 }
 
@@ -352,9 +362,9 @@ async function verifyOwner(id, isVerified) {
             body: JSON.stringify({ is_verified: isVerified })
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Failed to update owner verification');
+        if (!res.ok) throw new Error(data.error || data.message || 'Failed to update owner verification');
 
-        showToast(data.message, 'success');
+        showToast(data.message || 'Owner verification updated', 'success');
         loadOwnersData();
     } catch (err) {
         showToast(err.message, 'danger');
@@ -374,7 +384,7 @@ async function loadBookingsData() {
     try {
         let url = `${API_BASE}/admin/bookings?status=${status}&search=${encodeURIComponent(search)}`;
         const res = await fetch(url, { headers: getHeaders() });
-        if (!res.ok) handleApiError(res);
+        if (!res.ok) await handleApiError(res);
         const data = await res.json();
         const bookings = data.data || [];
 
@@ -403,7 +413,7 @@ async function loadBookingsData() {
             </tr>
         `).join('');
     } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger">Error loading bookings</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading bookings'}</td></tr>`;
     }
 }
 
@@ -417,9 +427,9 @@ async function updateBookingStatus(id, status) {
             body: JSON.stringify({ status })
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Failed to update booking');
+        if (!res.ok) throw new Error(data.error || data.message || 'Failed to update booking');
 
-        showToast('Booking status updated', 'success');
+        showToast(data.message || 'Booking status updated', 'success');
         loadBookingsData();
     } catch (err) {
         showToast(err.message, 'danger');
@@ -438,7 +448,7 @@ async function loadUsersData() {
     try {
         let url = `${API_BASE}/admin/users?search=${encodeURIComponent(search)}`;
         const res = await fetch(url, { headers: getHeaders() });
-        if (!res.ok) handleApiError(res);
+        if (!res.ok) await handleApiError(res);
         const data = await res.json();
         const users = data.data || [];
 
@@ -462,7 +472,7 @@ async function loadUsersData() {
             </tr>
         `).join('');
     } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">Error loading users</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading users'}</td></tr>`;
     }
 }
 
@@ -474,9 +484,9 @@ async function toggleUserStatus(id, isVerified) {
             body: JSON.stringify({ is_verified: isVerified })
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Failed to update user status');
+        if (!res.ok) throw new Error(data.error || data.message || 'Failed to update user status');
 
-        showToast('User status updated', 'success');
+        showToast(data.message || 'User status updated', 'success');
         loadUsersData();
     } catch (err) {
         showToast(err.message, 'danger');
@@ -492,7 +502,7 @@ async function loadReviewsData() {
 
     try {
         const res = await fetch(`${API_BASE}/admin/reviews`, { headers: getHeaders() });
-        if (!res.ok) handleApiError(res);
+        if (!res.ok) await handleApiError(res);
         const data = await res.json();
         const reviews = data.data || [];
 
@@ -510,7 +520,7 @@ async function loadReviewsData() {
                     </div>
                     <span class="badge approved"><i class="fa-solid fa-star"></i> ${r.rating || 5}</span>
                 </div>
-                <p style="font-size:13px; color: var(--text-secondary); line-height: 1.4;">
+                <p style="font-size:13px; color: var(--text-secondary); line-height: 1.4; margin: 8px 0;">
                     "${r.comment || r.review || 'No text comment provided.'}"
                 </p>
                 <div style="margin-top: auto;">
@@ -521,7 +531,7 @@ async function loadReviewsData() {
             </div>
         `).join('');
     } catch (err) {
-        container.innerHTML = `<div class="empty-state">Error loading reviews</div>`;
+        container.innerHTML = `<div class="empty-state text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading reviews'}</div>`;
     }
 }
 
@@ -534,9 +544,9 @@ async function deleteReview(id) {
             headers: getHeaders()
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Failed to delete review');
+        if (!res.ok) throw new Error(data.error || data.message || 'Failed to delete review');
 
-        showToast('Review deleted successfully', 'success');
+        showToast(data.message || 'Review deleted successfully', 'success');
         loadReviewsData();
     } catch (err) {
         showToast(err.message, 'danger');
@@ -546,13 +556,21 @@ async function deleteReview(id) {
 // ----------------------------------------------------
 // UTILITIES & TOAST NOTIFICATIONS
 // ----------------------------------------------------
-function handleApiError(res) {
+async function handleApiError(res) {
+    let errorMsg = `Server Error (${res.status})`;
+    try {
+        const data = await res.json();
+        errorMsg = data.error || data.message || errorMsg;
+    } catch(e) {}
+
     if (res.status === 401 || res.status === 403) {
         authToken = '';
         localStorage.removeItem('yaan_admin_token');
+        localStorage.removeItem('yaan_admin_user');
         showLoginScreen();
-        throw new Error('Session expired. Please login again.');
+        throw new Error(errorMsg || 'Session expired. Please login again.');
     }
+    throw new Error(errorMsg);
 }
 
 function showToast(message, type = 'info') {

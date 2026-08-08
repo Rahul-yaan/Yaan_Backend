@@ -38,4 +38,24 @@ class User extends Authenticatable
         $isTrue = filter_var($value, FILTER_VALIDATE_BOOLEAN);
         $this->attributes['is_verified'] = $isTrue ? DB::raw('true') : DB::raw('false');
     }
+
+    public function ownerProfile()
+    {
+        return $this->hasOne(OwnerProfile::class);
+    }
+
+    public function hotels()
+    {
+        return $this->hasMany(Hotel::class, 'owner_id');
+    }
+
+    public function bookings()
+    {
+        return $this->hasMany(Booking::class);
+    }
+
+    public function reviews()
+    {
+        return $this->hasMany(Review::class);
+    }
 }
