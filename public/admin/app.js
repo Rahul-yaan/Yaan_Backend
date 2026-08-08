@@ -2,6 +2,7 @@
 const API_BASE = '/api';
 let authToken = localStorage.getItem('yaan_admin_token') || '';
 let currentUser = JSON.parse(localStorage.getItem('yaan_admin_user') || 'null');
+let currentOwners = [];
 
 // Initialize Application
 document.addEventListener('DOMContentLoaded', () => {
@@ -309,14 +310,14 @@ async function loadOwnersData() {
         const res = await fetch(url, { headers: getHeaders() });
         if (!res.ok) await handleApiError(res);
         const data = await res.json();
-        const owners = data.data || [];
+        currentOwners = data.data || [];
 
-        if (owners.length === 0) {
+        if (currentOwners.length === 0) {
             container.innerHTML = `<div class="empty-state">No owners found</div>`;
             return;
         }
 
-        container.innerHTML = owners.map(o => {
+        container.innerHTML = currentOwners.map(o => {
             const profile = o.owner_profile || o.ownerProfile || {};
             const isVerified = profile.is_profile_complete !== undefined ? profile.is_profile_complete : o.is_verified;
             return `
@@ -329,18 +330,14 @@ async function loadOwnersData() {
                     <span class="badge ${isVerified ? 'verified' : 'pending'}">${isVerified ? 'Verified KYC' : 'Pending KYC'}</span>
                 </div>
                 <div style="font-size:13px; color: var(--text-secondary); display:flex; flex-direction:column; gap:4px; background:#f9f9f9; padding:8px; border-radius:6px; margin: 8px 0;">
-                    <div><strong>Hotels Listed:</strong> ${o.hotels_count || 0}</div>
+                    <div><strong>Hotel:</strong> ${profile.hotel_name || 'N/A'}</div>
+                    <div><strong>Listed Hotels:</strong> ${o.hotels_count || 0}</div>
                     ${profile.gst_number ? `<div><strong>GST No:</strong> ${profile.gst_number}</div>` : ''}
                     ${profile.fssai_number ? `<div><strong>FSSAI No:</strong> ${profile.fssai_number}</div>` : ''}
                     ${profile.bank_name ? `<div><strong>Bank:</strong> ${profile.bank_name} (${profile.account_number || ''}) - ${profile.ifsc_code || ''}</div>` : ''}
-                    ${(profile.aadhaar_front || profile.pan_card || profile.business_proof) ? `
-                    <div style="margin-top:4px;"><strong>Docs:</strong> 
-                        ${profile.aadhaar_front ? `<a href="${profile.aadhaar_front}" target="_blank" style="color:var(--primary); margin-right:8px;"><i class="fa-solid fa-id-card"></i> Aadhaar</a>` : ''}
-                        ${profile.pan_card ? `<a href="${profile.pan_card}" target="_blank" style="color:var(--primary); margin-right:8px;"><i class="fa-solid fa-credit-card"></i> PAN</a>` : ''}
-                        ${profile.business_proof ? `<a href="${profile.business_proof}" target="_blank" style="color:var(--primary);"><i class="fa-solid fa-file-contract"></i> Proof</a>` : ''}
-                    </div>` : ''}
                 </div>
-                <div style="display:flex; gap: 8px; margin-top: auto;">
+                <div style="display:flex; gap: 8px; margin-top: auto; flex-wrap: wrap;">
+                    <button class="btn-sm" style="background:#4a5568; color:white;" onclick="openKycModal(${o.id})"><i class="fa-solid fa-file-invoice"></i> Inspect Full KYC</button>
                     ${!isVerified ? 
                         `<button class="btn-sm btn-success" onclick="verifyOwner(${o.id}, true)"><i class="fa-solid fa-user-check"></i> Approve KYC</button>` : 
                         `<button class="btn-sm btn-warning" onclick="verifyOwner(${o.id}, false)"><i class="fa-solid fa-user-xmark"></i> Revoke KYC</button>`
@@ -352,6 +349,85 @@ async function loadOwnersData() {
     } catch (err) {
         container.innerHTML = `<div class="empty-state text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading owners'}</div>`;
     }
+}
+
+function openKycModal(ownerId) {
+    const owner = currentOwners.find(o => o.id === ownerId);
+    if (!owner) return;
+
+    const profile = owner.owner_profile || owner.ownerProfile || {};
+    const isVerified = profile.is_profile_complete !== undefined ? profile.is_profile_complete : owner.is_verified;
+
+    const getDocItem = (title, path, url) => {
+        if (!url && !path) return '';
+        const docUrl = url || (path ? (path.startsWith('http') ? path : `/storage/${path.replace(/^\/+/, '')}`) : '#');
+        const isImg = docUrl.match(/\.(jpeg|jpg|gif|png|webp)($|\?)/i);
+        return `
+            <div class="doc-box">
+                <strong style="display:block; font-size:12px; margin-bottom:6px;">${title}</strong>
+                ${isImg ? `<a href="${docUrl}" target="_blank"><img src="${docUrl}" alt="${title}" onerror="this.src='https://via.placeholder.com/150?text=Document';"></a>` : ''}
+                <a href="${docUrl}" target="_blank" class="btn-sm" style="display:inline-block; font-size:11px; margin-top:4px; text-decoration:none;">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Open File
+                </a>
+            </div>
+        `;
+    };
+
+    const modalBody = document.getElementById('kyc-modal-body');
+    modalBody.innerHTML = `
+        <div style="margin-bottom:16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <h4 style="margin:0; font-size:18px;">${owner.name}</h4>
+                <span class="badge ${isVerified ? 'verified' : 'pending'}">${isVerified ? 'Verified KYC' : 'Pending KYC'}</span>
+            </div>
+            <div style="font-size:13px; color:var(--text-secondary); display:flex; flex-direction:column; gap:4px;">
+                <div><i class="fa-solid fa-envelope"></i> <strong>Email:</strong> ${owner.email}</div>
+                <div><i class="fa-solid fa-phone"></i> <strong>Phone:</strong> ${owner.phone}</div>
+                <div><i class="fa-solid fa-hotel"></i> <strong>Hotel Name:</strong> ${profile.hotel_name || 'N/A'}</div>
+                <div><i class="fa-solid fa-location-dot"></i> <strong>Address:</strong> ${profile.address || 'N/A'}, ${profile.city || ''}, ${profile.state || ''} ${profile.pincode || ''}</div>
+            </div>
+        </div>
+
+        <hr style="border:0; border-top:1px solid var(--border); margin:16px 0;">
+
+        <div style="margin-bottom:16px;">
+            <h5 style="margin:0 0 8px 0; font-size:14px;"><i class="fa-solid fa-building-columns"></i> Tax & Bank Information</h5>
+            <div style="font-size:13px; color:var(--text-secondary); display:grid; grid-template-columns:1fr 1fr; gap:8px; background:var(--bg-surface); padding:10px; border-radius:6px;">
+                <div><strong>GST Number:</strong> ${profile.gst_number || 'N/A'}</div>
+                <div><strong>FSSAI Number:</strong> ${profile.fssai_number || 'N/A'}</div>
+                <div><strong>Bank Name:</strong> ${profile.bank_name || 'N/A'}</div>
+                <div><strong>Account No:</strong> ${profile.account_number || 'N/A'}</div>
+                <div><strong>IFSC Code:</strong> ${profile.ifsc_code || 'N/A'}</div>
+            </div>
+        </div>
+
+        <div>
+            <h5 style="margin:0 0 8px 0; font-size:14px;"><i class="fa-solid fa-file-shield"></i> Uploaded KYC Documents</h5>
+            <div class="doc-grid">
+                ${getDocItem('Aadhaar Front', profile.aadhaar_front, profile.aadhaar_front_url)}
+                ${getDocItem('Aadhaar Back', profile.aadhaar_back, profile.aadhaar_back_url)}
+                ${getDocItem('PAN Card', profile.pan_card, profile.pan_card_url)}
+                ${getDocItem('GST Certificate', profile.gst_image, profile.gst_image_url)}
+                ${getDocItem('FSSAI License', profile.fssai_license, profile.fssai_license_url)}
+                ${getDocItem('Business Proof', profile.business_proof, profile.business_proof_url)}
+            </div>
+            ${(!profile.aadhaar_front && !profile.pan_card && !profile.business_proof) ? '<div class="empty-state">No document files uploaded by owner yet</div>' : ''}
+        </div>
+
+        <div style="display:flex; gap:10px; margin-top:20px; justify-content:flex-end;">
+            ${!isVerified ? 
+                `<button class="btn-sm btn-success" style="padding:8px 16px;" onclick="verifyOwner(${owner.id}, true); closeKycModal();"><i class="fa-solid fa-check"></i> Approve Owner KYC</button>` : 
+                `<button class="btn-sm btn-warning" style="padding:8px 16px;" onclick="verifyOwner(${owner.id}, false); closeKycModal();"><i class="fa-solid fa-xmark"></i> Revoke KYC</button>`
+            }
+            <button class="btn-sm" style="padding:8px 16px;" onclick="closeKycModal()">Close</button>
+        </div>
+    `;
+
+    document.getElementById('kyc-modal').classList.remove('hidden');
+}
+
+function closeKycModal() {
+    document.getElementById('kyc-modal').classList.add('hidden');
 }
 
 async function verifyOwner(id, isVerified) {
