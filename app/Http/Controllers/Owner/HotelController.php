@@ -151,15 +151,7 @@ class HotelController extends Controller
             ], 422);
         }
 
-        $existingHotel = Hotel::where('owner_id', $request->user()->id)
-            ->where(function($q) use ($request) {
-                $q->where('address', trim($request->address))
-                  ->orWhere(function($q2) use ($request) {
-                      $q2->where('name', trim($request->name))
-                         ->where('city', trim($request->city));
-                  });
-            })
-            ->first();
+        $existingHotel = Hotel::where('owner_id', $request->user()->id)->first();
 
         if ($existingHotel) {
             $existingHotel->update([
