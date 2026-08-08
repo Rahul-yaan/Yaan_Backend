@@ -345,7 +345,13 @@ class HotelController extends Controller
             if (!$file->isValid()) continue;
 
             $path = $file->store('hotels', 'public');
-            $isPrimary = !$hasPrimary && ($index === 0);
+            $isPrimary = !$hasPrimary || ($index === 0);
+
+            if ($isPrimary) {
+                HotelImage::where('hotel_id', $hotel->id)->update([
+                    'is_primary' => \Illuminate\Support\Facades\DB::raw('false')
+                ]);
+            }
 
             $image = HotelImage::create([
                 'hotel_id'   => $hotel->id,

@@ -51,7 +51,8 @@ class Hotel extends Model
         }
 
         if ($this->relationLoaded('images') && $this->images->isNotEmpty()) {
-            return $this->images->first();
+            $primary = $this->images->firstWhere('is_primary', true);
+            return $primary ?? $this->images->first();
         }
 
         return $this->images()->whereRaw('("is_primary" = true OR "is_primary" IS TRUE)')->first()

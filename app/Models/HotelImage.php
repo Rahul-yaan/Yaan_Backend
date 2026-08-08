@@ -33,7 +33,11 @@ class HotelImage extends Model
         if (str_starts_with($this->image_path, 'http://') || str_starts_with($this->image_path, 'https://')) {
             return $this->image_path;
         }
-        return url('storage/' . ltrim($this->image_path, '/'));
+        $cleanPath = ltrim($this->image_path, '/');
+        if (str_starts_with($cleanPath, 'storage/')) {
+            $cleanPath = substr($cleanPath, 8);
+        }
+        return url('storage/' . ltrim($cleanPath, '/'));
     }
 
     public function hotel()
