@@ -123,6 +123,42 @@ class HotelController extends Controller
             ], 422);
         }
 
+        $existingHotel = Hotel::where('owner_id', $request->user()->id)
+            ->where(function($q) use ($request) {
+                $q->where('address', trim($request->address))
+                  ->orWhere(function($q2) use ($request) {
+                      $q2->where('name', trim($request->name))
+                         ->where('city', trim($request->city));
+                  });
+            })
+            ->first();
+
+        if ($existingHotel) {
+            $existingHotel->update([
+                'name'           => $request->name,
+                'description'    => $request->description,
+                'city'           => $request->city,
+                'address'        => $request->address,
+                'latitude'       => $request->latitude,
+                'longitude'      => $request->longitude,
+                'price_per_night'=> $request->price_per_night,
+                'total_rooms'    => $request->total_rooms,
+                'available_rooms'=> $request->total_rooms,
+                'status'         => 'active',
+            ]);
+
+            if (!empty($resolvedAmenities)) {
+                $existingHotel->amenities()->sync($resolvedAmenities);
+            }
+
+            $this->processUploadedImages($request, $existingHotel);
+
+            return response()->json([
+                'message' => 'Hotel details updated successfully.',
+                'hotel'   => $existingHotel->load(['images', 'primaryImage', 'amenities']),
+            ], 200);
+        }
+
         $hotel = Hotel::create([
             'owner_id'       => $request->user()->id,
             'name'           => $request->name,
