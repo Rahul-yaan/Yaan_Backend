@@ -17,8 +17,8 @@ class DashboardController extends Controller
     {
         $totalUsers = User::where('role', 'user')->count();
         $totalOwners = User::where('role', 'owner')->count();
-        $verifiedOwners = OwnerProfile::where('is_verified', true)->count();
-        $pendingOwners = OwnerProfile::where('is_verified', false)->count();
+        $verifiedOwners = OwnerProfile::where('is_profile_complete', true)->count();
+        $pendingOwners = OwnerProfile::where('is_profile_complete', false)->count();
 
         $totalHotels = Hotel::count();
         $approvedHotels = Hotel::where('status', 'approved')->count();

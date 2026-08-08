@@ -25,7 +25,7 @@ class OwnerController extends Controller
         if ($request->has('verified')) {
             $isVerified = filter_var($request->verified, FILTER_VALIDATE_BOOLEAN);
             $query->whereHas('ownerProfile', function($q) use ($isVerified) {
-                $q->where('is_verified', $isVerified);
+                $q->where('is_profile_complete', $isVerified);
             });
         }
 
@@ -44,7 +44,7 @@ class OwnerController extends Controller
         $owner = User::where('role', 'owner')->findOrFail($id);
         
         $profile = OwnerProfile::firstOrCreate(['user_id' => $owner->id]);
-        $profile->is_verified = $request->is_verified;
+        $profile->is_profile_complete = $request->is_verified;
         $profile->save();
 
         $owner->is_verified = $request->is_verified;

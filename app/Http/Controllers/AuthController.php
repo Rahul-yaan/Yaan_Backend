@@ -38,14 +38,14 @@ class AuthController extends Controller
                   ->orWhere('phone', $rawDigits)
                   ->orWhere('phone', '+' . $rawDigits)
                   ->orWhere('phone', 'LIKE', '%' . $last10);
-            })->where('is_verified', false)->delete();
+            })->whereRaw('("is_verified" = false OR "is_verified" IS FALSE)')->delete();
         }
 
         if ($request->email) {
             $email = trim(strtolower($request->email));
             $request->merge(['email' => $email]);
             User::where('email', $email)
-                ->where('is_verified', false)
+                ->whereRaw('("is_verified" = false OR "is_verified" IS FALSE)')
                 ->delete();
         }
 
@@ -160,7 +160,8 @@ class AuthController extends Controller
     // ============================================================
     public function login(Request $request)
     {
-        $rawRole = strtolower($request->input('role', 'owner'));
+        $hasRoleInput = $request->has('role');
+        $rawRole = strtolower($request->input('role', 'user'));
         if (in_array($rawRole, ['owner', 'hotel_owner', 'hotelowner'])) {
             $role = 'owner';
         } else if (in_array($rawRole, ['admin', 'administrator', 'superadmin'])) {
@@ -168,19 +169,19 @@ class AuthController extends Controller
         } else {
             $role = 'user';
         }
-        $request->merge(['role' => $role]);
+        if ($hasRoleInput) {
+            $request->merge(['role' => $role]);
+        }
 
         $request->validate([
             'email'    => 'required|email',
             'password' => 'required|string',
-            'role'     => 'required|in:user,owner,admin',
+            'role'     => 'nullable|in:user,owner,admin',
         ]);
 
-        $user = User::where('email', $request->email)
-                    ->where('role', $request->role)
-                    ->first();
+        $user = User::where('email', $request->email)->first();
 
-        if (!$user || !Hash::check($request->password, $user->password)) {
+        if (!$user || ($hasRoleInput && $user->role !== $role) || !Hash::check($request->password, $user->password)) {
             return response()->json([
                 'error' => 'Invalid email or password.',
             ], 401);
