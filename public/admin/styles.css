@@ -747,3 +747,31 @@ body {
     margin-bottom: 6px;
 }
 
+/* Status Select Dropdown Styling */
+.status-select-dropdown {
+    width: 100%;
+    background: #1a202c;
+    color: #ffffff;
+    border: 1.5px solid #4a5568;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    outline: none;
+    transition: all 0.2s ease;
+}
+
+.status-select-dropdown:hover,
+.status-select-dropdown:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
+}
+
+.status-select-dropdown option {
+    background: #1a202c;
+    color: #ffffff;
+    padding: 10px;
+}
+
+

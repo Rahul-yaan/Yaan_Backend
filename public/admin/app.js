@@ -251,33 +251,40 @@ async function loadHotelsData() {
             return;
         }
 
-        container.innerHTML = hotels.map(h => `
+        container.innerHTML = hotels.map(h => {
+            const currentStatus = h.status || 'pending';
+            return `
             <div class="data-card">
                 <div class="data-card-header">
                     <div class="data-card-title">
                         <h4>${h.name}</h4>
                         <div class="data-card-sub"><i class="fa-solid fa-location-dot"></i> ${h.city || 'N/A'} • ${h.address || ''}</div>
                     </div>
-                    <span class="badge ${h.status}">${h.status}</span>
+                    <span class="badge ${currentStatus}">${currentStatus}</span>
                 </div>
                 <div style="font-size:13px; color: var(--text-secondary); margin: 8px 0;">
                     <div><strong>Owner:</strong> ${h.owner ? h.owner.name : 'Unknown'} (${h.owner ? h.owner.email : ''})</div>
                     <div><strong>Rooms:</strong> ${h.total_rooms || 0} Total • ₹${h.price_per_night}/night</div>
                 </div>
-                <div style="display:flex; gap: 8px; margin-top: auto;">
-                    ${h.status !== 'approved' ? `<button class="btn-sm btn-success" onclick="updateHotelStatus(${h.id}, 'approved')"><i class="fa-solid fa-check"></i> Approve</button>` : ''}
-                    ${h.status !== 'rejected' ? `<button class="btn-sm btn-danger" onclick="updateHotelStatus(${h.id}, 'rejected')"><i class="fa-solid fa-xmark"></i> Reject</button>` : ''}
-                    ${h.status === 'approved' ? `<button class="btn-sm btn-warning" onclick="updateHotelStatus(${h.id}, 'suspended')"><i class="fa-solid fa-ban"></i> Suspend</button>` : ''}
+                <div style="margin-top: auto; display:flex; flex-direction:column; gap:6px;">
+                    <label style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">Approval Status:</label>
+                    <select class="status-select-dropdown" onchange="updateHotelStatus(${h.id}, this.value)">
+                        <option value="pending" ${currentStatus === 'pending' ? 'selected' : ''}>Pending Approval</option>
+                        <option value="approved" ${(currentStatus === 'approved' || currentStatus === 'active') ? 'selected' : ''}>Approved</option>
+                        <option value="rejected" ${currentStatus === 'rejected' ? 'selected' : ''}>Rejected</option>
+                        <option value="suspended" ${(currentStatus === 'suspended' || currentStatus === 'inactive') ? 'selected' : ''}>Suspended</option>
+                    </select>
                 </div>
             </div>
-        `).join('');
+            `;
+        }).join('');
     } catch (err) {
         container.innerHTML = `<div class="empty-state text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading hotels'}</div>`;
     }
 }
 
 async function updateHotelStatus(id, newStatus) {
-    if (!confirm(`Are you sure you want to change hotel status to ${newStatus}?`)) return;
+    if (!newStatus) return;
 
     try {
         const res = await fetch(`${API_BASE}/admin/hotels/${id}/status`, {
@@ -292,6 +299,7 @@ async function updateHotelStatus(id, newStatus) {
         loadHotelsData();
     } catch (err) {
         showToast(err.message, 'danger');
+        loadHotelsData();
     }
 }
 

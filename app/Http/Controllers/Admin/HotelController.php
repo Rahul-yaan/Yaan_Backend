@@ -13,7 +13,14 @@ class HotelController extends Controller
         $query = Hotel::with(['owner:id,name,email,phone', 'images', 'amenities']);
 
         if ($request->has('status') && !empty($request->status)) {
-            $query->where('status', $request->status);
+            $status = $request->status;
+            if ($status === 'approved') {
+                $query->whereIn('status', ['approved', 'active']);
+            } elseif ($status === 'suspended') {
+                $query->whereIn('status', ['suspended', 'inactive']);
+            } else {
+                $query->where('status', $status);
+            }
         }
 
         if ($request->has('search') && !empty($request->search)) {
