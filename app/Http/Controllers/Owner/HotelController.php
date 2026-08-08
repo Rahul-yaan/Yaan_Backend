@@ -274,7 +274,7 @@ class HotelController extends Controller
             return [];
         }
 
-        $hasPrimary = $hotel->images()->where('is_primary', true)->exists();
+        $hasPrimary = $hotel->images()->whereRaw('("is_primary" = true OR "is_primary" IS TRUE)')->exists();
         $uploaded = [];
 
         foreach ($files as $index => $file) {
