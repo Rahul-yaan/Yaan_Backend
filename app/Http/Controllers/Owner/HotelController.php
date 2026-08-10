@@ -190,7 +190,7 @@ class HotelController extends Controller
             'price_per_night'=> $request->price_per_night,
             'total_rooms'    => $request->total_rooms,
             'available_rooms'=> $request->total_rooms,
-            'status'         => 'active',
+            'status'         => 'pending',
         ]);
 
         // Attach amenities if provided

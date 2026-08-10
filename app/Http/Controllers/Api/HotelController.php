@@ -8,13 +8,28 @@ use App\Models\Hotel;
 
 class HotelController extends Controller
 {
+    /**
+     * Helper scope for customer visible hotels:
+     * Hotel must be approved/active AND hotel owner must be verified by admin.
+     */
+    private function applyApprovedScope($query)
+    {
+        return $query->where(function($q) {
+            $q->where('status', 'approved')->orWhere('status', 'active');
+        })->whereHas('owner', function($q) {
+            $q->where('is_verified', true);
+        });
+    }
+
     // GET /api/hotels
     public function index(Request $request)
     {
         $query = Hotel::with(['primaryImage', 'amenities'])->withAvg('reviews', 'rating');
 
+        $query = $this->applyApprovedScope($query);
+
         if ($request->city) {
-            $query->where('city', $request->city);
+            $query->where('city', 'LIKE', '%' . $request->city . '%');
         }
 
         return response()->json($query->get());
@@ -23,20 +38,30 @@ class HotelController extends Controller
     // GET /api/hotels/{id}
     public function show($id)
     {
-        $hotel = Hotel::with(['reviews', 'amenities'])->findOrFail($id);
+        $query = Hotel::with(['reviews', 'amenities']);
+        $query = $this->applyApprovedScope($query);
+        $hotel = $query->findOrFail($id);
+
         return response()->json($hotel);
     }
 
-    // GET /api/hotels/search (or similar)
+    // GET /api/hotels/search
     public function search(Request $request) 
     {
         $destinationCity = $request->query('destination');
         
-        $hotels = Hotel::where('city', 'LIKE', '%' . $destinationCity . '%')->get();
+        $query = Hotel::with(['primaryImage', 'amenities'])->withAvg('reviews', 'rating');
+        $query = $this->applyApprovedScope($query);
+
+        if ($destinationCity) {
+            $query->where('city', 'LIKE', '%' . $destinationCity . '%');
+        }
+
+        $hotels = $query->get();
         
         return response()->json([
             'success' => true,
-            'data' => $hotels
+            'data'    => $hotels
         ]);
     }
 }

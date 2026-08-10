@@ -24,13 +24,21 @@ class OwnerController extends Controller
 
         if ($request->has('verified') && $request->verified !== '' && $request->verified !== null) {
             $isVerified = filter_var($request->verified, FILTER_VALIDATE_BOOLEAN);
-            $query->whereHas('ownerProfile', function($q) use ($isVerified) {
-                if ($isVerified) {
-                    $q->whereRaw('("is_profile_complete" = true OR "is_profile_complete" IS TRUE)');
-                } else {
-                    $q->whereRaw('("is_profile_complete" = false OR "is_profile_complete" IS FALSE OR "is_profile_complete" IS NULL)');
-                }
-            });
+            if ($isVerified) {
+                $query->where('is_verified', true)
+                      ->whereHas('ownerProfile', function($q) {
+                          $q->whereRaw('("is_profile_complete" = true OR "is_profile_complete" IS TRUE)');
+                      });
+            } else {
+                $query->where(function($q) {
+                    $q->where('is_verified', false)
+                      ->orWhereNull('is_verified')
+                      ->orWhereHas('ownerProfile', function($sq) {
+                          $sq->whereRaw('("is_profile_complete" = false OR "is_profile_complete" IS FALSE OR "is_profile_complete" IS NULL)');
+                      })
+                      ->orDoesntHave('ownerProfile');
+                });
+            }
         }
 
         $owners = $query->withCount('hotels')->latest()->paginate($request->input('per_page', 15));
