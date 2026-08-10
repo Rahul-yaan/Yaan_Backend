@@ -27,7 +27,7 @@ class BookingController extends Controller
         if ($filter === 'today') {
             $query->whereDate('created_at', $today);
         } elseif ($filter === 'upcoming') {
-            $query->where('check_in', '>', $today)
+            $query->where('check_in', '>=', $today)
                   ->where('status', '!=', 'cancelled');
         } elseif ($filter === 'older') {
             $query->where('check_out', '<', $today);

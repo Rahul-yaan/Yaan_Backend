@@ -29,7 +29,9 @@ class BookingController extends Controller
         ]);
 
         $hotel = Hotel::where('id', $request->hotel_id)
-            ->where('status', 'active')
+            ->where(function($q) {
+                $q->where('status', 'approved')->orWhere('status', 'active');
+            })
             ->firstOrFail();
 
         // Check date-specific availability
@@ -50,10 +52,9 @@ class BookingController extends Controller
         $gstAmount = $price * 0.18;
         $totalPayable = $price + $gstAmount;
 
-        $rawPayment = strtolower(trim($request->payment_method));
-        $isOnlinePayment = in_array($rawPayment, [
-            'online payment', 'online_payment', 'online', 'razorpay', 'upi', 'card', 'netbanking'
-        ]);
+        $rawPayment = strtolower(trim($request->payment_method ?? 'online'));
+        $isOfflinePayment = in_array($rawPayment, ['cash', 'pay_at_hotel', 'pay at hotel', 'offline']);
+        $isOnlinePayment = !$isOfflinePayment;
 
         $tempTxnId = 'TMP-' . strtoupper(\Illuminate\Support\Str::random(8)) . '-' . time();
 
@@ -88,8 +89,8 @@ class BookingController extends Controller
 
         // Generate Razorpay Order if Online Payment
         if ($isOnlinePayment) {
-            $razorpayKeyId = env('RAZORPAY_KEY_ID');
-            $razorpayKeySecret = env('RAZORPAY_KEY_SECRET');
+            $razorpayKeyId = config('services.razorpay.key_id') ?? env('RAZORPAY_KEY_ID');
+            $razorpayKeySecret = config('services.razorpay.key_secret') ?? env('RAZORPAY_KEY_SECRET');
 
             try {
                 $response = Http::withBasicAuth($razorpayKeyId, $razorpayKeySecret)
@@ -116,7 +117,7 @@ class BookingController extends Controller
 
                     return response()->json([
                         'error'   => 'Razorpay Error: ' . $errorDesc,
-                        'message' => 'Your Razorpay Key ID or Secret is invalid. Please update RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in your .env file.',
+                        'message' => 'Your Razorpay Key ID or Secret is invalid. Please update RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in server environment.',
                     ], 400);
                 }
             } catch (\Throwable $e) {
@@ -133,12 +134,14 @@ class BookingController extends Controller
         }
 
         return response()->json([
-            'message'           => 'Booking created successfully.',
+            'success'           => true,
+            'is_online'         => $isOnlinePayment,
+            'message'           => 'Booking created successfully. Proceed to payment.',
             'booking'           => $booking->load('hotel'),
             'order_id'          => $booking->razorpay_order_id,
             'razorpay_order_id' => $booking->razorpay_order_id,
-            'key'               => env('RAZORPAY_KEY_ID'),
-            'razorpay_key_id'   => env('RAZORPAY_KEY_ID'),
+            'key'               => config('services.razorpay.key_id') ?? env('RAZORPAY_KEY_ID'),
+            'razorpay_key_id'   => config('services.razorpay.key_id') ?? env('RAZORPAY_KEY_ID'),
             'amount'            => (int) round($totalPayable * 100),
             'amount_in_paise'   => (int) round($totalPayable * 100),
             'amount_in_rupees'  => (float) $totalPayable,
