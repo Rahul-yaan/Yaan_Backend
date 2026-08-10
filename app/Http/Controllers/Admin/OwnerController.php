@@ -48,16 +48,11 @@ class OwnerController extends Controller
         $isVerified = filter_var($request->is_verified, FILTER_VALIDATE_BOOLEAN);
 
         $owner = User::where('role', 'owner')->findOrFail($id);
-        $owner->is_verified = $isVerified;
-        $owner->save();
-
         $profile = OwnerProfile::firstOrCreate(['user_id' => $owner->id]);
-        $profile->is_profile_complete = $isVerified;
-        $profile->save();
 
         $boolStr = $isVerified ? 'true' : 'false';
-        \Illuminate\Support\Facades\DB::statement("UPDATE owner_profiles SET is_profile_complete = {$boolStr} WHERE user_id = ?", [$owner->id]);
-        \Illuminate\Support\Facades\DB::statement("UPDATE users SET is_verified = {$boolStr} WHERE id = ?", [$owner->id]);
+        \Illuminate\Support\Facades\DB::statement("UPDATE owner_profiles SET is_profile_complete = {$boolStr}, updated_at = NOW() WHERE user_id = ?", [$owner->id]);
+        \Illuminate\Support\Facades\DB::statement("UPDATE users SET is_verified = {$boolStr}, updated_at = NOW() WHERE id = ?", [$owner->id]);
 
         $statusText = $isVerified ? 'Verified' : 'Unverified';
 
@@ -74,29 +69,10 @@ class OwnerController extends Controller
     public function resetKyc($id)
     {
         $owner = User::where('role', 'owner')->findOrFail($id);
-        $owner->is_verified = false;
-        $owner->save();
 
-        \Illuminate\Support\Facades\DB::statement("UPDATE users SET is_verified = false WHERE id = ?", [$owner->id]);
+        \Illuminate\Support\Facades\DB::statement("UPDATE users SET is_verified = false, updated_at = NOW() WHERE id = ?", [$owner->id]);
 
-        $profile = OwnerProfile::where('user_id', $owner->id)->first();
-        if ($profile) {
-            $profile->is_profile_complete = false;
-            $profile->aadhaar_front       = null;
-            $profile->aadhaar_back        = null;
-            $profile->pan_card            = null;
-            $profile->fssai_license       = null;
-            $profile->gst_image           = null;
-            $profile->business_proof      = null;
-            $profile->gst_number          = null;
-            $profile->fssai_number        = null;
-            $profile->bank_name           = null;
-            $profile->account_number      = null;
-            $profile->ifsc_code           = null;
-            $profile->save();
-        }
-
-        \Illuminate\Support\Facades\DB::statement("UPDATE owner_profiles SET is_profile_complete = false, aadhaar_front = NULL, aadhaar_back = NULL, pan_card = NULL, fssai_license = NULL, gst_image = NULL, business_proof = NULL, gst_number = NULL, fssai_number = NULL, bank_name = NULL, account_number = NULL, ifsc_code = NULL WHERE user_id = ?", [$owner->id]);
+        \Illuminate\Support\Facades\DB::statement("UPDATE owner_profiles SET is_profile_complete = false, aadhaar_front = NULL, aadhaar_back = NULL, pan_card = NULL, fssai_license = NULL, gst_image = NULL, business_proof = NULL, gst_number = NULL, fssai_number = NULL, bank_name = NULL, account_number = NULL, ifsc_code = NULL, updated_at = NOW() WHERE user_id = ?", [$owner->id]);
 
         return response()->json([
             'message' => "Owner KYC data has been removed and reset successfully. The owner can now re-submit fresh KYC details.",
