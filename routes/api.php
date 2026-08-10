@@ -78,6 +78,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/bookings/{id}',       [App\Http\Controllers\Admin\BookingController::class, 'show']);
         Route::put('/bookings/{id}/status',[App\Http\Controllers\Admin\BookingController::class, 'updateStatus']);
 
+        // Transactions & Razorpay Management
+        Route::get('/transactions',                       [App\Http\Controllers\Admin\TransactionController::class, 'index']);
+        Route::get('/transactions/{id}',                   [App\Http\Controllers\Admin\TransactionController::class, 'show']);
+        Route::post('/transactions/{id}/verify-razorpay',  [App\Http\Controllers\Admin\TransactionController::class, 'verifyRazorpay']);
+        Route::put('/transactions/{id}/status',            [App\Http\Controllers\Admin\TransactionController::class, 'updateStatus']);
+
         // Reviews
         Route::get('/reviews',             [App\Http\Controllers\Admin\ReviewController::class, 'index']);
         Route::delete('/reviews/{id}',      [App\Http\Controllers\Admin\ReviewController::class, 'destroy']);

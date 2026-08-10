@@ -55,18 +55,21 @@ class BookingController extends Controller
             'online payment', 'online_payment', 'online', 'razorpay', 'upi', 'card', 'netbanking'
         ]);
 
+        $tempTxnId = 'TMP-' . strtoupper(\Illuminate\Support\Str::random(8)) . '-' . time();
+
         $booking = Booking::create([
-            'user_id'          => $request->user()->id,
-            'hotel_id'         => $request->hotel_id,
-            'booking_date'     => $request->booking_date,
-            'check_in'         => $request->booking_date, // Defaulting check_in to avoid DB constraint error
-            'check_out'        => \Carbon\Carbon::parse($request->booking_date)->addDay()->toDateString(), // Default 1 day
-            'total_nights'     => 1, // Default 1 night
-            'truck_type'       => $request->truck_type,
-            'truck_no'         => $request->truck_no,
-            'logistics_name'   => $request->logistics_name,
-            'logistics_number' => $request->logistics_number,
-            'payment_method'   => $isOnlinePayment ? 'Online Payment' : $request->payment_method,
+            'user_id'             => $request->user()->id,
+            'hotel_id'            => $request->hotel_id,
+            'booking_date'        => $request->booking_date,
+            'check_in'            => $request->booking_date, // Defaulting check_in to avoid DB constraint error
+            'check_out'           => \Carbon\Carbon::parse($request->booking_date)->addDay()->toDateString(), // Default 1 day
+            'total_nights'        => 1, // Default 1 night
+            'truck_type'          => $request->truck_type,
+            'truck_no'            => $request->truck_no,
+            'logistics_name'      => $request->logistics_name,
+            'logistics_number'    => $request->logistics_number,
+            'payment_method'      => $isOnlinePayment ? 'Online Payment' : $request->payment_method,
+            'temp_transaction_id' => $tempTxnId,
             
             'price_per_night'  => $price,
             'total_amount'     => $price,
@@ -181,8 +184,11 @@ class BookingController extends Controller
             ], 422);
         }
 
+        $reason = $request->input('cancellation_reason') ?? $request->input('reason') ?? 'User cancelled payment / Internet slow';
+
         $booking->update([
-            'status' => 'cancelled',
+            'status'              => 'cancelled',
+            'cancellation_reason' => $reason,
         ]);
 
         // Restore available rooms

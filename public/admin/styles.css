@@ -774,4 +774,54 @@ body {
     padding: 10px;
 }
 
+/* Subtabs and Transaction UI */
+.subtab-btn {
+    background: rgba(30, 41, 59, 0.8);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+    padding: 8px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.subtab-btn:hover {
+    color: var(--text-primary);
+    border-color: var(--primary);
+}
+
+.subtab-btn.active {
+    background: var(--primary);
+    color: #ffffff;
+    border-color: var(--primary);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+}
+
+.temp-txn-row {
+    background: rgba(245, 158, 11, 0.03);
+}
+
+.confirmed-txn-row {
+    background: rgba(16, 185, 129, 0.02);
+}
+
+.pay-method-pill {
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid var(--border);
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+
 

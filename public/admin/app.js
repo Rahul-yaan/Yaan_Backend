@@ -3,6 +3,8 @@ const API_BASE = '/api';
 let authToken = localStorage.getItem('yaan_admin_token') || '';
 let currentUser = JSON.parse(localStorage.getItem('yaan_admin_user') || 'null');
 let currentOwners = [];
+let currentTxnTypeFilter = '';
+let currentTransactions = [];
 
 // Initialize Application
 document.addEventListener('DOMContentLoaded', () => {
@@ -125,6 +127,7 @@ function switchTab(tabId, event) {
     if (tabId === 'hotels') loadHotelsData();
     if (tabId === 'owners') loadOwnersData();
     if (tabId === 'bookings') loadBookingsData();
+    if (tabId === 'transactions') loadTransactionsData();
     if (tabId === 'users') loadUsersData();
     if (tabId === 'reviews') loadReviewsData();
 }
@@ -632,6 +635,307 @@ async function deleteReview(id) {
 
         showToast(data.message || 'Review deleted successfully', 'success');
         loadReviewsData();
+    } catch (err) {
+        showToast(err.message, 'danger');
+    }
+}
+
+// ----------------------------------------------------
+// 7. TRANSACTIONS & RAZORPAY LEDGER MANAGEMENT
+// ----------------------------------------------------
+function filterTxnType(type) {
+    currentTxnTypeFilter = type;
+    document.querySelectorAll('.subtab-btn').forEach(btn => {
+        if (btn.getAttribute('data-txntype') === type) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+    loadTransactionsData();
+}
+
+async function loadTransactionsData() {
+    const tbody = document.getElementById('transactions-table-body');
+    const methodSelect = document.getElementById('filter-txn-method');
+    const method = methodSelect ? methodSelect.value : '';
+    const searchInput = document.getElementById('search-transactions');
+    const search = searchInput ? searchInput.value : '';
+
+    tbody.innerHTML = `<tr><td colspan="9" class="text-center"><i class="fa-solid fa-spinner fa-spin"></i> Loading transactions...</td></tr>`;
+
+    try {
+        let url = `${API_BASE}/admin/transactions?type=${currentTxnTypeFilter}&payment_method=${encodeURIComponent(method)}&search=${encodeURIComponent(search)}`;
+        const res = await fetch(url, { headers: getHeaders() });
+        if (!res.ok) await handleApiError(res);
+        const resData = await res.json();
+        
+        currentTransactions = (resData.transactions && resData.transactions.data) ? resData.transactions.data : [];
+        const m = resData.metrics || {};
+
+        // Update Overview Widgets
+        if (document.getElementById('stat-txn-revenue')) {
+            document.getElementById('stat-txn-revenue').textContent = `₹${(m.confirmed_amount || 0).toLocaleString('en-IN')}`;
+        }
+        if (document.getElementById('stat-txn-confirmed-count')) {
+            document.getElementById('stat-txn-confirmed-count').textContent = m.confirmed_count || 0;
+        }
+        if (document.getElementById('stat-txn-temp-count')) {
+            document.getElementById('stat-txn-temp-count').textContent = m.temporary_count || 0;
+        }
+        if (document.getElementById('stat-txn-cancelled-count')) {
+            document.getElementById('stat-txn-cancelled-count').textContent = m.cancelled_count || 0;
+        }
+
+        if (currentTransactions.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="9" class="text-center">No transaction records found</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = currentTransactions.map(t => {
+            const isConfirmed = t.is_confirmed || t.payment_status === 'paid' || t.status === 'confirmed' || t.status === 'completed';
+            const displayTxnId = t.display_transaction_id || t.transaction_id || t.temp_transaction_id || `TMP-${t.razorpay_order_id || t.id}`;
+            const isTemp = !isConfirmed;
+            const regionTime = t.region_time_formatted || (t.created_at ? new Date(t.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' IST' : 'N/A');
+            const userObj = t.user || {};
+            const userName = userObj.name || 'Guest User';
+            const userContact = userObj.phone || userObj.email || '';
+
+            let statusBadgeClass = 'pending';
+            let statusText = t.status || 'pending';
+            if (isConfirmed) {
+                statusBadgeClass = 'confirmed';
+                statusText = 'Confirmed';
+            } else if (t.status === 'cancelled') {
+                statusBadgeClass = 'cancelled';
+                statusText = 'Cancelled';
+            } else if (t.payment_status === 'failed') {
+                statusBadgeClass = 'failed';
+                statusText = 'Failed';
+            }
+
+            const reasonText = t.cancellation_reason || (isTemp ? 'Temporary Payment / Pending Verification' : '');
+
+            return `
+                <tr class="${isTemp ? 'temp-txn-row' : 'confirmed-txn-row'}">
+                    <td><strong>#${t.id}</strong></td>
+                    <td>
+                        <span class="badge ${isConfirmed ? 'confirmed' : 'pending'}" style="font-size:10px;">
+                            <i class="fa-solid ${isConfirmed ? 'fa-circle-check' : 'fa-clock'}"></i>
+                            ${isConfirmed ? 'CONFIRMED' : 'TEMPORARY'}
+                        </span>
+                    </td>
+                    <td>
+                        <div style="font-family: monospace; font-weight: 700; color: ${isConfirmed ? '#10b981' : '#f59e0b'}; font-size:12px;">
+                            ${displayTxnId}
+                        </div>
+                        ${t.razorpay_order_id ? `<small style="font-size:10px; color:var(--text-muted);">Order: ${t.razorpay_order_id}</small>` : ''}
+                    </td>
+                    <td>
+                        <strong>${userName}</strong><br>
+                        <small class="text-muted"><i class="fa-solid fa-phone" style="font-size:10px;"></i> ${userContact}</small>
+                    </td>
+                    <td>
+                        <div style="font-size:12px; font-weight:600;">${regionTime}</div>
+                        <small class="text-muted" style="font-size:10px;">Hotel: ${t.hotel ? t.hotel.name : 'N/A'}</small>
+                    </td>
+                    <td>
+                        <span class="pay-method-pill">
+                            <i class="fa-solid ${t.payment_method === 'Razorpay' || t.razorpay_order_id ? 'fa-shield-halved' : 'fa-credit-card'}"></i>
+                            ${t.payment_method || 'Razorpay / Online'}
+                        </span>
+                    </td>
+                    <td>
+                        <strong style="font-size:14px; color:var(--text-primary);">₹${t.total_payable || t.total_amount || 0}</strong>
+                    </td>
+                    <td>
+                        <span class="badge ${statusBadgeClass}">${statusText}</span>
+                        ${reasonText ? `<div style="font-size:11px; color:#fca5a5; margin-top:3px; max-width:180px; line-height:1.2;"><i class="fa-solid fa-circle-info"></i> ${reasonText}</div>` : ''}
+                    </td>
+                    <td>
+                        <div style="display:flex; flex-direction:column; gap:4px;">
+                            <button class="btn-sm" style="background:#4f46e5; color:#fff;" onclick="openTransactionModal(${t.id})" title="Inspect Full Razorpay Details">
+                                <i class="fa-solid fa-eye"></i> Details
+                            </button>
+                            <button class="btn-sm" style="background:#0284c7; color:#fff;" onclick="verifyRazorpayStatus(${t.id})" title="Verify Live Status with Razorpay API">
+                                <i class="fa-solid fa-rotate"></i> Live Sync
+                            </button>
+                            <select onchange="updateTransactionStatus(${t.id}, this.value)" style="padding:3px; font-size:11px; background:#0f172a; color:#fff; border:1px solid #334155; border-radius:4px; margin-top:2px;">
+                                <option value="">Action</option>
+                                <option value="confirmed">Confirm Txn</option>
+                                <option value="cancelled">Mark Cancelled</option>
+                                <option value="pending">Mark Temporary</option>
+                            </select>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading transactions'}</td></tr>`;
+    }
+}
+
+async function openTransactionModal(txnId) {
+    const modalBody = document.getElementById('transaction-modal-body');
+    modalBody.innerHTML = `<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Fetching transaction & Razorpay metadata...</div>`;
+    document.getElementById('transaction-modal').classList.remove('hidden');
+
+    try {
+        const res = await fetch(`${API_BASE}/admin/transactions/${txnId}`, { headers: getHeaders() });
+        if (!res.ok) await handleApiError(res);
+        const data = await res.json();
+        const t = data.transaction || {};
+        const r = data.razorpay || {};
+        const isConfirmed = t.is_confirmed || t.payment_status === 'paid' || t.status === 'confirmed' || t.status === 'completed';
+        const displayTxnId = t.display_transaction_id || t.transaction_id || t.temp_transaction_id || `TMP-${t.razorpay_order_id || t.id}`;
+        const regionTime = t.region_time_formatted || (t.created_at ? new Date(t.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' IST' : 'N/A');
+        const userObj = t.user || {};
+        const hotelObj = t.hotel || {};
+
+        let gatewayJsonHtml = '';
+        if (t.gateway_response) {
+            try {
+                const parsed = JSON.parse(t.gateway_response);
+                gatewayJsonHtml = `<pre style="background:#0f172a; padding:10px; border-radius:6px; font-size:11px; max-height:150px; overflow:auto; color:#38bdf8;">${JSON.stringify(parsed, null, 2)}</pre>`;
+            } catch(e) {
+                gatewayJsonHtml = `<div style="font-size:12px; color:var(--text-muted);">${t.gateway_response}</div>`;
+            }
+        }
+
+        modalBody.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+                <div>
+                    <h4 style="margin:0; font-size:18px;">
+                        Transaction #${t.id} 
+                        <span class="badge ${isConfirmed ? 'confirmed' : 'pending'}" style="margin-left:8px;">
+                            ${isConfirmed ? 'CONFIRMED PAYMENT' : 'TEMPORARY / CANCELLED'}
+                        </span>
+                    </h4>
+                    <div style="font-size:13px; font-weight:700; color:${isConfirmed ? '#10b981' : '#f59e0b'}; font-family:monospace; margin-top:4px;">
+                        ${displayTxnId}
+                    </div>
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-size:22px; font-weight:700; color:var(--text-primary);">₹${t.total_payable || t.total_amount || 0}</div>
+                    <div style="font-size:11px; color:var(--text-muted);">${t.payment_method || 'Online Payment'}</div>
+                </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">
+                <div style="background:var(--bg-dark); padding:12px; border-radius:8px; border:1px solid var(--border);">
+                    <h5 style="margin:0 0 6px 0; font-size:13px; color:var(--primary);"><i class="fa-solid fa-user"></i> Customer Info</h5>
+                    <div style="font-size:12px; display:flex; flex-direction:column; gap:3px;">
+                        <div><strong>Name:</strong> ${userObj.name || 'N/A'}</div>
+                        <div><strong>Email:</strong> ${userObj.email || 'N/A'}</div>
+                        <div><strong>Phone:</strong> ${userObj.phone || 'N/A'}</div>
+                    </div>
+                </div>
+
+                <div style="background:var(--bg-dark); padding:12px; border-radius:8px; border:1px solid var(--border);">
+                    <h5 style="margin:0 0 6px 0; font-size:13px; color:var(--primary);"><i class="fa-solid fa-hotel"></i> Hotel & Booking Info</h5>
+                    <div style="font-size:12px; display:flex; flex-direction:column; gap:3px;">
+                        <div><strong>Hotel:</strong> ${hotelObj.name || 'N/A'} (${hotelObj.city || ''})</div>
+                        <div><strong>Dates:</strong> ${t.check_in || ''} to ${t.check_out || ''}</div>
+                        <div><strong>Truck No:</strong> ${t.truck_no || 'N/A'} (${t.truck_type || ''})</div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="background:var(--bg-dark); padding:12px; border-radius:8px; border:1px solid var(--border); margin-bottom:16px;">
+                <h5 style="margin:0 0 8px 0; font-size:13px; color:var(--info);"><i class="fa-solid fa-clock"></i> Timestamps & Region Time</h5>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:12px;">
+                    <div><strong>Region Time (IST):</strong> ${regionTime}</div>
+                    <div><strong>Server Timestamp:</strong> ${t.created_at || 'N/A'}</div>
+                </div>
+                ${t.cancellation_reason ? `
+                    <div style="margin-top:8px; padding:8px; background:rgba(239, 68, 68, 0.15); border:1px solid var(--danger); border-radius:6px; font-size:12px; color:#fca5a5;">
+                        <i class="fa-solid fa-circle-exclamation"></i> <strong>Cancellation / Failure Reason:</strong> ${t.cancellation_reason}
+                    </div>
+                ` : ''}
+            </div>
+
+            <div style="background:var(--bg-dark); padding:12px; border-radius:8px; border:1px solid var(--border); margin-bottom:16px;">
+                <h5 style="margin:0 0 8px 0; font-size:13px; color:#a855f7;"><i class="fa-solid fa-shield-halved"></i> Razorpay Integration Metadata</h5>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:12px;">
+                    <div><strong>Razorpay Order ID:</strong> ${r.order_id || t.razorpay_order_id || 'N/A'}</div>
+                    <div><strong>Razorpay Payment ID:</strong> ${r.payment_id || t.razorpay_payment_id || 'N/A'}</div>
+                    <div><strong>Razorpay Key ID:</strong> ${r.key_id ? r.key_id.substring(0, 10) + '...' : 'Configured'}</div>
+                    <div><strong>Amount in Paise:</strong> ${r.amount_in_paise || ((t.total_payable || 0)*100)} paise</div>
+                </div>
+                ${gatewayJsonHtml ? `<div style="margin-top:10px;"><strong style="font-size:11px;">Razorpay Gateway Raw Response:</strong>${gatewayJsonHtml}</div>` : ''}
+            </div>
+
+            <div style="display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap; margin-top:20px;">
+                <button class="btn-sm" style="background:#0284c7; color:#fff; padding:8px 14px;" onclick="verifyRazorpayStatus(${t.id})">
+                    <i class="fa-solid fa-rotate"></i> Sync Live Razorpay Status
+                </button>
+                ${!isConfirmed ? `
+                    <button class="btn-sm btn-success" style="padding:8px 14px;" onclick="updateTransactionStatus(${t.id}, 'confirmed'); closeTransactionModal();">
+                        <i class="fa-solid fa-check"></i> Mark as Confirmed
+                    </button>
+                ` : `
+                    <button class="btn-sm btn-warning" style="padding:8px 14px;" onclick="updateTransactionStatus(${t.id}, 'cancelled'); closeTransactionModal();">
+                        <i class="fa-solid fa-ban"></i> Cancel Transaction
+                    </button>
+                `}
+                <button class="btn-sm" style="padding:8px 14px; background:#475569; color:#fff;" onclick="closeTransactionModal()">Close</button>
+            </div>
+        `;
+    } catch (err) {
+        modalBody.innerHTML = `<div class="empty-state text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading transaction details'}</div>`;
+    }
+}
+
+function closeTransactionModal() {
+    document.getElementById('transaction-modal').classList.add('hidden');
+}
+
+async function verifyRazorpayStatus(txnId) {
+    showToast('Contacting Razorpay API...', 'info');
+    try {
+        const res = await fetch(`${API_BASE}/admin/transactions/${txnId}/verify-razorpay`, {
+            method: 'POST',
+            headers: getHeaders()
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Razorpay verification failed');
+
+        showToast(data.message || 'Razorpay status synced!', 'success');
+        loadTransactionsData();
+        // Refresh modal if open
+        if (!document.getElementById('transaction-modal').classList.contains('hidden')) {
+            openTransactionModal(txnId);
+        }
+    } catch (err) {
+        showToast(err.message, 'danger');
+    }
+}
+
+async function updateTransactionStatus(txnId, newStatus) {
+    if (!newStatus) return;
+
+    let reason = null;
+    if (newStatus === 'cancelled') {
+        reason = prompt('Enter cancellation reason (e.g. User requested / Internet slow / Payment abandoned):', 'Cancelled by Admin / Payment abandoned');
+        if (reason === null) return; // User pressed cancel on prompt
+    }
+
+    try {
+        const res = await fetch(`${API_BASE}/admin/transactions/${txnId}/status`, {
+            method: 'PUT',
+            headers: getHeaders(),
+            body: JSON.stringify({
+                status: newStatus,
+                payment_status: newStatus === 'confirmed' ? 'paid' : (newStatus === 'cancelled' ? 'failed' : 'pending'),
+                cancellation_reason: reason
+            })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || data.message || 'Failed to update transaction status');
+
+        showToast(data.message || `Transaction updated to ${newStatus}`, 'success');
+        loadTransactionsData();
     } catch (err) {
         showToast(err.message, 'danger');
     }

@@ -19,7 +19,10 @@ class Booking extends Model
         'razorpay_order_id',
         'razorpay_payment_id',
         'transaction_id',
+        'temp_transaction_id',
         'payment_status',
+        'cancellation_reason',
+        'gateway_response',
         'booking_date',
         'truck_type',
         'truck_no',
@@ -41,6 +44,37 @@ class Booking extends Model
         'gst_amount'        => 'decimal:2',
         'total_payable'     => 'decimal:2',
     ];
+
+    protected $appends = [
+        'display_transaction_id',
+        'is_confirmed',
+        'region_time_formatted',
+    ];
+
+    public function getDisplayTransactionIdAttribute()
+    {
+        if (!empty($this->transaction_id)) {
+            return $this->transaction_id;
+        }
+        if (!empty($this->temp_transaction_id)) {
+            return $this->temp_transaction_id;
+        }
+        if (!empty($this->razorpay_order_id)) {
+            return 'TMP-' . $this->razorpay_order_id;
+        }
+        return 'TMP-' . str_pad($this->id, 8, '0', STR_PAD_LEFT);
+    }
+
+    public function getIsConfirmedAttribute()
+    {
+        return $this->payment_status === 'paid' || $this->status === 'confirmed';
+    }
+
+    public function getRegionTimeFormattedAttribute()
+    {
+        $dt = $this->created_at ? $this->created_at->timezone('Asia/Kolkata') : now()->timezone('Asia/Kolkata');
+        return $dt->format('d M Y, h:i:s A') . ' IST';
+    }
 
     public function user()
     {

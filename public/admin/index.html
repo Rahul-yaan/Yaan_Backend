@@ -109,6 +109,9 @@
                     <a href="#" class="nav-item" data-tab="bookings" onclick="switchTab('bookings', event)">
                         <i class="fa-solid fa-calendar-check"></i> <span>Bookings</span>
                     </a>
+                    <a href="#" class="nav-item" data-tab="transactions" onclick="switchTab('transactions', event)">
+                        <i class="fa-solid fa-receipt"></i> <span>Transactions</span>
+                    </a>
                     <a href="#" class="nav-item" data-tab="users" onclick="switchTab('users', event)">
                         <i class="fa-solid fa-users"></i> <span>Customers</span>
                     </a>
@@ -355,6 +358,98 @@
                     </div>
                 </section>
 
+                <!-- -------------------------------------- -->
+                <!-- TAB 7: TRANSACTIONS & RAZORPAY LEDGER -->
+                <!-- -------------------------------------- -->
+                <section id="tab-transactions" class="tab-content">
+                    <div class="section-title">
+                        <h2>Transactions & Payment Ledger</h2>
+                        <button class="btn-sm" onclick="loadTransactionsData()">
+                            <i class="fa-solid fa-rotate-right"></i> Refresh Ledger
+                        </button>
+                    </div>
+
+                    <!-- Overview Metrics for Transactions -->
+                    <div class="metrics-grid" style="margin-bottom: 16px;">
+                        <div class="metric-card gradient-purple">
+                            <div class="metric-icon"><i class="fa-solid fa-indian-rupee-sign"></i></div>
+                            <div class="metric-info">
+                                <span class="metric-label">Confirmed Revenue</span>
+                                <h3 id="stat-txn-revenue">₹0.00</h3>
+                            </div>
+                        </div>
+
+                        <div class="metric-card gradient-teal">
+                            <div class="metric-icon"><i class="fa-solid fa-circle-check"></i></div>
+                            <div class="metric-info">
+                                <span class="metric-label">Confirmed Txns</span>
+                                <h3 id="stat-txn-confirmed-count">0</h3>
+                            </div>
+                        </div>
+
+                        <div class="metric-card gradient-amber">
+                            <div class="metric-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
+                            <div class="metric-info">
+                                <span class="metric-label">Temporary / Pending</span>
+                                <h3 id="stat-txn-temp-count">0</h3>
+                            </div>
+                        </div>
+
+                        <div class="metric-card" style="background: linear-gradient(135deg, #e11d48, #be123c);">
+                            <div class="metric-icon"><i class="fa-solid fa-circle-xmark"></i></div>
+                            <div class="metric-info">
+                                <span class="metric-label">Cancelled / Failed</span>
+                                <h3 id="stat-txn-cancelled-count">0</h3>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Filter Tabs & Dropdown -->
+                    <div class="txn-filter-bar" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:14px;">
+                        <div class="txn-subtabs" style="display:flex; gap:8px; flex-wrap:wrap;">
+                            <button class="subtab-btn active" data-txntype="" onclick="filterTxnType('')">All Transactions</button>
+                            <button class="subtab-btn" data-txntype="confirmed" onclick="filterTxnType('confirmed')"><i class="fa-solid fa-circle-check"></i> Confirmed</button>
+                            <button class="subtab-btn" data-txntype="temporary" onclick="filterTxnType('temporary')"><i class="fa-solid fa-clock"></i> Temporary / Pending</button>
+                            <button class="subtab-btn" data-txntype="cancelled" onclick="filterTxnType('cancelled')"><i class="fa-solid fa-ban"></i> Cancelled / Failed</button>
+                        </div>
+                        <div class="filter-group">
+                            <select id="filter-txn-method" onchange="loadTransactionsData()">
+                                <option value="">All Payment Methods</option>
+                                <option value="Razorpay">Razorpay</option>
+                                <option value="Online Payment">Online Payment</option>
+                                <option value="Card">Card / NetBanking</option>
+                                <option value="UPI">UPI</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="search-bar">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" id="search-transactions" placeholder="Search Txn ID, Temp Txn ID, Order ID, Customer Name, Phone or Reason..." onkeyup="debounce(loadTransactionsData, 400)()">
+                    </div>
+
+                    <div id="transactions-container" class="table-responsive">
+                        <table class="custom-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Type</th>
+                                    <th>Transaction ID / Temp ID</th>
+                                    <th>Customer Details</th>
+                                    <th>Date, Time & Region</th>
+                                    <th>Payment Method</th>
+                                    <th>Amount</th>
+                                    <th>Status & Reason</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="transactions-table-body">
+                                <tr><td colspan="9" class="text-center">Loading transactions...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
             </main>
 
             <!-- Bottom App Navigation (Mobile Only) -->
@@ -375,6 +470,10 @@
                     <i class="fa-solid fa-calendar-check"></i>
                     <span>Bookings</span>
                 </button>
+                <button class="bottom-nav-item" data-tab="transactions" onclick="switchTab('transactions', event)">
+                    <i class="fa-solid fa-receipt"></i>
+                    <span>Txns</span>
+                </button>
             </nav>
 
         </div>
@@ -390,6 +489,19 @@
                     <button class="btn-sm" onclick="closeKycModal()"><i class="fa-solid fa-xmark"></i></button>
                 </div>
                 <div id="kyc-modal-body" class="modal-body">
+                    <!-- Populated dynamically by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Transaction & Razorpay Details Modal -->
+        <div id="transaction-modal" class="modal-backdrop hidden">
+            <div class="modal-content" style="max-width: 760px;">
+                <div class="modal-header">
+                    <h3><i class="fa-solid fa-receipt"></i> Full Transaction & Razorpay Inspection</h3>
+                    <button class="btn-sm" onclick="closeTransactionModal()"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div id="transaction-modal-body" class="modal-body">
                     <!-- Populated dynamically by JS -->
                 </div>
             </div>
