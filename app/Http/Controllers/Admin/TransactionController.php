@@ -408,6 +408,29 @@ class TransactionController extends Controller
         $gstAmount    = (float) ($transaction->gst_amount ?? ($transaction->total_amount * 0.18));
         $totalPayable = (float) ($transaction->total_payable ?? ($transaction->total_amount + $gstAmount));
 
+        $isRefunded = $transaction->payment_status === 'refunded' || str_contains(strtolower($transaction->cancellation_reason ?? ''), 'refund');
+        $refundId   = null;
+        if (!empty($transaction->cancellation_reason) && preg_match('/(rfnd_[A-Za-z0-9]+)/', $transaction->cancellation_reason, $m)) {
+            $refundId = $m[1];
+        } elseif (!empty($transaction->gateway_response)) {
+            $gw = json_decode($transaction->gateway_response, true);
+            if (is_array($gw)) {
+                $refundId = $gw['id'] ?? ($gw['refund_id'] ?? null);
+                if (!empty($gw['entity']) && $gw['entity'] === 'refund') {
+                    $isRefunded = true;
+                }
+            }
+        }
+
+        $paymentStatusText = 'PENDING';
+        if ($isRefunded) {
+            $paymentStatusText = 'REFUNDED';
+        } elseif ($transaction->payment_status === 'paid' || $transaction->is_confirmed) {
+            $paymentStatusText = 'PAID';
+        } else {
+            $paymentStatusText = strtoupper($transaction->status);
+        }
+
         return response()->json([
             'invoice' => [
                 'invoice_number' => $invoiceNumber,
@@ -442,7 +465,9 @@ class TransactionController extends Controller
                     'logistics_number' => $transaction->logistics_number ?? 'N/A',
                 ],
                 'payment' => [
-                    'status'                 => strtoupper($transaction->payment_status === 'paid' || $transaction->is_confirmed ? 'PAID' : $transaction->status),
+                    'status'                 => $paymentStatusText,
+                    'is_refunded'            => $isRefunded,
+                    'refund_id'              => $refundId,
                     'payment_method'         => $transaction->payment_method ?? 'Razorpay / Online',
                     'display_transaction_id' => $transaction->display_transaction_id,
                     'transaction_id'         => $transaction->transaction_id,

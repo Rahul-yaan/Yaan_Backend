@@ -964,8 +964,8 @@ async function openInvoiceModal(txnId) {
                         </div>
                     </div>
                     <div style="text-align:right;">
-                        <span class="badge ${pay.status === 'PAID' || pay.status === 'CONFIRMED' ? 'confirmed' : 'pending'}" style="font-size:12px; padding:6px 12px; text-transform:uppercase;">
-                            ${pay.status}
+                        <span class="badge ${pay.is_refunded || pay.status === 'REFUNDED' ? 'failed' : (pay.status === 'PAID' || pay.status === 'CONFIRMED' ? 'confirmed' : 'pending')}" style="font-size:12px; padding:6px 12px; text-transform:uppercase; ${pay.is_refunded || pay.status === 'REFUNDED' ? 'background:#e11d48; color:#ffffff;' : ''}">
+                            ${pay.is_refunded || pay.status === 'REFUNDED' ? 'REFUNDED (RAZORPAY)' : pay.status}
                         </span>
                         <h3 style="margin:8px 0 2px 0; font-size:18px; color:var(--primary); font-family:monospace;">${inv.invoice_number}</h3>
                         <div style="font-size:12px; color:var(--text-muted);">Date: <strong>${inv.invoice_date}</strong></div>
@@ -1035,6 +1035,15 @@ async function openInvoiceModal(txnId) {
                         ${pay.razorpay_order_id ? `<div><strong>Razorpay Order ID:</strong> <span style="font-family:monospace;">${pay.razorpay_order_id}</span></div>` : ''}
                         ${pay.razorpay_payment_id ? `<div><strong>Razorpay Payment ID:</strong> <span style="font-family:monospace;">${pay.razorpay_payment_id}</span></div>` : ''}
                         <div><strong>Region Timestamp:</strong> ${pay.region_time}</div>
+                        ${pay.is_refunded || pay.status === 'REFUNDED' ? `
+                            <div style="background:rgba(225,29,72,0.12); border:1px solid #e11d48; padding:8px 10px; border-radius:6px; margin-top:6px;">
+                                <div style="color:#fecdd3; font-weight:700; font-size:12px; margin-bottom:2px;">
+                                    <i class="fa-solid fa-arrow-rotate-left"></i> Payment Refunded via Razorpay
+                                </div>
+                                ${pay.refund_id ? `<div><strong>Razorpay Refund ID:</strong> <span style="font-family:monospace; color:#f43f5e; font-weight:700;">${pay.refund_id}</span></div>` : ''}
+                                ${pay.cancellation_reason ? `<div style="font-size:11px; color:#fda4af; margin-top:2px;"><strong>Reason:</strong> ${pay.cancellation_reason}</div>` : ''}
+                            </div>
+                        ` : ''}
                     </div>
 
                     <div style="background:var(--bg-dark); padding:12px; border-radius:8px; border:1px solid var(--border); display:flex; flex-direction:column; gap:6px; font-size:13px;">
