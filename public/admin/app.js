@@ -371,14 +371,35 @@ function openKycModal(ownerId) {
     const isVerified = profile.is_profile_complete !== undefined ? profile.is_profile_complete : owner.is_verified;
 
     const getDocItem = (title, path, url) => {
-        if (!url && !path) return '';
-        const docUrl = url || (path ? (path.startsWith('http') ? path : `/storage/${path.replace(/^\/+/, '')}`) : '#');
+        const rawPath = (path && typeof path === 'string') ? path.trim() : '';
+        const rawUrl = (url && typeof url === 'string') ? url.trim() : '';
+        
+        if (!rawPath && !rawUrl) {
+            return `
+                <div class="doc-box" style="opacity:0.6; border:1px dashed var(--border); text-align:center; padding:12px; background:rgba(255,255,255,0.02); border-radius:6px;">
+                    <strong style="display:block; font-size:12px; margin-bottom:4px; color:var(--text-secondary);">${title}</strong>
+                    <span style="font-size:11px; color:#f87171;"><i class="fa-solid fa-file-circle-xmark"></i> Not Uploaded Yet</span>
+                </div>
+            `;
+        }
+
+        let docUrl = rawUrl;
+        if (!docUrl && rawPath) {
+            if (rawPath.startsWith('http://') || rawPath.startsWith('https://')) {
+                docUrl = rawPath;
+            } else {
+                const cleanPath = rawPath.replace(/^\/+/, '').replace(/^storage\//, '');
+                docUrl = `${window.location.origin}/storage/${cleanPath}`;
+            }
+        }
+
         const isImg = docUrl.match(/\.(jpeg|jpg|gif|png|webp)($|\?)/i);
+
         return `
-            <div class="doc-box">
-                <strong style="display:block; font-size:12px; margin-bottom:6px;">${title}</strong>
-                ${isImg ? `<a href="${docUrl}" target="_blank"><img src="${docUrl}" alt="${title}" onerror="this.src='https://via.placeholder.com/150?text=Document';"></a>` : ''}
-                <a href="${docUrl}" target="_blank" class="btn-sm" style="display:inline-block; font-size:11px; margin-top:4px; text-decoration:none;">
+            <div class="doc-box" style="background:var(--bg-surface); padding:10px; border-radius:6px; border:1px solid var(--border);">
+                <strong style="display:block; font-size:12px; margin-bottom:6px; color:var(--text-primary);">${title}</strong>
+                ${isImg ? `<a href="${docUrl}" target="_blank"><img src="${docUrl}" alt="${title}" style="max-height:120px; object-fit:cover; border-radius:4px; width:100%; display:block; margin-bottom:6px;" onerror="this.onerror=null; this.src='https://via.placeholder.com/150?text=KYC+Document';"></a>` : ''}
+                <a href="${docUrl}" target="_blank" class="btn-sm" style="display:inline-block; font-size:11px; margin-top:4px; text-decoration:none; background:var(--primary); color:#ffffff; padding:4px 10px; border-radius:4px;">
                     <i class="fa-solid fa-arrow-up-right-from-square"></i> Open File
                 </a>
             </div>
