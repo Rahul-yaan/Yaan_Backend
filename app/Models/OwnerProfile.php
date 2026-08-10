@@ -83,8 +83,7 @@ class OwnerProfile extends Model
 
     public function setIsProfileCompleteAttribute($value)
     {
-        $isTrue = filter_var($value, FILTER_VALIDATE_BOOLEAN);
-        $this->attributes['is_profile_complete'] = $isTrue ? DB::raw('true') : DB::raw('false');
+        $this->attributes['is_profile_complete'] = filter_var($value, FILTER_VALIDATE_BOOLEAN);
     }
 
     public function user()

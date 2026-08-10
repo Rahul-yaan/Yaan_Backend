@@ -330,7 +330,7 @@ async function loadOwnersData() {
 
         container.innerHTML = currentOwners.map(o => {
             const profile = o.owner_profile || o.ownerProfile || {};
-            const isVerified = profile.is_profile_complete !== undefined ? profile.is_profile_complete : o.is_verified;
+            const isVerified = (o.is_verified === true || o.is_verified === 1) && (profile.is_profile_complete === true || profile.is_profile_complete === 1);
             return `
             <div class="data-card">
                 <div class="data-card-header">
@@ -351,7 +351,7 @@ async function loadOwnersData() {
                     <button class="btn-sm" style="background:#4a5568; color:white;" onclick="openKycModal(${o.id})"><i class="fa-solid fa-file-invoice"></i> Inspect Full KYC</button>
                     ${!isVerified ? 
                         `<button class="btn-sm btn-success" onclick="verifyOwner(${o.id}, true)"><i class="fa-solid fa-user-check"></i> Approve KYC</button>` : 
-                        `<button class="btn-sm btn-warning" onclick="verifyOwner(${o.id}, false)"><i class="fa-solid fa-user-xmark"></i> Revoke KYC</button>`
+                        `<button class="btn-sm btn-warning" onclick="verifyOwner(${o.id}, false)"><i class="fa-solid fa-user-xmark"></i> Revoke Verification</button>`
                     }
                     <button class="btn-sm" style="background:#e11d48; color:white;" onclick="resetOwnerKyc(${o.id})" title="Remove & Reset Owner KYC Documents"><i class="fa-solid fa-trash-can"></i> Reset KYC</button>
                 </div>
@@ -368,7 +368,7 @@ function openKycModal(ownerId) {
     if (!owner) return;
 
     const profile = owner.owner_profile || owner.ownerProfile || {};
-    const isVerified = profile.is_profile_complete !== undefined ? profile.is_profile_complete : owner.is_verified;
+    const isVerified = (owner.is_verified === true || owner.is_verified === 1) && (profile.is_profile_complete === true || profile.is_profile_complete === 1);
 
     const getDocItem = (title, path, url) => {
         const rawPath = (path && typeof path === 'string') ? path.trim() : '';
