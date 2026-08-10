@@ -401,7 +401,10 @@ function openKycModal(ownerId) {
             <div class="doc-box" style="background:var(--bg-surface); padding:10px; border-radius:6px; border:1px solid var(--border); text-align:center;">
                 <strong style="display:block; font-size:12px; margin-bottom:6px; color:var(--text-primary);">${title}</strong>
                 <a href="${docUrl}" target="_blank" style="display:block; text-decoration:none; margin-bottom:8px;">
-                    <img src="${docUrl}" alt="${title}" style="max-height:130px; object-fit:contain; border-radius:6px; width:100%; display:block; background:#0f172a; border:1px solid var(--border);" onerror="this.onerror=null; this.src='https://via.placeholder.com/200x120/1e293b/ffffff?text=${encodeURIComponent(title)}';">
+                    <img src="${docUrl}" alt="${title}" style="max-height:140px; object-fit:contain; border-radius:6px; width:100%; display:block; background:#0f172a; border:1px solid var(--border);" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='block';">
+                    <div style="display:none; padding:10px; background:rgba(239,68,68,0.1); border:1px dashed #ef4444; border-radius:6px; color:#f87171; font-size:11px; margin-bottom:6px;">
+                        <i class="fa-solid fa-triangle-exclamation"></i> File Expired on Server<br><small style="color:var(--text-muted);">Click "Reset KYC" for re-upload</small>
+                    </div>
                 </a>
                 <a href="${docUrl}" target="_blank" class="btn-sm" style="display:inline-block; font-size:11px; text-decoration:none; background:var(--primary); color:#ffffff; padding:5px 12px; border-radius:4px; font-weight:600;">
                     <i class="fa-solid fa-arrow-up-right-from-square"></i> Open File
