@@ -85,4 +85,9 @@ class Booking extends Model
     {
         return $this->belongsTo(Hotel::class);
     }
+
+    public function statusOverrides()
+    {
+        return $this->hasMany(TransactionStatusOverride::class, 'booking_id');
+    }
 }

@@ -17,6 +17,9 @@ Route::middleware('throttle:5,1')->group(function () {
     Route::post('/reset-password',  [ForgotPasswordController::class, 'resetPassword']);
 });
 
+// Razorpay Webhook — Verified by HMAC signature in controller
+Route::post('/webhooks/razorpay', [App\Http\Controllers\RazorpayWebhookController::class, 'handleWebhook']);
+
 // ============================================================
 // PROTECTED ROUTES — token required in Authorization header
 // ============================================================
@@ -82,6 +85,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/transactions',                       [App\Http\Controllers\Admin\TransactionController::class, 'index']);
         Route::get('/transactions/{id}',                   [App\Http\Controllers\Admin\TransactionController::class, 'show']);
         Route::post('/transactions/{id}/verify-razorpay',  [App\Http\Controllers\Admin\TransactionController::class, 'verifyRazorpay']);
+        Route::post('/transactions/{id}/refund',           [App\Http\Controllers\Admin\TransactionController::class, 'refundTransaction']);
         Route::put('/transactions/{id}/status',            [App\Http\Controllers\Admin\TransactionController::class, 'updateStatus']);
 
         // Reviews

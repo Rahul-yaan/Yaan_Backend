@@ -915,13 +915,42 @@ async function verifyRazorpayStatus(txnId) {
 async function updateTransactionStatus(txnId, newStatus) {
     if (!newStatus) return;
 
-    let reason = null;
-    if (newStatus === 'cancelled') {
-        reason = prompt('Enter cancellation reason (e.g. User requested / Internet slow / Payment abandoned):', 'Cancelled by Admin / Payment abandoned');
-        if (reason === null) return; // User pressed cancel on prompt
+    const txn = currentTransactions.find(t => t.id === txnId);
+    const isPaid = txn && (txn.payment_status === 'paid' || txn.is_confirmed || (txn.status === 'confirmed' && txn.razorpay_payment_id));
+
+    let reason = prompt(`[Admin Override Audit Log]\nEnter mandatory reason for setting status to "${newStatus}" (min 5 characters):`, 
+        isPaid && newStatus === 'cancelled' ? 'Customer requested refund / Cancelled by Admin' : 'Admin manual status override');
+
+    if (reason === null) return; // User clicked Cancel in prompt
+    reason = reason.trim();
+
+    if (reason.length < 5) {
+        showToast('Status override failed: A detailed reason (minimum 5 characters) is required for audit logs.', 'danger');
+        return;
     }
 
     try {
+        // If payment was captured and admin is cancelling, call Razorpay Refund API (Prompt 2 Fix)
+        if (newStatus === 'cancelled' && isPaid) {
+            if (!confirm(`Warning: This payment of ₹${txn.total_payable || txn.total_amount} is currently CAPTURED at Razorpay.\n\nClicking OK will call Razorpay's Refund API (POST /v1/payments/${txn.razorpay_payment_id}/refund).\n\nProceed with Razorpay refund?`)) {
+                return;
+            }
+
+            showToast('Initiating refund with Razorpay API...', 'info');
+            const res = await fetch(`${API_BASE}/admin/transactions/${txnId}/refund`, {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify({ reason })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || data.message || 'Razorpay refund failed');
+
+            showToast(data.message || 'Refund initiated with Razorpay successfully!', 'success');
+            loadTransactionsData();
+            return;
+        }
+
+        // Standard status override (Prompt 3 Logged Override)
         const res = await fetch(`${API_BASE}/admin/transactions/${txnId}/status`, {
             method: 'PUT',
             headers: getHeaders(),
