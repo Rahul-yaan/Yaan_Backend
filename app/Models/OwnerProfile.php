@@ -46,9 +46,14 @@ class OwnerProfile extends Model
     {
         if (empty($path)) return null;
         if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
-            return $path;
+            return preg_replace('/^http:/i', 'https:', $path);
         }
-        return asset('storage/' . ltrim($path, '/'));
+        $clean = ltrim($path, '/');
+        if (str_starts_with($clean, 'storage/')) {
+            $clean = substr($clean, 8);
+        }
+        $url = asset('storage/' . $clean);
+        return preg_replace('/^http:/i', 'https:', $url);
     }
 
     public function getAadhaarFrontUrlAttribute()
