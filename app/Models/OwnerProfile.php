@@ -45,7 +45,7 @@ class OwnerProfile extends Model
     private function getStorageUrl($path)
     {
         if (empty($path)) return null;
-        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+        if (str_starts_with($path, 'data:') || str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
             return preg_replace('/^http:/i', 'https:', $path);
         }
         $clean = ltrim($path, '/');

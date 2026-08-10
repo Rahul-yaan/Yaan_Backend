@@ -84,12 +84,11 @@ class ProfileController extends Controller
 
         foreach ($fileFields as $field) {
             if ($request->hasFile($field)) {
-                // Delete old file
-                if ($profile->$field) {
-                    Storage::disk('public')->delete($profile->$field);
-                }
-                $data[$field] = $request->file($field)
-                    ->store('owner_documents', 'public');
+                $file = $request->file($field);
+                $mime = $file->getClientMimeType() ?: 'image/jpeg';
+                $contents = file_get_contents($file->getRealPath());
+                $base64 = 'data:' . $mime . ';base64,' . base64_encode($contents);
+                $data[$field] = $base64;
             }
         }
 

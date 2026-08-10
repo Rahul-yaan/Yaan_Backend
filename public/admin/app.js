@@ -385,7 +385,7 @@ function openKycModal(ownerId) {
 
         let docUrl = rawUrl;
         if (!docUrl && rawPath) {
-            if (rawPath.startsWith('http://') || rawPath.startsWith('https://')) {
+            if (rawPath.startsWith('data:') || rawPath.startsWith('http://') || rawPath.startsWith('https://')) {
                 docUrl = rawPath;
             } else {
                 const cleanPath = rawPath.replace(/^\/+/, '').replace(/^storage\//, '');
