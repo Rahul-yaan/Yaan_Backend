@@ -14,12 +14,28 @@ class ProfileController extends Controller
     // ============================================================
     public function show(Request $request)
     {
-        $profile = OwnerProfile::where('user_id', $request->user()->id)
-            ->first();
+        $user = $request->user();
+        $profile = OwnerProfile::where('user_id', $user->id)->first();
+
+        $isVerified = (bool) $user->is_verified;
+        $isComplete = $profile ? (bool) $profile->is_profile_complete : false;
+
+        $kycStatus = 'action_required';
+        $kycMessage = 'Admin has requested fresh KYC submission. Please fill in your hotel details and upload document images.';
+
+        if ($isVerified) {
+            $kycStatus = 'verified';
+            $kycMessage = 'Your Owner KYC is fully verified and active.';
+        } elseif ($isComplete) {
+            $kycStatus = 'pending_approval';
+            $kycMessage = 'Your KYC documents have been submitted successfully and are currently pending Admin verification.';
+        }
 
         return response()->json([
-            'profile' => $profile,
-            'user'    => $request->user(),
+            'profile'    => $profile,
+            'user'       => $user,
+            'kyc_status' => $kycStatus,
+            'kyc_message' => $kycMessage,
         ]);
     }
 
@@ -48,8 +64,10 @@ class ProfileController extends Controller
             'gst_image'      => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:5120',
         ]);
 
+        $user = $request->user();
+
         $profile = OwnerProfile::firstOrCreate(
-            ['user_id' => $request->user()->id]
+            ['user_id' => $user->id]
         );
 
         $data = $request->only([
@@ -75,24 +93,25 @@ class ProfileController extends Controller
             }
         }
 
-        // Check if profile is complete
-        $data['is_profile_complete'] = !empty($data['hotel_name'] ?? $profile->hotel_name)
-            && !empty($data['owner_name'] ?? $profile->owner_name)
-            && !empty($data['address'] ?? $profile->address);
-
+        // Mark profile as complete (Pending Admin Approval)
+        $data['is_profile_complete'] = true;
         $profile->update($data);
 
-        // Sync hotel name with the core hotels table
+        \Illuminate\Support\Facades\DB::statement("UPDATE owner_profiles SET is_profile_complete = true, updated_at = NOW() WHERE user_id = ?", [$user->id]);
+        \Illuminate\Support\Facades\DB::statement("UPDATE users SET is_verified = false, updated_at = NOW() WHERE id = ?", [$user->id]);
+
+        // Sync hotel name with core hotels table
         if (!empty($data['hotel_name'])) {
-            $hotel = \App\Models\Hotel::where('owner_id', $request->user()->id)->first();
+            $hotel = \App\Models\Hotel::where('owner_id', $user->id)->first();
             if ($hotel) {
                 $hotel->update(['name' => $data['hotel_name']]);
             }
         }
 
         return response()->json([
-            'message' => 'Profile updated successfully.',
-            'profile' => $profile,
+            'message'    => 'KYC documents submitted successfully. Status is now Pending Admin Verification.',
+            'profile'    => $profile->fresh(),
+            'kyc_status' => 'pending_approval',
         ]);
     }
 }
