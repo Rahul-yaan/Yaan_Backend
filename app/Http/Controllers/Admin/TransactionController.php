@@ -15,7 +15,7 @@ class TransactionController extends Controller
      */
     public function index(Request $request)
     {
-        // Auto-trigger Live Sync for any stuck pending transactions in the background
+        // Auto-trigger Live Sync for any pending bookings that have an attached razorpay_payment_id
         $this->autoSyncPendingTransactions();
 
         $query = Booking::with(['user:id,name,email,phone', 'hotel:id,name,city,address']);
@@ -24,24 +24,18 @@ class TransactionController extends Controller
         if ($request->has('type') && !empty($request->type)) {
             $type = strtolower($request->type);
             if ($type === 'confirmed' || $type === 'success') {
-                // Confirmed / Success Block: Strictly 100% verified paid/confirmed payments
-                $query->where(function($q) {
-                    $q->where('payment_status', 'paid')
-                      ->orWhere(function($q2) {
-                          $q2->whereIn('status', ['confirmed', 'completed'])
-                             ->whereNotIn('payment_status', ['pending', 'failed', 'refunded']);
-                      });
-                });
+                // Confirmed / Success Block: Strictly verified paid/confirmed payments
+                $query->where('payment_status', 'paid')
+                      ->whereIn('status', ['confirmed', 'completed']);
             } elseif ($type === 'temporary' || $type === 'temp') {
-                // Temporary / Incomplete Block: Strictly pending/unconfirmed active attempts (excluding cancelled & refunded)
+                // Temporary / Incomplete Block: Pending payment attempts where payment has not been completed
                 $query->where('status', 'pending')
-                      ->whereNotIn('payment_status', ['paid', 'refunded']);
+                      ->whereIn('payment_status', ['pending', 'failed']);
             } elseif ($type === 'cancelled' || $type === 'failed') {
-                // Cancelled / Failed / Refunded Block: Strictly all cancelled, refunded, or failed records
+                // Cancelled / Failed / Refunded Block: Cancelled bookings or refunded payments
                 $query->where(function($q) {
                     $q->where('status', 'cancelled')
-                      ->orWhere('payment_status', 'refunded')
-                      ->orWhere('payment_status', 'failed');
+                      ->orWhere('payment_status', 'refunded');
                 });
             }
         }
@@ -79,9 +73,9 @@ class TransactionController extends Controller
 
         // Calculate Overview Metrics for Dashboard Widgets
         $allBookings = Booking::all();
-        $confirmedBookings = $allBookings->filter(fn($b) => $b->payment_status === 'paid' || (($b->status === 'confirmed' || $b->status === 'completed') && !in_array($b->payment_status, ['pending', 'failed', 'refunded'])));
-        $temporaryBookings = $allBookings->filter(fn($b) => $b->status === 'pending' && !in_array($b->payment_status, ['paid', 'refunded']));
-        $cancelledBookings = $allBookings->filter(fn($b) => $b->status === 'cancelled' || $b->payment_status === 'refunded' || $b->payment_status === 'failed');
+        $confirmedBookings = $allBookings->filter(fn($b) => $b->payment_status === 'paid' && in_array($b->status, ['confirmed', 'completed']));
+        $temporaryBookings = $allBookings->filter(fn($b) => $b->status === 'pending' && in_array($b->payment_status, ['pending', 'failed']));
+        $cancelledBookings = $allBookings->filter(fn($b) => $b->status === 'cancelled' || $b->payment_status === 'refunded');
 
         $metrics = [
             'total_count'       => $allBookings->count(),
@@ -506,9 +500,7 @@ class TransactionController extends Controller
         try {
             $stuckBookings = Booking::where('status', 'pending')
                 ->whereNotIn('payment_status', ['paid', 'refunded'])
-                ->where(function($q) {
-                    $q->whereNotNull('razorpay_payment_id')->orWhereNotNull('razorpay_order_id');
-                })
+                ->whereNotNull('razorpay_payment_id')
                 ->where('created_at', '>=', now()->subHours(48))
                 ->take(10)
                 ->get();
