@@ -93,11 +93,11 @@ class ProfileController extends Controller
             }
         }
 
-        // Mark profile as complete (Pending Admin Approval)
-        $data['is_profile_complete'] = true;
+        // Update profile text and file fields (excluding boolean flags to avoid PostgreSQL 42804 type mismatch)
+        unset($data['is_profile_complete']);
         $profile->update($data);
 
-        \Illuminate\Support\Facades\DB::statement("UPDATE owner_profiles SET is_profile_complete = true, updated_at = NOW() WHERE user_id = ?", [$user->id]);
+        \Illuminate\Support\Facades\DB::statement("UPDATE owner_profiles SET is_profile_complete = true, updated_at = NOW() WHERE id = ?", [$profile->id]);
         \Illuminate\Support\Facades\DB::statement("UPDATE users SET is_verified = false, updated_at = NOW() WHERE id = ?", [$user->id]);
 
         // Sync hotel name with core hotels table
