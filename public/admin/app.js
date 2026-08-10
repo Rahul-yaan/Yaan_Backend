@@ -694,16 +694,40 @@ async function loadTransactionsData() {
 
         tbody.innerHTML = currentTransactions.map(t => {
             const isConfirmed = t.is_confirmed || t.payment_status === 'paid' || t.status === 'confirmed' || t.status === 'completed';
+            const isRefunded = t.payment_status === 'refunded' || (t.cancellation_reason && t.cancellation_reason.toLowerCase().includes('refund'));
+            const isCancelled = t.status === 'cancelled' || isRefunded || t.payment_status === 'failed';
+            const isTemp = !isConfirmed && !isCancelled;
             const displayTxnId = t.display_transaction_id || t.transaction_id || t.temp_transaction_id || `TMP-${t.razorpay_order_id || t.id}`;
-            const isTemp = !isConfirmed;
             const regionTime = t.region_time_formatted || (t.created_at ? new Date(t.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' IST' : 'N/A');
             const userObj = t.user || {};
             const userName = userObj.name || 'Guest User';
             const userContact = userObj.phone || userObj.email || '';
 
+            let typeBadgeClass = 'pending';
+            let typeBadgeIcon = 'fa-clock';
+            let typeBadgeText = 'TEMPORARY';
+
+            if (isConfirmed) {
+                typeBadgeClass = 'confirmed';
+                typeBadgeIcon = 'fa-circle-check';
+                typeBadgeText = 'CONFIRMED';
+            } else if (isRefunded) {
+                typeBadgeClass = 'failed';
+                typeBadgeIcon = 'fa-arrow-rotate-left';
+                typeBadgeText = 'REFUNDED';
+            } else if (isCancelled) {
+                typeBadgeClass = 'cancelled';
+                typeBadgeIcon = 'fa-circle-xmark';
+                typeBadgeText = 'CANCELLED';
+            }
+
             let statusBadgeClass = 'pending';
             let statusText = t.status || 'pending';
-            if (isConfirmed) {
+
+            if (isRefunded) {
+                statusBadgeClass = 'failed';
+                statusText = 'REFUNDED VIA RAZORPAY';
+            } else if (isConfirmed) {
                 statusBadgeClass = 'confirmed';
                 statusText = 'CONFIRMED SUCCESS';
             } else if (t.status === 'cancelled') {
@@ -723,16 +747,16 @@ async function loadTransactionsData() {
             }
 
             return `
-                <tr class="${isTemp ? 'temp-txn-row' : 'confirmed-txn-row'}">
+                <tr class="${isTemp ? 'temp-txn-row' : (isConfirmed ? 'confirmed-txn-row' : '')}">
                     <td><strong>#${t.id}</strong></td>
                     <td>
-                        <span class="badge ${isConfirmed ? 'confirmed' : 'pending'}" style="font-size:10px;">
-                            <i class="fa-solid ${isConfirmed ? 'fa-circle-check' : 'fa-clock'}"></i>
-                            ${isConfirmed ? 'CONFIRMED' : 'TEMPORARY'}
+                        <span class="badge ${typeBadgeClass}" style="font-size:10px;">
+                            <i class="fa-solid ${typeBadgeIcon}"></i>
+                            ${typeBadgeText}
                         </span>
                     </td>
                     <td>
-                        <div style="font-family: monospace; font-weight: 700; color: ${isConfirmed ? '#10b981' : '#f59e0b'}; font-size:12px;">
+                        <div style="font-family: monospace; font-weight: 700; color: ${isConfirmed ? '#10b981' : (isRefunded ? '#a855f7' : '#f59e0b')}; font-size:12px;">
                             ${displayTxnId}
                         </div>
                         ${t.razorpay_order_id ? `<small style="font-size:10px; color:var(--text-muted);">Order: ${t.razorpay_order_id}</small>` : ''}

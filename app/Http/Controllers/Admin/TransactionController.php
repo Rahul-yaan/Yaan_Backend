@@ -17,7 +17,7 @@ class TransactionController extends Controller
     {
         $query = Booking::with(['user:id,name,email,phone', 'hotel:id,name,city,address']);
 
-        // Filter by Transaction Type / Status (Strict Success vs Temporary Separation)
+        // Filter by Transaction Type / Status (Strict Success vs Temporary vs Cancelled/Refunded)
         if ($request->has('type') && !empty($request->type)) {
             $type = strtolower($request->type);
             if ($type === 'confirmed' || $type === 'success') {
@@ -30,21 +30,16 @@ class TransactionController extends Controller
                       });
                 });
             } elseif ($type === 'temporary' || $type === 'temp') {
-                // Temporary / Incomplete Block: All pending, user-cancelled, slow internet, or unverified attempts
+                // Temporary / Incomplete Block: Strictly pending/unconfirmed active attempts (excluding cancelled & refunded)
+                $query->where('status', 'pending')
+                      ->whereNotIn('payment_status', ['paid', 'refunded']);
+            } elseif ($type === 'cancelled' || $type === 'failed') {
+                // Cancelled / Failed / Refunded Block: Strictly all cancelled, refunded, or failed records
                 $query->where(function($q) {
-                    $q->where('payment_status', '!=', 'paid')
-                      ->where(function($q2) {
-                          $q2->where('status', 'pending')
-                             ->orWhere('status', 'cancelled')
-                             ->orWhere('payment_status', 'pending')
-                             ->orWhere('payment_status', 'failed')
-                             ->orWhereNotNull('cancellation_reason');
-                      });
+                    $q->where('status', 'cancelled')
+                      ->orWhere('payment_status', 'refunded')
+                      ->orWhere('payment_status', 'failed');
                 });
-            } elseif ($type === 'cancelled') {
-                $query->where('status', 'cancelled');
-            } elseif ($type === 'failed') {
-                $query->where('payment_status', 'failed');
             }
         }
 
@@ -82,8 +77,8 @@ class TransactionController extends Controller
         // Calculate Overview Metrics for Dashboard Widgets
         $allBookings = Booking::all();
         $confirmedBookings = $allBookings->filter(fn($b) => $b->payment_status === 'paid' || (($b->status === 'confirmed' || $b->status === 'completed') && !in_array($b->payment_status, ['pending', 'failed', 'refunded'])));
-        $temporaryBookings = $allBookings->filter(fn($b) => $b->payment_status !== 'paid' && ($b->status === 'pending' || $b->status === 'cancelled' || $b->payment_status === 'pending' || $b->payment_status === 'failed' || !empty($b->cancellation_reason)));
-        $cancelledBookings = $allBookings->filter(fn($b) => $b->status === 'cancelled');
+        $temporaryBookings = $allBookings->filter(fn($b) => $b->status === 'pending' && !in_array($b->payment_status, ['paid', 'refunded']));
+        $cancelledBookings = $allBookings->filter(fn($b) => $b->status === 'cancelled' || $b->payment_status === 'refunded' || $b->payment_status === 'failed');
 
         $metrics = [
             'total_count'       => $allBookings->count(),
