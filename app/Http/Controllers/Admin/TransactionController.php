@@ -362,5 +362,77 @@ class TransactionController extends Controller
             'transaction' => $transaction,
         ]);
     }
+
+    /**
+     * Generate structured invoice data for a transaction/booking.
+     * Endpoint: GET /api/admin/transactions/{id}/invoice
+     */
+    public function getInvoice($id)
+    {
+        $transaction = Booking::with(['user', 'hotel.owner'])->findOrFail($id);
+
+        $invoiceNumber = 'INV-' . date('Y', strtotime($transaction->created_at ?? now())) . '-' . str_pad($transaction->id, 6, '0', STR_PAD_LEFT);
+        $invoiceDate   = $transaction->created_at ? $transaction->created_at->format('d M Y') : date('d M Y');
+
+        $basePrice    = (float) ($transaction->price_per_night ?? ($transaction->total_amount / max(1, $transaction->total_nights)));
+        $gstAmount    = (float) ($transaction->gst_amount ?? ($transaction->total_amount * 0.18));
+        $totalPayable = (float) ($transaction->total_payable ?? ($transaction->total_amount + $gstAmount));
+
+        return response()->json([
+            'invoice' => [
+                'invoice_number' => $invoiceNumber,
+                'invoice_date'   => $invoiceDate,
+                'company' => [
+                    'name'     => 'Yaan Logistics & Hotel Platform',
+                    'address'  => 'Tech Hub, Corporate Towers, Cyber City',
+                    'city'     => 'Bangalore, India',
+                    'email'    => 'support@yaan.com',
+                    'gstin'    => '29AAAAA0000A1Z5',
+                ],
+                'customer' => [
+                    'name'  => $transaction->user ? $transaction->user->name : 'Guest User',
+                    'email' => $transaction->user ? $transaction->user->email : 'N/A',
+                    'phone' => $transaction->user ? $transaction->user->phone : 'N/A',
+                ],
+                'hotel' => [
+                    'name'    => $transaction->hotel ? $transaction->hotel->name : 'N/A',
+                    'city'    => $transaction->hotel ? $transaction->hotel->city : 'N/A',
+                    'address' => $transaction->hotel ? $transaction->hotel->address : 'N/A',
+                ],
+                'stay' => [
+                    'check_in'     => $transaction->check_in ? $transaction->check_in->format('Y-m-d') : 'N/A',
+                    'check_out'    => $transaction->check_out ? $transaction->check_out->format('Y-m-d') : 'N/A',
+                    'total_nights' => $transaction->total_nights ?? 1,
+                    'guests'       => $transaction->guests ?? 1,
+                ],
+                'logistics' => [
+                    'truck_type'       => $transaction->truck_type ?? 'N/A',
+                    'truck_no'         => $transaction->truck_no ?? 'N/A',
+                    'logistics_name'   => $transaction->logistics_name ?? 'N/A',
+                    'logistics_number' => $transaction->logistics_number ?? 'N/A',
+                ],
+                'payment' => [
+                    'status'                 => strtoupper($transaction->payment_status === 'paid' || $transaction->is_confirmed ? 'PAID' : $transaction->status),
+                    'payment_method'         => $transaction->payment_method ?? 'Razorpay / Online',
+                    'display_transaction_id' => $transaction->display_transaction_id,
+                    'transaction_id'         => $transaction->transaction_id,
+                    'temp_transaction_id'    => $transaction->temp_transaction_id,
+                    'razorpay_order_id'      => $transaction->razorpay_order_id,
+                    'razorpay_payment_id'    => $transaction->razorpay_payment_id,
+                    'region_time'            => $transaction->region_time_formatted,
+                    'cancellation_reason'    => $transaction->cancellation_reason,
+                ],
+                'pricing' => [
+                    'price_per_night'   => $basePrice,
+                    'subtotal'          => (float) $transaction->total_amount,
+                    'promotion_applied' => (float) ($transaction->promotion_applied ?? 0.00),
+                    'gst_amount'        => $gstAmount,
+                    'total_payable'     => $totalPayable,
+                    'currency'          => 'INR',
+                ],
+                'booking_raw' => $transaction,
+            ]
+        ]);
+    }
 }
 

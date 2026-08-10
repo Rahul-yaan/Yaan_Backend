@@ -507,6 +507,22 @@
             </div>
         </div>
 
+        <!-- Payment Invoice Modal -->
+        <div id="invoice-modal" class="modal-backdrop hidden">
+            <div class="modal-content invoice-modal-content" style="max-width: 820px;">
+                <div class="modal-header no-print">
+                    <h3><i class="fa-solid fa-file-invoice-dollar"></i> Official Payment Invoice</h3>
+                    <div style="display:flex; gap:8px;">
+                        <button class="btn-sm" style="background:#10b981; color:#fff;" onclick="printInvoice()"><i class="fa-solid fa-print"></i> Print / Save PDF</button>
+                        <button class="btn-sm" onclick="closeInvoiceModal()"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                </div>
+                <div id="invoice-modal-body" class="modal-body printable-area">
+                    <!-- Populated dynamically by JS -->
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <!-- Application JS Script -->

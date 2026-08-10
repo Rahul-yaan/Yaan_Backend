@@ -823,5 +823,35 @@ body {
     gap: 5px;
 }
 
+/* Print Media Styles for Official Invoice */
+@media print {
+    body * {
+        visibility: hidden;
+    }
+    #invoice-modal, .printable-area, .printable-area * {
+        visibility: visible !important;
+    }
+    .printable-area {
+        position: fixed;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        color: #000000 !important;
+        background: #ffffff !important;
+        padding: 20px;
+        z-index: 99999;
+    }
+    .printable-area div, .printable-area span, .printable-area td, .printable-area th, .printable-area h2, .printable-area h3, .printable-area h4 {
+        color: #000000 !important;
+        background: transparent !important;
+        border-color: #dddddd !important;
+    }
+    .no-print, .app-header, .app-drawer, .toast-container {
+        display: none !important;
+    }
+}
+
+
 
 

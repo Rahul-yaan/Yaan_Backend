@@ -757,6 +757,9 @@ async function loadTransactionsData() {
                             <button class="btn-sm" style="background:#4f46e5; color:#fff;" onclick="openTransactionModal(${t.id})" title="Inspect Full Razorpay Details">
                                 <i class="fa-solid fa-eye"></i> Details
                             </button>
+                            <button class="btn-sm" style="background:#10b981; color:#fff;" onclick="openInvoiceModal(${t.id})" title="View & Print Official Invoice">
+                                <i class="fa-solid fa-file-invoice"></i> Invoice
+                            </button>
                             <button class="btn-sm" style="background:#0284c7; color:#fff;" onclick="verifyRazorpayStatus(${t.id})" title="Verify Live Status with Razorpay API">
                                 <i class="fa-solid fa-rotate"></i> Live Sync
                             </button>
@@ -867,6 +870,9 @@ async function openTransactionModal(txnId) {
             </div>
 
             <div style="display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap; margin-top:20px;">
+                <button class="btn-sm" style="background:#10b981; color:#fff; padding:8px 14px;" onclick="openInvoiceModal(${t.id}); closeTransactionModal();">
+                    <i class="fa-solid fa-file-invoice-dollar"></i> View Payment Invoice
+                </button>
                 <button class="btn-sm" style="background:#0284c7; color:#fff; padding:8px 14px;" onclick="verifyRazorpayStatus(${t.id})">
                     <i class="fa-solid fa-rotate"></i> Sync Live Razorpay Status
                 </button>
@@ -889,6 +895,143 @@ async function openTransactionModal(txnId) {
 
 function closeTransactionModal() {
     document.getElementById('transaction-modal').classList.add('hidden');
+}
+
+// ----------------------------------------------------
+// 8. OFFICIAL PAYMENT INVOICE
+// ----------------------------------------------------
+async function openInvoiceModal(txnId) {
+    const modalBody = document.getElementById('invoice-modal-body');
+    modalBody.innerHTML = `<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Generating official payment invoice...</div>`;
+    document.getElementById('invoice-modal').classList.remove('hidden');
+
+    try {
+        const res = await fetch(`${API_BASE}/admin/transactions/${txnId}/invoice`, { headers: getHeaders() });
+        if (!res.ok) await handleApiError(res);
+        const data = await res.json();
+        const inv = data.invoice || {};
+        const comp = inv.company || {};
+        const cust = inv.customer || {};
+        const hotel = inv.hotel || {};
+        const stay = inv.stay || {};
+        const logi = inv.logistics || {};
+        const pay = inv.payment || {};
+        const price = inv.pricing || {};
+
+        modalBody.innerHTML = `
+            <div class="invoice-box">
+                <!-- Invoice Header / Letterhead -->
+                <div class="invoice-header-row" style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px;">
+                    <div>
+                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
+                            <i class="fa-solid fa-hotel" style="font-size:28px; color:var(--primary);"></i>
+                            <h2 style="margin:0; font-size:22px; font-weight:800; color:var(--text-primary);">${comp.name || 'Yaan Platform'}</h2>
+                        </div>
+                        <div style="font-size:12px; color:var(--text-secondary); line-height:1.4;">
+                            <div>${comp.address}</div>
+                            <div>${comp.city} • Email: ${comp.email}</div>
+                            <div><strong>GSTIN:</strong> ${comp.gstin}</div>
+                        </div>
+                    </div>
+                    <div style="text-align:right;">
+                        <span class="badge ${pay.status === 'PAID' || pay.status === 'CONFIRMED' ? 'confirmed' : 'pending'}" style="font-size:12px; padding:6px 12px; text-transform:uppercase;">
+                            ${pay.status}
+                        </span>
+                        <h3 style="margin:8px 0 2px 0; font-size:18px; color:var(--primary); font-family:monospace;">${inv.invoice_number}</h3>
+                        <div style="font-size:12px; color:var(--text-muted);">Date: <strong>${inv.invoice_date}</strong></div>
+                    </div>
+                </div>
+
+                <hr style="border:0; border-top:1px solid var(--border); margin:16px 0;">
+
+                <!-- Customer & Hotel Columns -->
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
+                    <div style="background:var(--bg-dark); padding:12px; border-radius:8px; border:1px solid var(--border);">
+                        <h4 style="margin:0 0 6px 0; font-size:13px; color:var(--primary);"><i class="fa-solid fa-user"></i> Billed To (Customer)</h4>
+                        <div style="font-size:12px; display:flex; flex-direction:column; gap:2px;">
+                            <div><strong>${cust.name}</strong></div>
+                            <div>Email: ${cust.email}</div>
+                            <div>Phone: ${cust.phone}</div>
+                        </div>
+                    </div>
+                    <div style="background:var(--bg-dark); padding:12px; border-radius:8px; border:1px solid var(--border);">
+                        <h4 style="margin:0 0 6px 0; font-size:13px; color:var(--primary);"><i class="fa-solid fa-building-user"></i> Hotel & Stay Details</h4>
+                        <div style="font-size:12px; display:flex; flex-direction:column; gap:2px;">
+                            <div><strong>${hotel.name}</strong> (${hotel.city})</div>
+                            <div>${hotel.address}</div>
+                            <div>Check-in: <strong>${stay.check_in}</strong> to <strong>${stay.check_out}</strong></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Logistics & Vehicle Info -->
+                <div style="background:var(--bg-dark); padding:10px 12px; border-radius:8px; border:1px solid var(--border); margin-bottom:16px;">
+                    <div style="font-size:12px; font-weight:700; color:var(--info); margin-bottom:4px;"><i class="fa-solid fa-truck"></i> Vehicle & Transport Details</div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; font-size:12px;">
+                        <div><strong>Truck No:</strong> ${logi.truck_no} (${logi.truck_type})</div>
+                        <div><strong>Logistics Partner:</strong> ${logi.logistics_name} (${logi.logistics_number})</div>
+                    </div>
+                </div>
+
+                <!-- Financial Table -->
+                <table class="custom-table" style="margin-bottom:16px;">
+                    <thead>
+                        <tr>
+                            <th>Description</th>
+                            <th style="text-align:center;">Nights</th>
+                            <th style="text-align:right;">Rate / Night</th>
+                            <th style="text-align:right;">Amount (₹)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>
+                                <strong>${hotel.name} Booking</strong><br>
+                                <small class="text-muted">Accommodation & Parking for ${stay.check_in} to ${stay.check_out}</small>
+                            </td>
+                            <td style="text-align:center;">${stay.total_nights}</td>
+                            <td style="text-align:right;">₹${(price.price_per_night || 0).toFixed(2)}</td>
+                            <td style="text-align:right;">₹${(price.subtotal || 0).toFixed(2)}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <!-- Summary Breakdown -->
+                <div style="display:grid; grid-template-columns:1.2fr 1fr; gap:16px; margin-bottom:16px;">
+                    <div style="background:var(--bg-dark); padding:12px; border-radius:8px; border:1px solid var(--border); font-size:12px; display:flex; flex-direction:column; gap:4px;">
+                        <h4 style="margin:0 0 6px 0; font-size:13px; color:#a855f7;"><i class="fa-solid fa-shield-halved"></i> Payment Metadata</h4>
+                        <div><strong>Payment Method:</strong> ${pay.payment_method}</div>
+                        <div><strong>Transaction ID:</strong> <span style="font-family:monospace; color:var(--success); font-weight:700;">${pay.display_transaction_id}</span></div>
+                        ${pay.razorpay_order_id ? `<div><strong>Razorpay Order ID:</strong> <span style="font-family:monospace;">${pay.razorpay_order_id}</span></div>` : ''}
+                        ${pay.razorpay_payment_id ? `<div><strong>Razorpay Payment ID:</strong> <span style="font-family:monospace;">${pay.razorpay_payment_id}</span></div>` : ''}
+                        <div><strong>Region Timestamp:</strong> ${pay.region_time}</div>
+                    </div>
+
+                    <div style="background:var(--bg-dark); padding:12px; border-radius:8px; border:1px solid var(--border); display:flex; flex-direction:column; gap:6px; font-size:13px;">
+                        <div style="display:flex; justify-content:space-between;"><span>Subtotal:</span> <strong>₹${(price.subtotal || 0).toFixed(2)}</strong></div>
+                        ${price.promotion_applied > 0 ? `<div style="display:flex; justify-content:space-between; color:var(--success);"><span>Discount:</span> <strong>-₹${(price.promotion_applied).toFixed(2)}</strong></div>` : ''}
+                        <div style="display:flex; justify-content:space-between;"><span>GST (18%):</span> <strong>₹${(price.gst_amount || 0).toFixed(2)}</strong></div>
+                        <hr style="border:0; border-top:1px solid var(--border); margin:4px 0;">
+                        <div style="display:flex; justify-content:space-between; font-size:16px; color:var(--primary);"><span>Total Payable:</span> <strong>₹${(price.total_payable || 0).toFixed(2)}</strong></div>
+                    </div>
+                </div>
+
+                <div style="text-align:center; font-size:11px; color:var(--text-muted); border-top:1px solid var(--border); padding-top:12px;">
+                    Thank you for booking with Yaan! This is a computer-generated tax invoice and requires no physical signature.
+                </div>
+            </div>
+        `;
+    } catch (err) {
+        modalBody.innerHTML = `<div class="empty-state text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error generating invoice'}</div>`;
+    }
+}
+
+function closeInvoiceModal() {
+    document.getElementById('invoice-modal').classList.add('hidden');
+}
+
+function printInvoice() {
+    window.print();
 }
 
 async function verifyRazorpayStatus(txnId) {
