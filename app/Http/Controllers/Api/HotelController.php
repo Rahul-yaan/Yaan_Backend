@@ -14,11 +14,10 @@ class HotelController extends Controller
      */
     private function applyApprovedScope($query)
     {
-        return $query->where(function($q) {
-            $q->where('status', 'approved')->orWhere('status', 'active');
-        })->whereHas('owner', function($q) {
-            $q->whereRaw('("is_verified" = true OR "is_verified" IS TRUE)');
-        });
+        return $query->where('status', 'approved')
+            ->whereHas('owner', function($q) {
+                $q->whereRaw('("is_verified" = true OR "is_verified" IS TRUE)');
+            });
     }
 
     // GET /api/hotels
