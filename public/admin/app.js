@@ -1169,9 +1169,16 @@ async function updateTransactionStatus(txnId, newStatus) {
     }
 
     try {
-        // If payment was captured and admin is cancelling, call Razorpay Refund API (Prompt 2 Fix)
+        // If payment was captured and admin is cancelling, call Razorpay Refund API with strict Admin approval prompt
         if (newStatus === 'cancelled' && isPaid) {
-            if (!confirm(`Warning: This payment of ₹${txn.total_payable || txn.total_amount} is currently CAPTURED at Razorpay.\n\nClicking OK will call Razorpay's Refund API (POST /v1/payments/${txn.razorpay_payment_id}/refund).\n\nProceed with Razorpay refund?`)) {
+            const customerName = (txn && txn.user) ? txn.user.name : 'Customer';
+            const refundAmount = txn ? (txn.total_payable || txn.total_amount || 0) : 0;
+            
+            const adminApproved = confirm(`🔔 ADMIN REFUND APPROVAL REQUIRED:\n\nBooking ID: #${txnId}\nCustomer: ${customerName}\nRefund Amount: ₹${refundAmount}\nReason: ${reason}\n\nDo you explicitly APPROVE issuing this refund to the customer via Razorpay?\n\n• Click OK (YES) to APPROVE & issue the refund.\n• Click CANCEL (NO) to REJECT & keep money.`);
+            
+            if (!adminApproved) {
+                showToast('Refund request REJECTED by Admin. No money was refunded.', 'warning');
+                loadTransactionsData();
                 return;
             }
 

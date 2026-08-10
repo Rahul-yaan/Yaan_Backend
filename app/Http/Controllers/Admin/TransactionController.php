@@ -15,6 +15,9 @@ class TransactionController extends Controller
      */
     public function index(Request $request)
     {
+        // Auto-trigger Live Sync for any stuck pending transactions in the background
+        $this->autoSyncPendingTransactions();
+
         $query = Booking::with(['user:id,name,email,phone', 'hotel:id,name,city,address']);
 
         // Filter by Transaction Type / Status (Strict Success vs Temporary vs Cancelled/Refunded)
@@ -488,6 +491,68 @@ class TransactionController extends Controller
                 'booking_raw' => $transaction,
             ]
         ]);
+    }
+
+    /**
+     * Auto-trigger Live Sync in background for stuck pending bookings.
+     */
+    private function autoSyncPendingTransactions()
+    {
+        $razorpayKeyId     = config('services.razorpay.key_id') ?? env('RAZORPAY_KEY_ID');
+        $razorpayKeySecret = config('services.razorpay.key_secret') ?? env('RAZORPAY_KEY_SECRET');
+
+        if (empty($razorpayKeyId) || empty($razorpayKeySecret)) return;
+
+        try {
+            $stuckBookings = Booking::where('status', 'pending')
+                ->whereNotIn('payment_status', ['paid', 'refunded'])
+                ->where(function($q) {
+                    $q->whereNotNull('razorpay_payment_id')->orWhereNotNull('razorpay_order_id');
+                })
+                ->where('created_at', '>=', now()->subHours(48))
+                ->take(10)
+                ->get();
+
+            foreach ($stuckBookings as $b) {
+                if (!empty($b->razorpay_payment_id)) {
+                    $res = Http::withBasicAuth($razorpayKeyId, $razorpayKeySecret)
+                        ->get("https://api.razorpay.com/v1/payments/{$b->razorpay_payment_id}");
+                    if ($res->successful()) {
+                        $data = $res->json();
+                        $status = $data['status'] ?? 'unknown';
+                        if (in_array($status, ['captured', 'authorized'])) {
+                            $b->payment_status = 'paid';
+                            $b->status = 'confirmed';
+                            $b->transaction_id = $b->transaction_id ?? $b->razorpay_payment_id;
+                            $b->cancellation_reason = 'Auto-synced from Razorpay (Payment Captured)';
+                            $b->gateway_response = json_encode($data);
+                            $b->save();
+                        }
+                    }
+                } elseif (!empty($b->razorpay_order_id)) {
+                    $res = Http::withBasicAuth($razorpayKeyId, $razorpayKeySecret)
+                        ->get("https://api.razorpay.com/v1/orders/{$b->razorpay_order_id}/payments");
+                    if ($res->successful()) {
+                        $items = $res->json('items') ?? [];
+                        if (!empty($items)) {
+                            $latest = $items[0];
+                            $status = $latest['status'] ?? 'unknown';
+                            if (in_array($status, ['captured', 'authorized'])) {
+                                $b->payment_status = 'paid';
+                                $b->status = 'confirmed';
+                                $b->razorpay_payment_id = $latest['id'];
+                                $b->transaction_id = $latest['id'];
+                                $b->cancellation_reason = 'Auto-synced from Razorpay (Payment Captured)';
+                                $b->gateway_response = json_encode($latest);
+                                $b->save();
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::error('Auto-sync background check error: ' . $e->getMessage());
+        }
     }
 }
 
