@@ -61,4 +61,38 @@ class OwnerController extends Controller
             'owner'   => $owner->load('ownerProfile'),
         ]);
     }
+
+    /**
+     * Remove / Reset Owner KYC data completely.
+     * Endpoint: POST /api/admin/owners/{id}/reset-kyc
+     */
+    public function resetKyc($id)
+    {
+        $owner = User::where('role', 'owner')->findOrFail($id);
+
+        $profile = OwnerProfile::where('user_id', $owner->id)->first();
+        if ($profile) {
+            $profile->is_profile_complete = false;
+            $profile->aadhaar_front       = null;
+            $profile->aadhaar_back        = null;
+            $profile->pan_card            = null;
+            $profile->fssai_license       = null;
+            $profile->gst_image           = null;
+            $profile->business_proof      = null;
+            $profile->gst_number          = null;
+            $profile->fssai_number        = null;
+            $profile->bank_name           = null;
+            $profile->account_number      = null;
+            $profile->ifsc_code           = null;
+            $profile->save();
+        }
+
+        $owner->is_verified = false;
+        $owner->save();
+
+        return response()->json([
+            'message' => "Owner KYC data has been removed and reset successfully. The owner can now re-submit fresh KYC details.",
+            'owner'   => $owner->load('ownerProfile'),
+        ]);
+    }
 }

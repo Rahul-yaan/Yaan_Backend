@@ -353,6 +353,7 @@ async function loadOwnersData() {
                         `<button class="btn-sm btn-success" onclick="verifyOwner(${o.id}, true)"><i class="fa-solid fa-user-check"></i> Approve KYC</button>` : 
                         `<button class="btn-sm btn-warning" onclick="verifyOwner(${o.id}, false)"><i class="fa-solid fa-user-xmark"></i> Revoke KYC</button>`
                     }
+                    <button class="btn-sm" style="background:#e11d48; color:white;" onclick="resetOwnerKyc(${o.id})" title="Remove & Reset Owner KYC Documents"><i class="fa-solid fa-trash-can"></i> Reset KYC</button>
                 </div>
             </div>
             `;
@@ -425,11 +426,12 @@ function openKycModal(ownerId) {
             ${(!profile.aadhaar_front && !profile.pan_card && !profile.business_proof) ? '<div class="empty-state">No document files uploaded by owner yet</div>' : ''}
         </div>
 
-        <div style="display:flex; gap:10px; margin-top:20px; justify-content:flex-end;">
+        <div style="display:flex; gap:10px; margin-top:20px; justify-content:flex-end; flex-wrap:wrap;">
             ${!isVerified ? 
                 `<button class="btn-sm btn-success" style="padding:8px 16px;" onclick="verifyOwner(${owner.id}, true); closeKycModal();"><i class="fa-solid fa-check"></i> Approve Owner KYC</button>` : 
-                `<button class="btn-sm btn-warning" style="padding:8px 16px;" onclick="verifyOwner(${owner.id}, false); closeKycModal();"><i class="fa-solid fa-xmark"></i> Revoke KYC</button>`
+                `<button class="btn-sm btn-warning" style="padding:8px 16px;" onclick="verifyOwner(${owner.id}, false); closeKycModal();"><i class="fa-solid fa-xmark"></i> Revoke Verification</button>`
             }
+            <button class="btn-sm" style="background:#e11d48; color:white; padding:8px 16px;" onclick="resetOwnerKyc(${owner.id}); closeKycModal();"><i class="fa-solid fa-trash-can"></i> Remove & Reset KYC Data</button>
             <button class="btn-sm" style="padding:8px 16px;" onclick="closeKycModal()">Close</button>
         </div>
     `;
@@ -452,6 +454,29 @@ async function verifyOwner(id, isVerified) {
         if (!res.ok) throw new Error(data.error || data.message || 'Failed to update owner verification');
 
         showToast(data.message || 'Owner verification updated', 'success');
+        loadOwnersData();
+    } catch (err) {
+        showToast(err.message, 'danger');
+    }
+}
+
+async function resetOwnerKyc(id) {
+    const owner = currentOwners.find(o => o.id === id);
+    const ownerName = owner ? owner.name : `Owner #${id}`;
+
+    if (!confirm(`Are you sure you want to REMOVE & RESET all uploaded KYC documents for ${ownerName}?\n\nThis will clear their verified status and document uploads so they can submit fresh KYC details.`)) {
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API_BASE}/admin/owners/${id}/reset-kyc`, {
+            method: 'POST',
+            headers: getHeaders(),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || data.message || 'Failed to reset owner KYC');
+
+        showToast(data.message || 'Owner KYC data removed and reset successfully', 'success');
         loadOwnersData();
     } catch (err) {
         showToast(err.message, 'danger');
