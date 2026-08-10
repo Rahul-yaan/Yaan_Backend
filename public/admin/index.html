@@ -382,7 +382,7 @@
                         <div class="metric-card gradient-teal">
                             <div class="metric-icon"><i class="fa-solid fa-circle-check"></i></div>
                             <div class="metric-info">
-                                <span class="metric-label">Confirmed Txns</span>
+                                <span class="metric-label">Confirmed Success Txns</span>
                                 <h3 id="stat-txn-confirmed-count">0</h3>
                             </div>
                         </div>
@@ -390,7 +390,7 @@
                         <div class="metric-card gradient-amber">
                             <div class="metric-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
                             <div class="metric-info">
-                                <span class="metric-label">Temporary / Pending</span>
+                                <span class="metric-label">Temporary Incomplete</span>
                                 <h3 id="stat-txn-temp-count">0</h3>
                             </div>
                         </div>
@@ -408,8 +408,8 @@
                     <div class="txn-filter-bar" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:14px;">
                         <div class="txn-subtabs" style="display:flex; gap:8px; flex-wrap:wrap;">
                             <button class="subtab-btn active" data-txntype="" onclick="filterTxnType('')">All Transactions</button>
-                            <button class="subtab-btn" data-txntype="confirmed" onclick="filterTxnType('confirmed')"><i class="fa-solid fa-circle-check"></i> Confirmed</button>
-                            <button class="subtab-btn" data-txntype="temporary" onclick="filterTxnType('temporary')"><i class="fa-solid fa-clock"></i> Temporary / Pending</button>
+                            <button class="subtab-btn" data-txntype="confirmed" onclick="filterTxnType('confirmed')"><i class="fa-solid fa-circle-check"></i> Confirmed (Success Block)</button>
+                            <button class="subtab-btn" data-txntype="temporary" onclick="filterTxnType('temporary')"><i class="fa-solid fa-clock"></i> Temporary (Incomplete Block)</button>
                             <button class="subtab-btn" data-txntype="cancelled" onclick="filterTxnType('cancelled')"><i class="fa-solid fa-ban"></i> Cancelled / Failed</button>
                         </div>
                         <div class="filter-group">

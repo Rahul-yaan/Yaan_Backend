@@ -705,16 +705,22 @@ async function loadTransactionsData() {
             let statusText = t.status || 'pending';
             if (isConfirmed) {
                 statusBadgeClass = 'confirmed';
-                statusText = 'Confirmed';
+                statusText = 'CONFIRMED SUCCESS';
             } else if (t.status === 'cancelled') {
                 statusBadgeClass = 'cancelled';
-                statusText = 'Cancelled';
+                statusText = 'CANCELLED / EXITED';
             } else if (t.payment_status === 'failed') {
                 statusBadgeClass = 'failed';
-                statusText = 'Failed';
+                statusText = 'PAYMENT FAILED';
+            } else {
+                statusBadgeClass = 'pending';
+                statusText = 'TEMPORARY / UNVERIFIED';
             }
 
-            const reasonText = t.cancellation_reason || (isTemp ? 'Temporary Payment / Pending Verification' : '');
+            let reasonText = t.cancellation_reason;
+            if (!reasonText && isTemp) {
+                reasonText = 'Money Deducted? Click Live Sync to check Razorpay status';
+            }
 
             return `
                 <tr class="${isTemp ? 'temp-txn-row' : 'confirmed-txn-row'}">
@@ -1044,7 +1050,11 @@ async function verifyRazorpayStatus(txnId) {
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || 'Razorpay verification failed');
 
-        showToast(data.message || 'Razorpay status synced!', 'success');
+        if (data.live_status === 'captured' || data.live_status === 'authorized' || (data.transaction && (data.transaction.payment_status === 'paid' || data.transaction.status === 'confirmed'))) {
+            showToast('Payment verified with Razorpay! Moved to Confirmed Success Block.', 'success');
+        } else {
+            showToast(data.message || 'Razorpay status synced!', 'info');
+        }
         loadTransactionsData();
         // Refresh modal if open
         if (!document.getElementById('transaction-modal').classList.contains('hidden')) {
