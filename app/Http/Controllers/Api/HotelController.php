@@ -17,7 +17,7 @@ class HotelController extends Controller
         return $query->where(function($q) {
             $q->where('status', 'approved')->orWhere('status', 'active');
         })->whereHas('owner', function($q) {
-            $q->where('is_verified', true);
+            $q->whereRaw('("is_verified" = true OR "is_verified" IS TRUE)');
         });
     }
 

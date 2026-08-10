@@ -25,14 +25,13 @@ class OwnerController extends Controller
         if ($request->has('verified') && $request->verified !== '' && $request->verified !== null) {
             $isVerified = filter_var($request->verified, FILTER_VALIDATE_BOOLEAN);
             if ($isVerified) {
-                $query->where('is_verified', true)
+                $query->whereRaw('("is_verified" = true OR "is_verified" IS TRUE)')
                       ->whereHas('ownerProfile', function($q) {
                           $q->whereRaw('("is_profile_complete" = true OR "is_profile_complete" IS TRUE)');
                       });
             } else {
                 $query->where(function($q) {
-                    $q->where('is_verified', false)
-                      ->orWhereNull('is_verified')
+                    $q->whereRaw('("is_verified" = false OR "is_verified" IS FALSE OR "is_verified" IS NULL)')
                       ->orWhereHas('ownerProfile', function($sq) {
                           $sq->whereRaw('("is_profile_complete" = false OR "is_profile_complete" IS FALSE OR "is_profile_complete" IS NULL)');
                       })
