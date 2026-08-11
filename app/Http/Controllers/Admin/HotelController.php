@@ -68,8 +68,36 @@ class HotelController extends Controller
 
     public function show($id)
     {
-        $hotel = Hotel::with(['owner', 'images', 'amenities', 'reviews.user', 'bookings.user'])->findOrFail($id);
-        return response()->json(['hotel' => $hotel]);
+        $hotel = Hotel::with(['owner', 'images', 'amenities', 'reviews.user'])->findOrFail($id);
+
+        $bookings = \App\Models\Booking::where('hotel_id', $hotel->id)
+            ->with(['user:id,name,email,phone'])
+            ->latest()
+            ->get();
+
+        $totalBookings     = $bookings->count();
+        $confirmedBookings = $bookings->filter(function($b) {
+            return ($b->payment_status === 'paid' || in_array($b->status, ['confirmed', 'completed'])) && $b->payment_status !== 'refunded';
+        });
+
+        $totalRevenue = (float) $confirmedBookings->sum(function($b) {
+            return (float) ($b->total_payable ?? $b->total_amount ?? 0);
+        });
+
+        $totalCancelled = $bookings->filter(function($b) {
+            return $b->status === 'cancelled' || in_array($b->payment_status, ['refunded', 'refund_initiated']);
+        })->count();
+
+        return response()->json([
+            'hotel'      => $hotel,
+            'analytics'  => [
+                'total_revenue'      => $totalRevenue,
+                'total_bookings'     => $totalBookings,
+                'confirmed_bookings' => $confirmedBookings->count(),
+                'cancelled_bookings' => $totalCancelled,
+            ],
+            'visiting_customers' => $bookings->take(20),
+        ]);
     }
 
     public function updateStatus(Request $request, $id)

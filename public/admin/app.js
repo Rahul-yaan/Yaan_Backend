@@ -300,12 +300,54 @@ async function loadHotelsData() {
             return;
         }
 
+function getHotelImageUrl(imgObj) {
+    const defaultFallback = 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80';
+    if (!imgObj) return defaultFallback;
+    let path = typeof imgObj === 'string' ? imgObj : (imgObj.url || imgObj.image_path);
+    if (!path) return defaultFallback;
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    const clean = path.replace(/^\/?storage\//, '').replace(/^\//, '');
+    return `${STORAGE_BASE}/${clean}`;
+}
+
+async function loadHotelsData() {
+    const container = document.getElementById('hotels-container');
+    const searchInput = document.getElementById('search-hotels');
+    const citySelect   = document.getElementById('filter-hotel-city');
+    const stateSelect  = document.getElementById('filter-hotel-state');
+
+    const search = searchInput ? searchInput.value : '';
+    const city   = citySelect ? citySelect.value : '';
+    const state  = stateSelect ? stateSelect.value : '';
+
+    container.innerHTML = `<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Searching & loading hotel listings...</div>`;
+
+    try {
+        let url = `${API_BASE}/admin/hotels?status=${currentHotelStatusFilter}&search=${encodeURIComponent(search)}&city=${encodeURIComponent(city)}&state=${encodeURIComponent(state)}`;
+        const res = await fetch(url, { headers: getHeaders() });
+        if (!res.ok) await handleApiError(res);
+        const data = await res.json();
+        const hotels = data.data || [];
+
+        populateHotelCitiesDropdown(hotels);
+
+        if (hotels.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state" style="padding:40px 20px; text-align:center; grid-column:1/-1;">
+                    <i class="fa-solid fa-hotel-slash" style="font-size:36px; color:var(--text-muted); margin-bottom:12px;"></i>
+                    <h3 style="margin:0 0 6px 0; font-size:16px;">No Hotels Found</h3>
+                    <p style="color:var(--text-muted); font-size:13px; margin:0;">No hotel listings match your current search ("${search || 'all'}"), city ("${city || 'all'}"), state ("${state || 'all'}"), or status filter.</p>
+                </div>
+            `;
+            return;
+        }
+
         container.innerHTML = hotels.map(h => {
             const isApproved = h.status === 'approved' || h.status === 'active';
             const isPending  = h.status === 'pending';
-            const primaryImg = (h.primary_image && h.primary_image.image_path) 
-                ? (h.primary_image.image_path.startsWith('http') ? h.primary_image.image_path : `${STORAGE_BASE}/${h.primary_image.image_path}`)
-                : (h.images && h.images.length > 0 ? (h.images[0].image_path.startsWith('http') ? h.images[0].image_path : `${STORAGE_BASE}/${h.images[0].image_path}`) : 'https://via.placeholder.com/400x250?text=No+Hotel+Image');
+
+            const rawImg = h.primary_image || (h.images && h.images.length > 0 ? h.images[0] : null);
+            const primaryImg = getHotelImageUrl(rawImg);
 
             let statusBadgeClass = isApproved ? 'confirmed' : (isPending ? 'pending' : 'failed');
             let statusText       = isApproved ? 'APPROVED' : (isPending ? 'PENDING APPROVAL' : 'REJECTED / SUSPENDED');
@@ -313,8 +355,8 @@ async function loadHotelsData() {
             return `
                 <div class="data-card" style="display:flex; flex-direction:column; justify-content:space-between; position:relative; overflow:hidden;">
                     <div>
-                        <div style="position:relative; height:150px; border-radius:8px; overflow:hidden; margin-bottom:12px; background:#0f172a;">
-                            <img src="${primaryImg}" alt="${h.name}" style="width:100%; height:100%; object-fit:cover;" onerror="this.src='https://via.placeholder.com/400x250?text=Hotel+Image'">
+                        <div style="position:relative; height:160px; border-radius:8px; overflow:hidden; margin-bottom:12px; background:#0f172a;">
+                            <img src="${primaryImg}" alt="${h.name}" style="width:100%; height:100%; object-fit:cover;" onerror="this.src='https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80'">
                             <span class="badge ${statusBadgeClass}" style="position:absolute; top:8px; right:8px; font-size:10px; font-weight:700; ${!isApproved && !isPending ? 'background:#e11d48; color:#fff;' : ''}">
                                 ${statusText}
                             </span>
@@ -390,13 +432,15 @@ async function openHotelDetailsModal(id) {
         if (!res.ok) await handleApiError(res);
         const data = await res.json();
         const h = data.hotel;
+        const analytics = data.analytics || {};
+        const visitingCustomers = data.visiting_customers || [];
         const isApproved = h.status === 'approved' || h.status === 'active';
         const isPending  = h.status === 'pending';
 
-        const images = (h.images || []).map(img => {
-            return img.image_path.startsWith('http') ? img.image_path : `${STORAGE_BASE}/${img.image_path}`;
-        });
-        if (images.length === 0) images.push('https://via.placeholder.com/600x350?text=No+Hotel+Images+Uploaded');
+        const galleryImages = (h.images || []).map(img => getHotelImageUrl(img));
+        if (galleryImages.length === 0) {
+            galleryImages.push('https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80');
+        }
 
         body.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
@@ -425,9 +469,29 @@ async function openHotelDetailsModal(id) {
             </div>
 
             <!-- Image Gallery -->
-            <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; gap:8px; height:180px; overflow:hidden; border-radius:8px; margin-bottom:14px;">
-                <img src="${images[0]}" style="width:100%; height:100%; object-fit:cover;" onerror="this.src='https://via.placeholder.com/600x350?text=Hotel+Image'">
-                ${images.slice(1, 3).map(img => `<img src="${img}" style="width:100%; height:100%; object-fit:cover;" onerror="this.src='https://via.placeholder.com/300x200?text=Gallery'">`).join('')}
+            <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; gap:8px; height:180px; overflow:hidden; border-radius:8px; margin-bottom:14px; background:#0f172a;">
+                <img src="${galleryImages[0]}" style="width:100%; height:100%; object-fit:cover;" onerror="this.src='https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80'">
+                ${galleryImages.slice(1, 3).map(img => `<img src="${img}" style="width:100%; height:100%; object-fit:cover;" onerror="this.src='https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=400&q=80'">`).join('')}
+            </div>
+
+            <!-- Hotel Financial Performance & Revenue Grid -->
+            <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; background:var(--bg-dark); padding:14px; border-radius:8px; border:1px solid var(--border); margin-bottom:14px;">
+                <div style="text-align:center;">
+                    <span style="font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Hotel Revenue</span>
+                    <h3 style="margin:4px 0 0 0; color:var(--success); font-size:18px;">₹${(analytics.total_revenue || 0).toLocaleString('en-IN')}</h3>
+                </div>
+                <div style="text-align:center;">
+                    <span style="font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Total Bookings</span>
+                    <h3 style="margin:4px 0 0 0; color:#38bdf8; font-size:18px;">${analytics.total_bookings || 0}</h3>
+                </div>
+                <div style="text-align:center;">
+                    <span style="font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Confirmed Check-ins</span>
+                    <h3 style="margin:4px 0 0 0; color:#10b981; font-size:18px;">${analytics.confirmed_bookings || 0}</h3>
+                </div>
+                <div style="text-align:center;">
+                    <span style="font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Cancelled / Refunded</span>
+                    <h3 style="margin:4px 0 0 0; color:#f43f5e; font-size:18px;">${analytics.cancelled_bookings || 0}</h3>
+                </div>
             </div>
 
             <!-- Specs Grid -->
@@ -450,6 +514,29 @@ async function openHotelDetailsModal(id) {
                     <div style="color:var(--text-secondary); line-height:1.4;">${h.description || 'No detailed description provided by owner.'}</div>
                 </div>
             </div>
+
+            <!-- Visiting Customers List -->
+            <h4 style="margin:0 0 8px 0; font-size:14px; color:#a855f7;"><i class="fa-solid fa-users"></i> Visiting Customers & Check-in History (${visitingCustomers.length})</h4>
+            ${visitingCustomers.length === 0 ? `
+                <div style="padding:10px; background:var(--bg-dark); border-radius:6px; font-size:12px; color:var(--text-muted); margin-bottom:14px;">No customer check-ins recorded at this hotel yet.</div>
+            ` : `
+                <div style="max-height:160px; overflow-y:auto; display:flex; flex-direction:column; gap:6px; margin-bottom:14px;">
+                    ${visitingCustomers.map(b => `
+                        <div style="background:var(--bg-dark); padding:8px 12px; border-radius:6px; border:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; font-size:12px;">
+                            <div>
+                                <strong style="color:var(--text-primary);">${b.user ? b.user.name : 'Guest User'}</strong> (${b.user ? b.user.phone : 'N/A'})<br>
+                                <small class="text-muted">Check-in: ${b.check_in || ''} to ${b.check_out || ''}</small>
+                            </div>
+                            <div style="text-align:right;">
+                                <strong style="color:var(--text-primary);">₹${b.total_payable || b.total_amount}</strong><br>
+                                <span class="badge ${b.status === 'confirmed' ? 'confirmed' : (b.payment_status === 'refunded' ? 'failed' : 'pending')}" style="font-size:10px;">
+                                    ${b.payment_status === 'refunded' ? 'REFUNDED' : b.status.toUpperCase()}
+                                </span>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `}
 
             <!-- Amenities -->
             ${(h.amenities || []).length > 0 ? `
