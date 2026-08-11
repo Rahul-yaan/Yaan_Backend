@@ -11,18 +11,33 @@ class OwnerController extends Controller
 {
     public function index(Request $request)
     {
-        $query = User::where('role', 'owner')->with(['ownerProfile']);
+        $query = User::where('role', 'owner')->with(['ownerProfile', 'hotels']);
 
         if ($request->has('search') && !empty($request->search)) {
-            $search = $request->search;
+            $search = trim($request->search);
             $query->where(function($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
                   ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('phone', 'like', "%{$search}%");
+                  ->orWhere('phone', 'like', "%{$search}%")
+                  ->orWhereHas('ownerProfile', function($pq) use ($search) {
+                      $pq->where('hotel_name', 'like', "%{$search}%")
+                         ->orWhere('gst_number', 'like', "%{$search}%");
+                  })
+                  ->orWhereHas('hotels', function($hq) use ($search) {
+                      $hq->where('name', 'like', "%{$search}%")
+                         ->orWhere('city', 'like', "%{$search}%");
+                  });
             });
         }
 
-        if ($request->has('verified') && $request->verified !== '' && $request->verified !== null) {
+        if ($request->has('city') && !empty($request->city)) {
+            $city = trim($request->city);
+            $query->whereHas('hotels', function($hq) use ($city) {
+                $hq->where('city', 'like', "%{$city}%");
+            });
+        }
+
+        if ($request->has('verified') && $request->verified !== '' && $request->verified !== null && $request->verified !== 'all') {
             $isVerified = filter_var($request->verified, FILTER_VALIDATE_BOOLEAN);
             if ($isVerified) {
                 $query->whereRaw('("is_verified" = true OR "is_verified" IS TRUE)')
@@ -43,6 +58,37 @@ class OwnerController extends Controller
         $owners = $query->withCount('hotels')->latest()->paginate($request->input('per_page', 15));
 
         return response()->json($owners);
+    }
+
+    public function show($id)
+    {
+        $owner = User::where('role', 'owner')
+            ->with(['ownerProfile', 'hotels.images'])
+            ->findOrFail($id);
+
+        $hotelIds = $owner->hotels->pluck('id');
+
+        $bookings = \App\Models\Booking::whereIn('hotel_id', $hotelIds)
+            ->with(['user:id,name,email,phone', 'hotel:id,name,city'])
+            ->latest()
+            ->get();
+
+        $totalBookings     = $bookings->count();
+        $confirmedBookings = $bookings->whereIn('status', ['confirmed', 'completed'])->where('payment_status', '!=', 'refunded');
+        $totalRevenue      = (float) $confirmedBookings->sum('total_payable');
+        $totalCancelled    = $bookings->where('status', 'cancelled')->count();
+
+        return response()->json([
+            'owner'       => $owner,
+            'hotels'      => $owner->hotels,
+            'analytics'   => [
+                'total_revenue'      => $totalRevenue,
+                'total_bookings'     => $totalBookings,
+                'confirmed_bookings' => $confirmedBookings->count(),
+                'cancelled_bookings' => $totalCancelled,
+            ],
+            'visiting_customers' => $bookings->take(25),
+        ]);
     }
 
     public function verifyOwner(Request $request, $id)

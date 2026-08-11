@@ -71,6 +71,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Owners
         Route::get('/owners',              [App\Http\Controllers\Admin\OwnerController::class, 'index']);
+        Route::get('/owners/{id}',         [App\Http\Controllers\Admin\OwnerController::class, 'show']);
         Route::put('/owners/{id}/verify',  [App\Http\Controllers\Admin\OwnerController::class, 'verifyOwner']);
         Route::post('/owners/{id}/reset-kyc', [App\Http\Controllers\Admin\OwnerController::class, 'resetKyc']);
 

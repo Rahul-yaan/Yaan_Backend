@@ -103,7 +103,7 @@
                         <span id="badge-pending-hotels" class="nav-badge alert hidden">0</span>
                     </a>
                     <a href="#" class="nav-item" data-tab="owners" onclick="switchTab('owners', event)">
-                        <i class="fa-solid fa-id-card"></i> <span>Owner KYC</span>
+                        <i class="fa-solid fa-id-card"></i> <span>Hotel Owners</span>
                         <span id="badge-pending-owners" class="nav-badge info hidden">0</span>
                     </a>
                     <a href="#" class="nav-item" data-tab="bookings" onclick="switchTab('bookings', event)">
@@ -279,23 +279,37 @@
                 </section>
 
                 <!-- -------------------------------------- -->
-                <!-- TAB 3: OWNER KYC VERIFICATION -->
+                <!-- TAB 3: HOTEL OWNERS MANAGEMENT -->
                 <!-- -------------------------------------- -->
                 <section id="tab-owners" class="tab-content">
                     <div class="section-title">
-                        <h2>Hotel Owners & KYC</h2>
-                        <div class="filter-group">
-                            <select id="filter-owner-verified" onchange="loadOwnersData()">
-                                <option value="">All Verification</option>
-                                <option value="false">Pending / Unverified</option>
-                                <option value="true">Verified Owners</option>
-                            </select>
-                        </div>
+                        <h2>Hotel Owners Profile & Performance</h2>
                     </div>
 
-                    <div class="search-bar">
-                        <i class="fa-solid fa-magnifying-glass"></i>
-                        <input type="text" id="search-owners" placeholder="Search owner name, email, or phone..." onkeyup="debounce(loadOwnersData, 400)()">
+                    <!-- Owners Filter Navigation Subtabs -->
+                    <div class="txn-subtabs" style="margin-bottom:16px;">
+                        <button class="subtab-btn active" data-owner-filter="false" onclick="filterOwnersByStatus('false', this)">
+                            <i class="fa-solid fa-clock"></i> Pending KYC (New Registrations)
+                        </button>
+                        <button class="subtab-btn" data-owner-filter="true" onclick="filterOwnersByStatus('true', this)">
+                            <i class="fa-solid fa-user-check"></i> Verified Owners
+                        </button>
+                        <button class="subtab-btn" data-owner-filter="all" onclick="filterOwnersByStatus('all', this)">
+                            <i class="fa-solid fa-users-gear"></i> All Hotel Owners
+                        </button>
+                    </div>
+
+                    <!-- Search Bar & City Multi-Filter -->
+                    <div style="display:grid; grid-template-columns: 2fr 1fr; gap:10px; margin-bottom:16px;" class="owner-filters-bar">
+                        <div class="search-bar" style="margin-bottom:0;">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="search-owners" placeholder="Search owner name, city, phone number, or hotel name..." onkeyup="debounce(loadOwnersData, 400)()">
+                        </div>
+                        <div>
+                            <select id="filter-owner-city" class="custom-select" style="width:100%; padding:11px 14px; border-radius:8px; background:var(--bg-dark); border:1px solid var(--border); color:var(--text-primary); font-size:13px;" onchange="loadOwnersData()">
+                                <option value="">All Cities</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div id="owners-container" class="data-cards-grid">

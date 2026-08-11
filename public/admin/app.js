@@ -471,59 +471,252 @@ function closeHotelModal() {
 }
 
 // ----------------------------------------------------
-// 3. OWNER KYC MANAGEMENT
+// 3. OWNER KYC & PERFORMANCE MANAGEMENT
 // ----------------------------------------------------
-async function loadOwnersData() {
-    const container = document.getElementById('owners-container');
-    const verified = document.getElementById('filter-owner-verified').value;
-    const search = document.getElementById('search-owners').value;
+let currentOwnerStatusFilter = 'false'; // Default view: Pending KYC for new registrations
 
-    container.innerHTML = `<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Loading owners...</div>`;
+function filterOwnersByStatus(verifiedState, btnElem) {
+    currentOwnerStatusFilter = verifiedState;
+    document.querySelectorAll('#tab-owners .subtab-btn').forEach(b => b.classList.remove('active'));
+    if (btnElem) btnElem.classList.add('active');
+    loadOwnersData();
+}
+
+let loadedOwnerCitiesList = false;
+async function populateOwnerCitiesDropdown() {
+    const citySelect = document.getElementById('filter-owner-city');
+    if (!citySelect || loadedOwnerCitiesList) return;
 
     try {
-        let url = `${API_BASE}/admin/owners?verified=${verified}&search=${encodeURIComponent(search)}`;
+        const res = await fetch(`${API_BASE}/admin/hotels/locations`, { headers: getHeaders() });
+        if (res.ok) {
+            const data = await res.json();
+            const cities = data.cities || [];
+            if (cities.length > 0) {
+                const currentVal = citySelect.value;
+                citySelect.innerHTML = `<option value="">All Cities (${cities.length})</option>` + 
+                    cities.map(c => `<option value="${c}" ${currentVal === c ? 'selected' : ''}>${c}</option>`).join('');
+                loadedOwnerCitiesList = true;
+            }
+        }
+    } catch(e) {}
+}
+
+async function loadOwnersData() {
+    const container = document.getElementById('owners-container');
+    const searchInput = document.getElementById('search-owners');
+    const citySelect   = document.getElementById('filter-owner-city');
+
+    const search = searchInput ? searchInput.value : '';
+    const city   = citySelect ? citySelect.value : '';
+
+    container.innerHTML = `<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Loading hotel owner profiles...</div>`;
+
+    try {
+        let url = `${API_BASE}/admin/owners?verified=${currentOwnerStatusFilter}&search=${encodeURIComponent(search)}&city=${encodeURIComponent(city)}`;
         const res = await fetch(url, { headers: getHeaders() });
         if (!res.ok) await handleApiError(res);
         const data = await res.json();
         currentOwners = data.data || [];
 
+        populateOwnerCitiesDropdown();
+
         if (currentOwners.length === 0) {
-            container.innerHTML = `<div class="empty-state">No owners found</div>`;
+            container.innerHTML = `
+                <div class="empty-state" style="padding:40px 20px; text-align:center; grid-column:1/-1;">
+                    <i class="fa-solid fa-user-slash" style="font-size:36px; color:var(--text-muted); margin-bottom:12px;"></i>
+                    <h3 style="margin:0 0 6px 0; font-size:16px;">No Hotel Owners Found</h3>
+                    <p style="color:var(--text-muted); font-size:13px; margin:0;">No hotel owner accounts match your current search ("${search || 'all'}"), city ("${city || 'all'}"), or verification filter.</p>
+                </div>
+            `;
             return;
         }
 
         container.innerHTML = currentOwners.map(o => {
             const profile = o.owner_profile || o.ownerProfile || {};
             const isVerified = (o.is_verified === true || o.is_verified === 1) && (profile.is_profile_complete === true || profile.is_profile_complete === 1);
+            const joinedDate = o.created_at ? new Date(o.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A';
+
             return `
-            <div class="data-card">
-                <div class="data-card-header">
-                    <div class="data-card-title">
-                        <h4>${o.name}</h4>
-                        <div class="data-card-sub"><i class="fa-solid fa-envelope"></i> ${o.email} • <i class="fa-solid fa-phone"></i> ${o.phone}</div>
+            <div class="data-card" style="display:flex; flex-direction:column; justify-content:space-between; position:relative;">
+                <div>
+                    <div class="data-card-header" style="margin-bottom:10px;">
+                        <div class="data-card-title">
+                            <h4 style="font-size:16px; color:var(--text-primary); margin:0;">
+                                <i class="fa-solid fa-user-tie" style="color:var(--primary);"></i> ${o.name}
+                            </h4>
+                            <div class="data-card-sub" style="font-size:11px; margin-top:2px;">Joined: ${joinedDate}</div>
+                        </div>
+                        <span class="badge ${isVerified ? 'confirmed' : 'pending'}" style="font-size:11px; ${!isVerified ? 'background:#f59e0b; color:#000;' : ''}">
+                            <i class="fa-solid ${isVerified ? 'fa-circle-check' : 'fa-clock'}"></i> ${isVerified ? 'Verified Owner' : 'Pending KYC'}
+                        </span>
                     </div>
-                    <span class="badge ${isVerified ? 'verified' : 'pending'}">${isVerified ? 'Verified KYC' : 'Pending KYC'}</span>
+
+                    <div style="font-size:12px; color:var(--text-secondary); display:flex; flex-direction:column; gap:4px; background:var(--bg-dark); padding:10px; border-radius:6px; border:1px solid var(--border); margin-bottom:12px;">
+                        <div><i class="fa-solid fa-envelope" style="color:#38bdf8; font-size:11px;"></i> <strong>Email:</strong> ${o.email || 'N/A'}</div>
+                        <div><i class="fa-solid fa-phone" style="color:var(--text-primary); font-size:11px;"></i> <strong>Phone:</strong> ${o.phone || 'N/A'}</div>
+                        <div><i class="fa-solid fa-hotel" style="color:var(--success); font-size:11px;"></i> <strong>Hotel Name:</strong> ${profile.hotel_name || 'N/A'}</div>
+                        <div><i class="fa-solid fa-building" style="font-size:11px;"></i> <strong>Listed Hotels:</strong> ${o.hotels_count || 0} Hotels</div>
+                        ${profile.gst_number ? `<div><strong>GSTIN:</strong> ${profile.gst_number}</div>` : ''}
+                    </div>
                 </div>
-                <div style="font-size:13px; color: var(--text-secondary); display:flex; flex-direction:column; gap:4px; background:#f9f9f9; padding:8px; border-radius:6px; margin: 8px 0;">
-                    <div><strong>Hotel:</strong> ${profile.hotel_name || 'N/A'}</div>
-                    <div><strong>Listed Hotels:</strong> ${o.hotels_count || 0}</div>
-                    ${profile.gst_number ? `<div><strong>GST No:</strong> ${profile.gst_number}</div>` : ''}
-                    ${profile.fssai_number ? `<div><strong>FSSAI No:</strong> ${profile.fssai_number}</div>` : ''}
-                    ${profile.bank_name ? `<div><strong>Bank:</strong> ${profile.bank_name} (${profile.account_number || ''}) - ${profile.ifsc_code || ''}</div>` : ''}
-                </div>
-                <div style="display:flex; gap: 8px; margin-top: auto; flex-wrap: wrap;">
-                    <button class="btn-sm" style="background:#4a5568; color:white;" onclick="openKycModal(${o.id})"><i class="fa-solid fa-file-invoice"></i> Inspect Full KYC</button>
+
+                <div style="display:flex; gap:6px; flex-wrap:wrap; border-top:1px solid var(--border); padding-top:10px; margin-top:auto;">
+                    <button class="btn-sm" style="background:#4f46e5; color:white; font-weight:600;" onclick="openKycModal(${o.id})">
+                        <i class="fa-solid fa-chart-line"></i> Inspect & Analytics
+                    </button>
                     ${!isVerified ? 
                         `<button class="btn-sm btn-success" onclick="verifyOwner(${o.id}, true)"><i class="fa-solid fa-user-check"></i> Approve KYC</button>` : 
-                        `<button class="btn-sm btn-warning" onclick="verifyOwner(${o.id}, false)"><i class="fa-solid fa-user-xmark"></i> Revoke Verification</button>`
+                        `<button class="btn-sm btn-warning" onclick="verifyOwner(${o.id}, false)"><i class="fa-solid fa-user-xmark"></i> Revoke</button>`
                     }
-                    <button class="btn-sm" style="background:#e11d48; color:white;" onclick="resetOwnerKyc(${o.id})" title="Remove & Reset Owner KYC Documents"><i class="fa-solid fa-trash-can"></i> Reset KYC</button>
+                    <button class="btn-sm" style="background:#e11d48; color:white;" onclick="resetOwnerKyc(${o.id})" title="Remove & Reset Owner KYC Documents"><i class="fa-solid fa-trash-can"></i> Reset</button>
                 </div>
             </div>
             `;
         }).join('');
     } catch (err) {
         container.innerHTML = `<div class="empty-state text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading owners'}</div>`;
+    }
+}
+
+async function openKycModal(id) {
+    const modal = document.getElementById('kyc-modal');
+    const body = document.getElementById('kyc-modal-body');
+    if (!modal || !body) return;
+
+    body.innerHTML = `<div style="padding:30px; text-align:center;"><i class="fa-solid fa-spinner fa-spin"></i> Fetching Owner Profile, Financial Performance & Customer Check-in History...</div>`;
+    modal.classList.remove('hidden');
+
+    try {
+        const res = await fetch(`${API_BASE}/admin/owners/${id}`, { headers: getHeaders() });
+        if (!res.ok) await handleApiError(res);
+        const data = await res.json();
+        
+        const owner = data.owner;
+        const profile = owner.owner_profile || owner.ownerProfile || {};
+        const isVerified = (owner.is_verified === true || owner.is_verified === 1) && (profile.is_profile_complete === true || profile.is_profile_complete === 1);
+        const analytics = data.analytics || {};
+        const hotels = data.hotels || [];
+        const visitingCustomers = data.visiting_customers || [];
+
+        const getImgUrl = (path) => path ? (path.startsWith('http') ? path : `${STORAGE_BASE}/${path}`) : null;
+        const aadhaarFront = getImgUrl(profile.aadhaar_front);
+        const aadhaarBack  = getImgUrl(profile.aadhaar_back);
+        const panCard       = getImgUrl(profile.pan_card);
+        const fssaiLic     = getImgUrl(profile.fssai_license);
+        const gstImg       = getImgUrl(profile.gst_image);
+
+        body.innerHTML = `
+            <!-- Header Status -->
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+                <div>
+                    <h3 style="margin:0; font-size:18px; color:var(--text-primary);">
+                        <i class="fa-solid fa-user-tie" style="color:var(--primary);"></i> ${owner.name}
+                        <span class="badge ${isVerified ? 'confirmed' : 'pending'}" style="margin-left:8px; ${!isVerified ? 'background:#f59e0b; color:#000;' : ''}">
+                            ${isVerified ? 'Verified Owner' : 'Pending KYC Verification'}
+                        </span>
+                    </h3>
+                    <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">
+                        <i class="fa-solid fa-envelope"></i> ${owner.email} • <i class="fa-solid fa-phone"></i> ${owner.phone}
+                    </div>
+                </div>
+                <div style="display:flex; gap:6px;">
+                    ${!isVerified ? 
+                        `<button class="btn-sm btn-success" onclick="verifyOwner(${owner.id}, true); closeKycModal();"><i class="fa-solid fa-user-check"></i> Approve KYC</button>` : 
+                        `<button class="btn-sm btn-warning" onclick="verifyOwner(${owner.id}, false); closeKycModal();"><i class="fa-solid fa-user-xmark"></i> Revoke KYC</button>`
+                    }
+                    <button class="btn-sm" style="background:#e11d48; color:white;" onclick="resetOwnerKyc(${owner.id}); closeKycModal();"><i class="fa-solid fa-trash-can"></i> Reset KYC Documents</button>
+                </div>
+            </div>
+
+            <!-- Hotel Financial Performance & Analytics Grid -->
+            <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; background:var(--bg-dark); padding:14px; border-radius:8px; border:1px solid var(--border); margin-bottom:16px;">
+                <div style="text-align:center;">
+                    <span style="font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Total Revenue</span>
+                    <h3 style="margin:4px 0 0 0; color:var(--success); font-size:18px;">₹${(analytics.total_revenue || 0).toLocaleString('en-IN')}</h3>
+                </div>
+                <div style="text-align:center;">
+                    <span style="font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Total Bookings</span>
+                    <h3 style="margin:4px 0 0 0; color:#38bdf8; font-size:18px;">${analytics.total_bookings || 0}</h3>
+                </div>
+                <div style="text-align:center;">
+                    <span style="font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Confirmed Check-ins</span>
+                    <h3 style="margin:4px 0 0 0; color:#10b981; font-size:18px;">${analytics.confirmed_bookings || 0}</h3>
+                </div>
+                <div style="text-align:center;">
+                    <span style="font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Cancelled / Refunded</span>
+                    <h3 style="margin:4px 0 0 0; color:#f43f5e; font-size:18px;">${analytics.cancelled_bookings || 0}</h3>
+                </div>
+            </div>
+
+            <!-- Listed Hotels Grid -->
+            <h4 style="margin:0 0 8px 0; font-size:14px; color:var(--info);"><i class="fa-solid fa-building"></i> Listed Hotels (${hotels.length})</h4>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:16px;">
+                ${hotels.length === 0 ? `<div style="color:var(--text-muted); font-size:12px;">No hotel listings created by this owner yet.</div>` : hotels.map(h => `
+                    <div style="background:var(--bg-dark); padding:10px; border-radius:6px; border:1px solid var(--border); font-size:12px;">
+                        <strong style="color:var(--text-primary); font-size:13px;">${h.name}</strong> • ${h.city || ''}<br>
+                        <span style="color:var(--success); font-weight:700;">₹${h.price_per_night} / night</span> • ${h.total_rooms || 0} Rooms<br>
+                        <span class="badge ${h.status === 'approved' ? 'confirmed' : 'pending'}" style="font-size:10px; margin-top:4px;">${h.status.toUpperCase()}</span>
+                    </div>
+                `).join('')}
+            </div>
+
+            <!-- Visiting Customers List -->
+            <h4 style="margin:0 0 8px 0; font-size:14px; color:#a855f7;"><i class="fa-solid fa-users"></i> Visiting Customers & Check-ins (${visitingCustomers.length})</h4>
+            ${visitingCustomers.length === 0 ? `
+                <div style="padding:10px; background:var(--bg-dark); border-radius:6px; font-size:12px; color:var(--text-muted); margin-bottom:16px;">No customer visits recorded yet for this owner's hotels.</div>
+            ` : `
+                <div style="max-height:180px; overflow-y:auto; display:flex; flex-direction:column; gap:6px; margin-bottom:16px;">
+                    ${visitingCustomers.map(b => `
+                        <div style="background:var(--bg-dark); padding:8px 12px; border-radius:6px; border:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; font-size:12px;">
+                            <div>
+                                <strong style="color:var(--text-primary);">${b.user ? b.user.name : 'Guest User'}</strong> (${b.user ? b.user.phone : 'N/A'})<br>
+                                <small class="text-muted">Hotel: ${b.hotel ? b.hotel.name : 'N/A'} • Check-in: ${b.check_in || ''} to ${b.check_out || ''}</small>
+                            </div>
+                            <div style="text-align:right;">
+                                <strong style="color:var(--text-primary);">₹${b.total_payable || b.total_amount}</strong><br>
+                                <span class="badge ${b.status === 'confirmed' ? 'confirmed' : (b.payment_status === 'refunded' ? 'failed' : 'pending')}" style="font-size:10px;">
+                                    ${b.payment_status === 'refunded' ? 'REFUNDED' : b.status.toUpperCase()}
+                                </span>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `}
+
+            <!-- Business & Bank Legal Details -->
+            <h4 style="margin:0 0 8px 0; font-size:14px; color:var(--primary);"><i class="fa-solid fa-file-contract"></i> Legal & Bank Account Details</h4>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; background:var(--bg-dark); padding:12px; border-radius:8px; border:1px solid var(--border); font-size:12px; margin-bottom:16px;">
+                <div><strong>GST Number:</strong> ${profile.gst_number || 'N/A'}</div>
+                <div><strong>FSSAI Number:</strong> ${profile.fssai_number || 'N/A'}</div>
+                <div><strong>Bank Name:</strong> ${profile.bank_name || 'N/A'}</div>
+                <div><strong>Account Number:</strong> ${profile.account_number || 'N/A'}</div>
+                <div><strong>IFSC Code:</strong> ${profile.ifsc_code || 'N/A'}</div>
+            </div>
+
+            <!-- Documents Preview -->
+            <h4 style="margin:0 0 8px 0; font-size:14px; color:var(--text-primary);"><i class="fa-solid fa-file-image"></i> KYC Uploaded Documents</h4>
+            <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px;">
+                ${[
+                    { label: 'Aadhaar Front', url: aadhaarFront },
+                    { label: 'Aadhaar Back', url: aadhaarBack },
+                    { label: 'PAN Card', url: panCard },
+                    { label: 'FSSAI License', url: fssaiLic },
+                    { label: 'GST Certificate', url: gstImg }
+                ].map(doc => `
+                    <div style="background:var(--bg-dark); padding:8px; border-radius:6px; border:1px solid var(--border); text-align:center; font-size:11px;">
+                        <strong style="display:block; margin-bottom:4px;">${doc.label}</strong>
+                        ${doc.url ? `
+                            <a href="${doc.url}" target="_blank">
+                                <img src="${doc.url}" style="width:100%; height:90px; object-fit:cover; border-radius:4px;" onerror="this.src='https://via.placeholder.com/200x120?text=View+Document'">
+                            </a>
+                        ` : `<div style="height:90px; display:flex; align-items:center; justify-content:center; color:var(--text-muted); background:rgba(255,255,255,0.03); border-radius:4px;">Not Uploaded</div>`}
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    } catch (err) {
+        body.innerHTML = `<div style="padding:20px; text-align:center; color:var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Failed to load owner KYC data'}</div>`;
     }
 }
 
