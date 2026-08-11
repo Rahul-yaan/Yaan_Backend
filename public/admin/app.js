@@ -343,7 +343,7 @@ function getHotelPhotosOnly(hotel) {
         hotel.images.forEach(img => {
             const url = getHotelImageUrl(img);
             if (url && !images.some(i => i.url === url)) {
-                images.push({ url: url, label: 'Hotel Photo' });
+                images.push({ id: img.id, url: url, label: 'Hotel Photo' });
             }
         });
     }
@@ -351,7 +351,7 @@ function getHotelPhotosOnly(hotel) {
     if (hotel.primary_image) {
         const url = getHotelImageUrl(hotel.primary_image);
         if (url && !images.some(i => i.url === url)) {
-            images.unshift({ url: url, label: 'Primary Photo' });
+            images.unshift({ id: hotel.primary_image.id, url: url, label: 'Primary Photo' });
         }
     }
 
@@ -524,30 +524,41 @@ async function openHotelDetailsModal(id) {
             </div>
 
             <!-- Hotel Property Photos Gallery -->
-            ${hotelPhotos.length > 0 ? `
-                <div style="margin-bottom:14px;">
-                    <h5 style="margin:0 0 8px 0; font-size:12px; color:var(--text-secondary); font-weight:700; text-transform:uppercase;">
+            <div style="margin-bottom:14px; background:var(--bg-dark); padding:14px; border-radius:8px; border:1px solid var(--border);">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <h5 style="margin:0; font-size:12px; color:var(--text-secondary); font-weight:700; text-transform:uppercase;">
                         <i class="fa-solid fa-camera"></i> Hotel Property Photos (${hotelPhotos.length})
                     </h5>
+                    <label class="btn-sm" style="background:#0284c7; color:#fff; cursor:pointer; padding:4px 10px; font-size:11px; border-radius:4px; margin:0; display:inline-flex; align-items:center; gap:4px;">
+                        <i class="fa-solid fa-cloud-arrow-up"></i> Upload Photo
+                        <input type="file" id="upload-hotel-photo-input" accept="image/*" style="display:none;" onchange="uploadAdminHotelPhoto(${h.id}, this)">
+                    </label>
+                </div>
+                ${hotelPhotos.length > 0 ? `
                     <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap:10px; max-height:220px; overflow-y:auto;">
                         ${hotelPhotos.map(img => `
-                            <div style="position:relative; height:130px; border-radius:8px; overflow:hidden; background:#0f172a; border:1px solid var(--border);">
+                            <div class="photo-card-item" style="position:relative; height:130px; border-radius:8px; overflow:hidden; background:#0f172a; border:1px solid var(--border);">
                                 <a href="${img.url}" target="_blank">
-                                    <img src="${img.url}" alt="${img.label}" style="width:100%; height:100%; object-fit:cover;">
+                                    <img src="${img.url}" alt="${img.label}" style="width:100%; height:100%; object-fit:cover;" onerror="this.onerror=null; this.closest('.photo-card-item')?.style.setProperty('display', 'none', 'important');">
                                 </a>
                                 <span style="position:absolute; bottom:6px; left:6px; background:rgba(0,0,0,0.85); color:#38bdf8; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:700;">
                                     ${img.label}
                                 </span>
+                                ${img.id ? `
+                                    <button onclick="deleteAdminHotelPhoto(${h.id}, ${img.id})" style="position:absolute; top:6px; right:6px; background:rgba(225,29,72,0.9); color:#fff; border:none; width:22px; height:22px; border-radius:50%; cursor:pointer; font-size:10px; display:flex; align-items:center; justify-content:center;" title="Delete Image">
+                                        <i class="fa-solid fa-xmark"></i>
+                                    </button>
+                                ` : ''}
                             </div>
                         `).join('')}
                     </div>
-                </div>
-            ` : `
-                <div style="padding:20px; background:var(--bg-dark); border:1px dashed var(--border); border-radius:8px; text-align:center; color:var(--text-muted); font-size:12px; margin-bottom:14px;">
-                    <i class="fa-solid fa-hotel" style="font-size:24px; color:#475569; margin-bottom:6px; display:block;"></i>
-                    No hotel property photos uploaded yet by owner.
-                </div>
-            `}
+                ` : `
+                    <div style="padding:16px; border:1px dashed var(--border); border-radius:6px; text-align:center; color:var(--text-muted); font-size:12px;">
+                        <i class="fa-solid fa-hotel" style="font-size:24px; color:#475569; margin-bottom:6px; display:block;"></i>
+                        No hotel property photos uploaded yet by owner. Click <strong>Upload Photo</strong> above to add hotel images.
+                    </div>
+                `}
+            </div>
 
             <!-- Hotel Financial Performance & Revenue Grid -->
             <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; background:var(--bg-dark); padding:14px; border-radius:8px; border:1px solid var(--border); margin-bottom:14px;">
@@ -689,6 +700,43 @@ async function saveHotelSlotSettings(id) {
         showToast(data.message || 'Hotel slots and inventory updated successfully!', 'success');
         openHotelDetailsModal(id);
         loadHotelsData();
+    } catch (err) {
+        showToast(err.message, 'danger');
+    }
+}
+
+async function uploadAdminHotelPhoto(hotelId, input) {
+    if (!input.files || input.files.length === 0) return;
+    const file = input.files[0];
+    const formData = new FormData();
+    formData.append('image', file);
+
+    try {
+        const res = await fetch(`${API_BASE}/admin/hotels/${hotelId}/images`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+            body: formData
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || data.message || 'Failed to upload photo');
+        showToast('Hotel photo uploaded successfully!', 'success');
+        openHotelDetailsModal(hotelId);
+    } catch (err) {
+        showToast(err.message, 'danger');
+    }
+}
+
+async function deleteAdminHotelPhoto(hotelId, imageId) {
+    if (!confirm('Are you sure you want to delete this hotel photo?')) return;
+    try {
+        const res = await fetch(`${API_BASE}/admin/hotels/${hotelId}/images/${imageId}`, {
+            method: 'DELETE',
+            headers: getHeaders()
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || data.message || 'Failed to delete photo');
+        showToast('Photo deleted successfully!', 'success');
+        openHotelDetailsModal(hotelId);
     } catch (err) {
         showToast(err.message, 'danger');
     }

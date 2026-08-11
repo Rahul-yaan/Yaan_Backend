@@ -123,4 +123,38 @@ class HotelController extends Controller
             'hotel'   => $hotel,
         ]);
     }
+
+    public function uploadImage(Request $request, $id)
+    {
+        $hotel = Hotel::findOrFail($id);
+
+        if ($request->hasFile('image')) {
+            $file = $request->file('image');
+            $path = $file->store('hotels', 'public');
+        } elseif ($request->has('image_url') && !empty($request->image_url)) {
+            $path = $request->image_url;
+        } else {
+            return response()->json(['error' => 'No image provided.'], 422);
+        }
+
+        $image = \App\Models\HotelImage::create([
+            'hotel_id'   => $hotel->id,
+            'image_path' => $path,
+            'is_primary' => false,
+        ]);
+
+        return response()->json([
+            'message' => 'Hotel photo uploaded successfully.',
+            'image'   => $image,
+        ]);
+    }
+
+    public function deleteImage($id, $imageId)
+    {
+        $image = \App\Models\HotelImage::where('hotel_id', $id)->where('id', $imageId)->first();
+        if ($image) {
+            $image->delete();
+        }
+        return response()->json(['message' => 'Image removed successfully.']);
+    }
 }

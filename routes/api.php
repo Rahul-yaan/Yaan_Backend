@@ -64,10 +64,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/dashboard',           [App\Http\Controllers\Admin\DashboardController::class, 'index']);
         
         // Hotels
-        Route::get('/hotels/locations',    [App\Http\Controllers\Admin\HotelController::class, 'getLocations']);
-        Route::get('/hotels',              [App\Http\Controllers\Admin\HotelController::class, 'index']);
-        Route::get('/hotels/{id}',         [App\Http\Controllers\Admin\HotelController::class, 'show']);
-        Route::put('/hotels/{id}/status',  [App\Http\Controllers\Admin\HotelController::class, 'updateStatus']);
+        Route::get('/hotels/locations',              [App\Http\Controllers\Admin\HotelController::class, 'getLocations']);
+        Route::get('/hotels',                        [App\Http\Controllers\Admin\HotelController::class, 'index']);
+        Route::get('/hotels/{id}',                   [App\Http\Controllers\Admin\HotelController::class, 'show']);
+        Route::put('/hotels/{id}/status',            [App\Http\Controllers\Admin\HotelController::class, 'updateStatus']);
+        Route::post('/hotels/{id}/images',           [App\Http\Controllers\Admin\HotelController::class, 'uploadImage']);
+        Route::delete('/hotels/{id}/images/{imageId}', [App\Http\Controllers\Admin\HotelController::class, 'deleteImage']);
 
         // Owners
         Route::get('/owners',              [App\Http\Controllers\Admin\OwnerController::class, 'index']);
