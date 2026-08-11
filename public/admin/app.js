@@ -365,6 +365,13 @@ function getHotelPhotosOnly(hotel) {
         }
     }
 
+    // Prioritize valid data: base64 URIs and full HTTP URLs so working photos show first!
+    images.sort((a, b) => {
+        const aValid = a.url && (a.url.startsWith('data:') || a.url.startsWith('http://') || a.url.startsWith('https://'));
+        const bValid = b.url && (b.url.startsWith('data:') || b.url.startsWith('http://') || b.url.startsWith('https://'));
+        return (bValid ? 1 : 0) - (aValid ? 1 : 0);
+    });
+
     return images;
 }
 
@@ -413,9 +420,13 @@ async function loadHotelsData() {
             return `
                 <div class="data-card" style="display:flex; flex-direction:column; justify-content:space-between; position:relative; overflow:hidden;">
                     <div>
-                        <div style="position:relative; height:160px; border-radius:8px; overflow:hidden; margin-bottom:12px; background:#0f172a;">
+                        <div style="position:relative; height:160px; border-radius:8px; overflow:hidden; margin-bottom:12px; background:#0f172a;" id="card-img-container-${h.id}">
                             ${primaryImgObj ? `
-                                <img src="${primaryImgObj.url}" alt="${h.name}" style="width:100%; height:100%; object-fit:cover;">
+                                <img src="${primaryImgObj.url}" alt="${h.name}" style="width:100%; height:100%; object-fit:cover;" onerror="this.style.display='none'; document.getElementById('card-img-placeholder-${h.id}')?.style.setProperty('display', 'flex', 'important');">
+                                <div id="card-img-placeholder-${h.id}" style="display:none; flex-direction:column; align-items:center; justify-content:center; height:100%; color:var(--text-muted); font-size:12px;">
+                                    <i class="fa-solid fa-hotel" style="font-size:24px; margin-bottom:6px; color:#475569;"></i>
+                                    <span>No Hotel Photo Uploaded</span>
+                                </div>
                                 <span style="position:absolute; bottom:6px; right:8px; background:rgba(0,0,0,0.8); color:#38bdf8; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:700;">
                                     ${primaryImgObj.label}
                                 </span>
