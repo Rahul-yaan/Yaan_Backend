@@ -895,9 +895,15 @@ async function loadTransactionsData() {
                             <button class="btn-sm" style="background:#0284c7; color:#fff;" onclick="verifyRazorpayStatus(${t.id})" title="Verify Live Status with Razorpay API">
                                 <i class="fa-solid fa-rotate"></i> Live Sync
                             </button>
+                            ${isConfirmed && !isRefunded ? `
+                                <button class="btn-sm" style="background:#e11d48; color:#fff;" onclick="refundTransactionDirect(${t.id})" title="Issue Refund to Customer via Razorpay API">
+                                    <i class="fa-solid fa-arrow-rotate-left"></i> Refund Txn
+                                </button>
+                            ` : ''}
                             <select onchange="updateTransactionStatus(${t.id}, this.value)" style="padding:3px; font-size:11px; background:#0f172a; color:#fff; border:1px solid #334155; border-radius:4px; margin-top:2px;">
                                 <option value="">Action</option>
                                 <option value="confirmed">Confirm Txn</option>
+                                <option value="refund">Issue Refund (Razorpay)</option>
                                 <option value="cancelled">Mark Cancelled</option>
                                 <option value="pending">Mark Temporary</option>
                             </select>
@@ -1008,15 +1014,15 @@ async function openTransactionModal(txnId) {
                 <button class="btn-sm" style="background:#0284c7; color:#fff; padding:8px 14px;" onclick="verifyRazorpayStatus(${t.id})">
                     <i class="fa-solid fa-rotate"></i> Sync Live Razorpay Status
                 </button>
-                ${!isConfirmed ? `
+                ${isConfirmed && !isRefunded ? `
+                    <button class="btn-sm" style="padding:8px 14px; background:#e11d48; color:#fff;" onclick="refundTransactionDirect(${t.id}); closeTransactionModal();">
+                        <i class="fa-solid fa-arrow-rotate-left"></i> Issue Razorpay Refund
+                    </button>
+                ` : (!isConfirmed ? `
                     <button class="btn-sm btn-success" style="padding:8px 14px;" onclick="updateTransactionStatus(${t.id}, 'confirmed'); closeTransactionModal();">
                         <i class="fa-solid fa-check"></i> Mark as Confirmed
                     </button>
-                ` : `
-                    <button class="btn-sm btn-warning" style="padding:8px 14px;" onclick="updateTransactionStatus(${t.id}, 'cancelled'); closeTransactionModal();">
-                        <i class="fa-solid fa-ban"></i> Cancel Transaction
-                    </button>
-                `}
+                ` : '')}
                 <button class="btn-sm" style="padding:8px 14px; background:#475569; color:#fff;" onclick="closeTransactionModal()">Close</button>
             </div>
         `;
@@ -1185,8 +1191,11 @@ async function verifyRazorpayStatus(txnId) {
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || 'Razorpay verification failed');
 
-        if (data.live_status === 'captured' || data.live_status === 'authorized' || (data.transaction && (data.transaction.payment_status === 'paid' || data.transaction.status === 'confirmed'))) {
-            showToast('Payment verified with Razorpay! Moved to Confirmed Success Block.', 'success');
+        const t = data.transaction || {};
+        if (t.payment_status === 'refunded' || data.live_status === 'refunded') {
+            showToast('Razorpay verified: Payment is REFUNDED! Status updated in system.', 'success');
+        } else if (data.live_status === 'captured' || data.live_status === 'authorized' || (data.transaction && (data.transaction.payment_status === 'paid' || data.transaction.status === 'confirmed'))) {
+            showToast('Payment verified with Razorpay! Status: Confirmed Success.', 'success');
         } else {
             showToast(data.message || 'Razorpay status synced!', 'info');
         }
@@ -1194,6 +1203,46 @@ async function verifyRazorpayStatus(txnId) {
         // Refresh modal if open
         if (!document.getElementById('transaction-modal').classList.contains('hidden')) {
             openTransactionModal(txnId);
+        }
+    } catch (err) {
+        showToast(err.message, 'danger');
+    }
+}
+
+async function refundTransactionDirect(txnId) {
+    const txn = currentTransactions.find(t => t.id === txnId);
+    const customerName = (txn && txn.user) ? txn.user.name : 'Customer';
+    const refundAmount = txn ? (txn.total_payable || txn.total_amount || 0) : 0;
+
+    let reason = prompt(`[Razorpay Refund Request]\nEnter reason for refunding Transaction #${txnId} (min 5 characters):`, 'Customer requested refund');
+    if (reason === null) return;
+    reason = reason.trim();
+
+    if (reason.length < 5) {
+        showToast('Refund cancelled: A detailed reason (minimum 5 characters) is required.', 'danger');
+        return;
+    }
+
+    const approved = confirm(`🔔 CONFIRM RAZORPAY REFUND:\n\nBooking/Txn ID: #${txnId}\nCustomer: ${customerName}\nRefund Amount: ₹${refundAmount}\nReason: ${reason}\n\nDo you explicitly APPROVE issuing this refund to the customer via Razorpay API?`);
+    if (!approved) {
+        showToast('Refund request cancelled by Admin.', 'warning');
+        return;
+    }
+
+    showToast('Initiating refund with Razorpay API...', 'info');
+    try {
+        const res = await fetch(`${API_BASE}/admin/transactions/${txnId}/refund`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ reason })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || data.message || 'Razorpay refund failed');
+
+        showToast(data.message || 'Refund processed with Razorpay successfully!', 'success');
+        loadTransactionsData();
+        if (!document.getElementById('transaction-modal').classList.contains('hidden')) {
+            closeTransactionModal();
         }
     } catch (err) {
         showToast(err.message, 'danger');
