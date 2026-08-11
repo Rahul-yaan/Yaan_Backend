@@ -1129,7 +1129,7 @@ async function deleteAdminHotelPhoto(hotelId, imageId) {
             const status = document.getElementById('filter-booking-status').value;
             const search = document.getElementById('search-bookings').value;
 
-            tbody.innerHTML = `<tr><td colspan="8" class="text-center"><i class="fa-solid fa-spinner fa-spin"></i> Loading bookings...</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="9" class="text-center"><i class="fa-solid fa-spinner fa-spin"></i> Loading bookings...</td></tr>`;
 
             try {
                 let url = `${API_BASE}/admin/bookings?status=${status}&search=${encodeURIComponent(search)}`;
@@ -1139,30 +1139,50 @@ async function deleteAdminHotelPhoto(hotelId, imageId) {
                 const bookings = data.data || [];
 
                 if (bookings.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="8" class="text-center">No bookings found</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="9" class="text-center">No bookings found</td></tr>`;
                     return;
                 }
 
                 tbody.innerHTML = bookings.map(b => {
                     const isRefunded = b.payment_status === 'refunded' || b.payment_status === 'refund_initiated' || (b.cancellation_reason && b.cancellation_reason.toLowerCase().includes('refund'));
                     const payBadgeClass = isRefunded ? 'failed' : (b.payment_status === 'paid' ? 'confirmed' : 'pending');
-                    const payText = isRefunded ? (b.payment_status === 'refunded' ? 'Refunded' : 'Refund_initiated') : (b.payment_status || 'pending');
+                    const payText = isRefunded ? (b.payment_status === 'refunded' ? 'Refunded' : 'Refund Initiated') : (b.payment_status || 'Pending');
 
                     return `
                 <tr>
-                    <td>#${b.id}</td>
-                    <td><strong>${b.user ? b.user.name : 'Guest'}</strong><br><small class="text-muted">${b.user ? b.user.phone : ''}</small></td>
-                    <td>${b.hotel ? b.hotel.name : 'N/A'}<br><small class="text-muted">${b.hotel ? b.hotel.city : ''}</small></td>
-                    <td>${b.check_in || ''} to ${b.check_out || ''}</td>
-                    <td><strong>₹${b.total_payable || b.total_amount || 0}</strong></td>
-                    <td><span class="badge ${payBadgeClass}" style="${isRefunded ? 'background:#e11d48; color:#ffffff;' : ''}">${payText}</span></td>
-                    <td><span class="badge ${b.status}">${b.status}</span></td>
+                    <td><strong style="color:#38bdf8; font-size:13px;">#${b.id}</strong></td>
                     <td>
-                        <select onchange="updateBookingStatus(${b.id}, this.value)" style="padding: 4px; font-size:12px;">
-                            <option value="">Change</option>
-                            <option value="confirmed">Confirmed</option>
-                            <option value="completed">Completed</option>
-                            <option value="cancelled">Cancelled</option>
+                        <div>
+                            <strong style="color:var(--text-primary); font-size:13px;"><i class="fa-solid fa-user" style="color:var(--primary); font-size:11px;"></i> ${b.user ? b.user.name : (b.logistics_name || 'Guest Driver')}</strong><br>
+                            <small style="color:#38bdf8; font-weight:600;"><i class="fa-solid fa-phone" style="font-size:10px;"></i> ${b.user ? (b.user.phone || b.logistics_number || 'N/A') : (b.logistics_number || 'N/A')}</small>
+                        </div>
+                    </td>
+                    <td>
+                        <div>
+                            <strong style="color:var(--text-primary); font-size:13px;"><i class="fa-solid fa-hotel" style="color:var(--success); font-size:11px;"></i> ${b.hotel ? b.hotel.name : 'N/A'}</strong><br>
+                            <small style="color:var(--text-muted); font-weight:600;"><i class="fa-solid fa-location-dot" style="color:#38bdf8; font-size:10px;"></i> ${b.hotel ? (b.hotel.city || 'N/A') : 'N/A'}</small>
+                        </div>
+                    </td>
+                    <td>
+                        <div style="font-size:12px; line-height:1.4;">
+                            <span style="color:var(--info); font-weight:600;"><i class="fa-solid fa-calendar-day" style="font-size:10px;"></i> In:</span> ${formatDateClean(b.check_in || b.booking_date)}<br>
+                            <span style="color:var(--success); font-weight:600;"><i class="fa-solid fa-calendar-check" style="font-size:10px;"></i> Out:</span> ${formatDateClean(b.check_out)}
+                        </div>
+                    </td>
+                    <td>
+                        <div style="font-size:11px; color:var(--text-secondary); white-space:nowrap;">
+                            <i class="fa-solid fa-clock" style="color:var(--warning); font-size:10px;"></i> ${formatDateTimeClean(b.created_at || b.booking_date)}
+                        </div>
+                    </td>
+                    <td><strong style="color:var(--success); font-size:14px;">₹${(b.total_payable || b.total_amount || 0).toLocaleString('en-IN')}</strong></td>
+                    <td><span class="badge ${payBadgeClass}" style="${isRefunded ? 'background:#e11d48; color:#ffffff;' : ''}; text-transform:uppercase; font-size:10px; font-weight:700;">${payText.toUpperCase()}</span></td>
+                    <td><span class="badge ${b.status === 'confirmed' ? 'confirmed' : (b.status === 'cancelled' ? 'failed' : 'pending')}" style="text-transform:uppercase; font-size:10px; font-weight:700;">${(b.status || 'PENDING').toUpperCase()}</span></td>
+                    <td>
+                        <select onchange="updateBookingStatus(${b.id}, this.value)" style="padding:6px 10px; font-size:12px; border-radius:6px; background:#0f172a; border:1px solid var(--border); color:#fff; cursor:pointer;">
+                            <option value="">Update Status...</option>
+                            <option value="confirmed">Confirm Check-in</option>
+                            <option value="completed">Complete Stay</option>
+                            <option value="cancelled">Cancel Booking</option>
                             <option value="refund">Issue Refund (Razorpay)</option>
                         </select>
                     </td>
@@ -1170,7 +1190,7 @@ async function deleteAdminHotelPhoto(hotelId, imageId) {
             `;
                 }).join('');
             } catch (err) {
-                tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading bookings'}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" class="text-center text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading bookings'}</td></tr>`;
             }
         }
 
