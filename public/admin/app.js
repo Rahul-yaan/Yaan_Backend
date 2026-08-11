@@ -265,7 +265,40 @@ function renderRecentHotels(hotels) {
 // ----------------------------------------------------
 // 2. HOTELS MANAGEMENT
 // ----------------------------------------------------
-let currentHotelStatusFilter = 'approved';
+let currentHotelStatusFilter = 'all';
+
+function formatDateClean(dateStr) {
+    if (!dateStr) return 'N/A';
+    try {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr.split('T')[0] || dateStr;
+        return d.toLocaleDateString('en-IN', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric'
+        });
+    } catch(e) {
+        return dateStr.split('T')[0] || dateStr;
+    }
+}
+
+function formatDateTimeClean(dateStr) {
+    if (!dateStr) return 'N/A';
+    try {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr.split('T')[0] || dateStr;
+        return d.toLocaleDateString('en-IN', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+        });
+    } catch(e) {
+        return dateStr.split('T')[0] || dateStr;
+    }
+}
 
 function filterHotelsByStatus(status, btnElem) {
     currentHotelStatusFilter = status;
@@ -588,16 +621,25 @@ async function openHotelDetailsModal(id) {
             ${visitingCustomers.length === 0 ? `
                 <div style="padding:10px; background:var(--bg-dark); border-radius:6px; font-size:12px; color:var(--text-muted); margin-bottom:14px;">No customer check-ins recorded at this hotel yet.</div>
             ` : `
-                <div style="max-height:160px; overflow-y:auto; display:flex; flex-direction:column; gap:6px; margin-bottom:14px;">
+                <div style="max-height:180px; overflow-y:auto; display:flex; flex-direction:column; gap:6px; margin-bottom:14px;">
                     ${visitingCustomers.map(b => `
-                        <div style="background:var(--bg-dark); padding:8px 12px; border-radius:6px; border:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; font-size:12px;">
+                        <div style="background:var(--bg-dark); padding:10px 12px; border-radius:6px; border:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; font-size:12px; gap:10px;">
                             <div>
-                                <strong style="color:var(--text-primary);">${b.user ? b.user.name : 'Guest User'}</strong> (${b.user ? b.user.phone : 'N/A'})<br>
-                                <small class="text-muted">Check-in: ${b.check_in || ''} to ${b.check_out || ''}</small>
+                                <div style="font-size:13px; font-weight:700; color:var(--text-primary); margin-bottom:3px;">
+                                    <i class="fa-solid fa-user" style="color:var(--primary);"></i> ${b.user ? b.user.name : (b.logistics_name || 'Guest Driver')} 
+                                    <span style="color:#38bdf8; font-weight:600; margin-left:6px; font-size:12px;">
+                                        <i class="fa-solid fa-phone"></i> ${b.user ? (b.user.phone || b.logistics_number || 'N/A') : (b.logistics_number || 'N/A')}
+                                    </span>
+                                </div>
+                                <div style="font-size:11px; color:var(--text-secondary); display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+                                    <span><i class="fa-solid fa-calendar-day" style="color:var(--info);"></i> Check-in: <strong>${formatDateClean(b.check_in || b.booking_date)}</strong></span>
+                                    <span><i class="fa-solid fa-calendar-check" style="color:var(--success);"></i> Check-out: <strong>${formatDateClean(b.check_out)}</strong></span>
+                                    ${b.created_at ? `<span><i class="fa-solid fa-clock" style="color:var(--warning);"></i> Booked: <strong>${formatDateTimeClean(b.created_at)}</strong></span>` : ''}
+                                </div>
                             </div>
-                            <div style="text-align:right;">
-                                <strong style="color:var(--text-primary);">₹${b.total_payable || b.total_amount}</strong><br>
-                                <span class="badge ${b.status === 'confirmed' ? 'confirmed' : (b.payment_status === 'refunded' ? 'failed' : 'pending')}" style="font-size:10px;">
+                            <div style="text-align:right; flex-shrink:0;">
+                                <strong style="color:var(--success); font-size:14px;">₹${(b.total_payable || b.total_amount || 0).toLocaleString('en-IN')}</strong><br>
+                                <span class="badge ${b.status === 'confirmed' ? 'confirmed' : (b.payment_status === 'refunded' ? 'failed' : 'pending')}" style="font-size:10px; margin-top:2px;">
                                     ${b.payment_status === 'refunded' ? 'REFUNDED' : b.status.toUpperCase()}
                                 </span>
                             </div>
@@ -848,16 +890,26 @@ async function saveHotelSlotSettings(id) {
             ${visitingCustomers.length === 0 ? `
                 <div style="padding:10px; background:var(--bg-dark); border-radius:6px; font-size:12px; color:var(--text-muted); margin-bottom:16px;">No customer visits recorded yet for this owner's hotels.</div>
             ` : `
-                <div style="max-height:180px; overflow-y:auto; display:flex; flex-direction:column; gap:6px; margin-bottom:16px;">
+                <div style="max-height:200px; overflow-y:auto; display:flex; flex-direction:column; gap:6px; margin-bottom:16px;">
                     ${visitingCustomers.map(b => `
-                        <div style="background:var(--bg-dark); padding:8px 12px; border-radius:6px; border:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; font-size:12px;">
+                        <div style="background:var(--bg-dark); padding:10px 12px; border-radius:6px; border:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; font-size:12px; gap:10px;">
                             <div>
-                                <strong style="color:var(--text-primary);">${b.user ? b.user.name : 'Guest User'}</strong> (${b.user ? b.user.phone : 'N/A'})<br>
-                                <small class="text-muted">Hotel: ${b.hotel ? b.hotel.name : 'N/A'} • Check-in: ${b.check_in || ''} to ${b.check_out || ''}</small>
+                                <div style="font-size:13px; font-weight:700; color:var(--text-primary); margin-bottom:3px;">
+                                    <i class="fa-solid fa-user" style="color:var(--primary);"></i> ${b.user ? b.user.name : (b.logistics_name || 'Guest Driver')} 
+                                    <span style="color:#38bdf8; font-weight:600; margin-left:6px; font-size:12px;">
+                                        <i class="fa-solid fa-phone"></i> ${b.user ? (b.user.phone || b.logistics_number || 'N/A') : (b.logistics_number || 'N/A')}
+                                    </span>
+                                    <span style="color:var(--text-muted); font-size:11px; margin-left:6px;">(${b.hotel ? b.hotel.name : 'N/A'})</span>
+                                </div>
+                                <div style="font-size:11px; color:var(--text-secondary); display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+                                    <span><i class="fa-solid fa-calendar-day" style="color:var(--info);"></i> Check-in: <strong>${formatDateClean(b.check_in || b.booking_date)}</strong></span>
+                                    <span><i class="fa-solid fa-calendar-check" style="color:var(--success);"></i> Check-out: <strong>${formatDateClean(b.check_out)}</strong></span>
+                                    ${b.created_at ? `<span><i class="fa-solid fa-clock" style="color:var(--warning);"></i> Booked: <strong>${formatDateTimeClean(b.created_at)}</strong></span>` : ''}
+                                </div>
                             </div>
-                            <div style="text-align:right;">
-                                <strong style="color:var(--text-primary);">₹${b.total_payable || b.total_amount}</strong><br>
-                                <span class="badge ${b.status === 'confirmed' ? 'confirmed' : (b.payment_status === 'refunded' ? 'failed' : 'pending')}" style="font-size:10px;">
+                            <div style="text-align:right; flex-shrink:0;">
+                                <strong style="color:var(--success); font-size:14px;">₹${(b.total_payable || b.total_amount || 0).toLocaleString('en-IN')}</strong><br>
+                                <span class="badge ${b.status === 'confirmed' ? 'confirmed' : (b.payment_status === 'refunded' ? 'failed' : 'pending')}" style="font-size:10px; margin-top:2px;">
                                     ${b.payment_status === 'refunded' ? 'REFUNDED' : b.status.toUpperCase()}
                                 </span>
                             </div>

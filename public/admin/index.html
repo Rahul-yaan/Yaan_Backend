@@ -239,14 +239,14 @@
 
                     <!-- Hotel Filter Navigation Subtabs -->
                     <div class="txn-subtabs" style="margin-bottom:16px;">
-                        <button class="subtab-btn active" data-hotel-status="approved" onclick="filterHotelsByStatus('approved', this)">
+                        <button class="subtab-btn active" data-hotel-status="all" onclick="filterHotelsByStatus('all', this)">
+                            <i class="fa-solid fa-hotel"></i> All Hotels
+                        </button>
+                        <button class="subtab-btn" data-hotel-status="approved" onclick="filterHotelsByStatus('approved', this)">
                             <i class="fa-solid fa-circle-check"></i> Approved Hotels
                         </button>
                         <button class="subtab-btn" data-hotel-status="pending" onclick="filterHotelsByStatus('pending', this)">
                             <i class="fa-solid fa-clock"></i> Pending Approval
-                        </button>
-                        <button class="subtab-btn" data-hotel-status="all" onclick="filterHotelsByStatus('all', this)">
-                            <i class="fa-solid fa-hotel"></i> All Hotels
                         </button>
                         <button class="subtab-btn" data-hotel-status="rejected" onclick="filterHotelsByStatus('rejected', this)">
                             <i class="fa-solid fa-circle-xmark"></i> Rejected / Suspended
