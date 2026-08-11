@@ -129,11 +129,14 @@ class TransactionController extends Controller
     /**
      * Live verify payment status directly with Razorpay API.
      */
+    /**
+     * Live verify payment status directly with Razorpay API.
+     */
     public function verifyRazorpay($id)
     {
         $transaction = Booking::with(['user', 'hotel'])->findOrFail($id);
-        $razorpayKeyId = env('RAZORPAY_KEY_ID');
-        $razorpayKeySecret = env('RAZORPAY_KEY_SECRET');
+        $razorpayKeyId     = config('services.razorpay.key_id') ?? env('RAZORPAY_KEY_ID');
+        $razorpayKeySecret = config('services.razorpay.key_secret') ?? env('RAZORPAY_KEY_SECRET');
 
         if (empty($razorpayKeyId) || empty($razorpayKeySecret)) {
             return response()->json([
@@ -154,24 +157,29 @@ class TransactionController extends Controller
                 
                 if ($response->successful()) {
                     $razorpayData = $response->json();
-                    $liveStatus = $razorpayData['status'] ?? 'unknown';
+                    $liveStatus   = $razorpayData['status'] ?? 'unknown';
+                    $amtRefunded  = (int) ($razorpayData['amount_refunded'] ?? 0);
+                    $isRefunded   = $amtRefunded > 0 || $liveStatus === 'refunded' || !empty($razorpayData['refund_status']);
 
-                    if (($razorpayData['amount_refunded'] ?? 0) > 0 || $liveStatus === 'refunded') {
-                        $transaction->payment_status = 'refunded';
-                        $transaction->status = 'cancelled';
+                    if ($isRefunded) {
+                        $transaction->payment_status      = 'refunded';
+                        $transaction->status              = 'cancelled';
                         $transaction->cancellation_reason = 'Payment refunded at Razorpay';
-                        $transaction->gateway_response = json_encode($razorpayData);
+                        $transaction->gateway_response    = json_encode($razorpayData);
                         $transaction->save();
                     } elseif (in_array($liveStatus, ['captured', 'authorized'])) {
-                        $transaction->payment_status = 'paid';
-                        $transaction->status = 'confirmed';
-                        $transaction->transaction_id = $transaction->transaction_id ?? $transaction->razorpay_payment_id;
-                        $transaction->gateway_response = json_encode($razorpayData);
-                        $transaction->save();
+                        // Do not overwrite if local database already marks payment as refunded or refund initiated
+                        if (!in_array($transaction->payment_status, ['refunded', 'refund_initiated'])) {
+                            $transaction->payment_status   = 'paid';
+                            $transaction->status           = 'confirmed';
+                            $transaction->transaction_id   = $transaction->transaction_id ?? $transaction->razorpay_payment_id;
+                            $transaction->gateway_response = json_encode($razorpayData);
+                            $transaction->save();
+                        }
                     } elseif ($liveStatus === 'failed') {
-                        $transaction->payment_status = 'failed';
+                        $transaction->payment_status      = 'failed';
                         $transaction->cancellation_reason = $razorpayData['error_description'] ?? 'Razorpay Payment Failed';
-                        $transaction->gateway_response = json_encode($razorpayData);
+                        $transaction->gateway_response    = json_encode($razorpayData);
                         $transaction->save();
                     }
                 }
@@ -183,24 +191,28 @@ class TransactionController extends Controller
 
                 if ($response->successful()) {
                     $razorpayData = $response->json();
-                    $items = $razorpayData['items'] ?? [];
+                    $items        = $razorpayData['items'] ?? [];
                     if (!empty($items)) {
                         $latestPayment = $items[0];
-                        $liveStatus = $latestPayment['status'] ?? 'unknown';
+                        $liveStatus    = $latestPayment['status'] ?? 'unknown';
+                        $amtRefunded   = (int) ($latestPayment['amount_refunded'] ?? 0);
+                        $isRefunded    = $amtRefunded > 0 || $liveStatus === 'refunded' || !empty($latestPayment['refund_status']);
                         
-                        if (($latestPayment['amount_refunded'] ?? 0) > 0 || $liveStatus === 'refunded') {
-                            $transaction->payment_status = 'refunded';
-                            $transaction->status = 'cancelled';
+                        if ($isRefunded) {
+                            $transaction->payment_status      = 'refunded';
+                            $transaction->status              = 'cancelled';
                             $transaction->cancellation_reason = 'Payment refunded at Razorpay';
-                            $transaction->gateway_response = json_encode($latestPayment);
+                            $transaction->gateway_response    = json_encode($latestPayment);
                             $transaction->save();
                         } elseif (in_array($liveStatus, ['captured', 'authorized'])) {
-                            $transaction->payment_status = 'paid';
-                            $transaction->status = 'confirmed';
-                            $transaction->razorpay_payment_id = $latestPayment['id'];
-                            $transaction->transaction_id = $latestPayment['id'];
-                            $transaction->gateway_response = json_encode($latestPayment);
-                            $transaction->save();
+                            if (!in_array($transaction->payment_status, ['refunded', 'refund_initiated'])) {
+                                $transaction->payment_status      = 'paid';
+                                $transaction->status              = 'confirmed';
+                                $transaction->razorpay_payment_id = $latestPayment['id'];
+                                $transaction->transaction_id      = $latestPayment['id'];
+                                $transaction->gateway_response    = json_encode($latestPayment);
+                                $transaction->save();
+                            }
                         }
                     } else {
                         $liveStatus = 'created_unpaid';
