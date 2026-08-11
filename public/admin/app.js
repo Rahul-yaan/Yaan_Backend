@@ -355,6 +355,16 @@ function getHotelPhotosOnly(hotel) {
         }
     }
 
+    // Fallback: If no custom hotel gallery photos exist, display the photo uploaded by the owner during registration / profile update
+    const profile = (hotel.owner && (hotel.owner.owner_profile || hotel.owner.ownerProfile)) ? (hotel.owner.owner_profile || hotel.owner.ownerProfile) : null;
+    if (profile) {
+        const registrationPhoto = profile.business_proof || profile.aadhaar_front || profile.gst_image || profile.pan_card;
+        const proofUrl = getHotelImageUrl(registrationPhoto);
+        if (proofUrl && !images.some(i => i.url === proofUrl)) {
+            images.push({ id: null, url: proofUrl, label: 'Registration Photo' });
+        }
+    }
+
     return images;
 }
 

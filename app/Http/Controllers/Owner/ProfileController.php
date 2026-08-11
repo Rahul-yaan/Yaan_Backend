@@ -100,31 +100,37 @@ class ProfileController extends Controller
         \Illuminate\Support\Facades\DB::statement("UPDATE users SET is_verified = false, updated_at = NOW() WHERE id = ?", [$user->id]);
 
         // Sync hotel name, address, and city with core hotels table and reset status to pending for Admin verification
-        if (!empty($data['hotel_name'])) {
-            $hotel = \App\Models\Hotel::where('owner_id', $user->id)->first();
-            if ($hotel) {
-                $hotel->update([
-                    'name'    => $data['hotel_name'],
-                    'address' => $data['address'] ?? $hotel->address,
-                    'city'    => $data['city'] ?? $hotel->city,
-                    'status'  => 'pending',
-                ]);
-            } else {
-                \App\Models\Hotel::create([
-                    'owner_id'        => $user->id,
-                    'name'            => $data['hotel_name'],
-                    'address'         => $data['address'] ?? 'N/A',
-                    'city'            => $data['city'] ?? 'N/A',
-                    'price_per_night' => 1500,
-                    'total_rooms'     => 10,
-                    'available_rooms' => 10,
-                    'rating'          => 4.5,
-                    'review_count'    => 0,
-                    'status'          => 'pending',
-                ]);
-            }
+        $targetHotel = \App\Models\Hotel::where('owner_id', $user->id)->first();
+        if (!$targetHotel) {
+            $targetHotel = \App\Models\Hotel::create([
+                'owner_id'        => $user->id,
+                'name'            => !empty($data['hotel_name']) ? $data['hotel_name'] : $user->name,
+                'address'         => $data['address'] ?? 'N/A',
+                'city'            => $data['city'] ?? 'N/A',
+                'price_per_night' => 1500,
+                'total_rooms'     => 10,
+                'available_rooms' => 10,
+                'rating'          => 4.5,
+                'review_count'    => 0,
+                'status'          => 'pending',
+            ]);
         } else {
-            \Illuminate\Support\Facades\DB::statement("UPDATE hotels SET status = 'pending', updated_at = NOW() WHERE owner_id = ?", [$user->id]);
+            $targetHotel->update([
+                'name'    => !empty($data['hotel_name']) ? $data['hotel_name'] : $targetHotel->name,
+                'address' => !empty($data['address']) ? $data['address'] : $targetHotel->address,
+                'city'    => !empty($data['city']) ? $data['city'] : $targetHotel->city,
+                'status'  => 'pending',
+            ]);
+        }
+
+        // Automatically attach registration/profile photo as hotel image
+        $uploadedPhoto = $data['business_proof'] ?? $data['aadhaar_front'] ?? $data['gst_image'] ?? null;
+        if ($uploadedPhoto && $targetHotel) {
+            \App\Models\HotelImage::create([
+                'hotel_id'   => $targetHotel->id,
+                'image_path' => $uploadedPhoto,
+                'is_primary' => true,
+            ]);
         }
 
         return response()->json([
