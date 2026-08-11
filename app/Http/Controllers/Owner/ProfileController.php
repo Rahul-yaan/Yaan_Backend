@@ -99,11 +99,28 @@ class ProfileController extends Controller
         \Illuminate\Support\Facades\DB::statement("UPDATE owner_profiles SET is_profile_complete = true, updated_at = NOW() WHERE id = ?", [$profile->id]);
         \Illuminate\Support\Facades\DB::statement("UPDATE users SET is_verified = false, updated_at = NOW() WHERE id = ?", [$user->id]);
 
-        // Sync hotel name with core hotels table
+        // Sync hotel name, address, and city with core hotels table
         if (!empty($data['hotel_name'])) {
             $hotel = \App\Models\Hotel::where('owner_id', $user->id)->first();
             if ($hotel) {
-                $hotel->update(['name' => $data['hotel_name']]);
+                $hotel->update([
+                    'name'    => $data['hotel_name'],
+                    'address' => $data['address'] ?? $hotel->address,
+                    'city'    => $data['city'] ?? $hotel->city,
+                ]);
+            } else {
+                \App\Models\Hotel::create([
+                    'owner_id'        => $user->id,
+                    'name'            => $data['hotel_name'],
+                    'address'         => $data['address'] ?? 'N/A',
+                    'city'            => $data['city'] ?? 'N/A',
+                    'price_per_night' => 1500,
+                    'total_rooms'     => 10,
+                    'available_rooms' => 10,
+                    'rating'          => 4.5,
+                    'review_count'    => 0,
+                    'status'          => 'pending',
+                ]);
             }
         }
 

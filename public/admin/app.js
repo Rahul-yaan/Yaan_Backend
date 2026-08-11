@@ -303,10 +303,9 @@ function getHotelImageUrl(imgObj) {
     return `${STORAGE_BASE}/${clean}`;
 }
 
-function getOwnerUploadedImages(hotel) {
+function getHotelPhotosOnly(hotel) {
     const images = [];
 
-    // 1. Hotel Images uploaded directly for the hotel
     if (hotel.images && hotel.images.length > 0) {
         hotel.images.forEach(img => {
             const url = getHotelImageUrl(img);
@@ -321,29 +320,6 @@ function getOwnerUploadedImages(hotel) {
         if (url && !images.some(i => i.url === url)) {
             images.unshift({ url: url, label: 'Primary Photo' });
         }
-    }
-
-    // 2. Registration / KYC Images uploaded by owner at register time
-    const profile = hotel.owner ? (hotel.owner.owner_profile || hotel.owner.ownerProfile) : null;
-    if (profile) {
-        const kycDocs = [
-            { path: profile.business_proof, url: profile.business_proof_url, label: 'Business Proof' },
-            { path: profile.gst_image, url: profile.gst_image_url, label: 'GST Certificate' },
-            { path: profile.aadhaar_front, url: profile.aadhaar_front_url, label: 'Aadhaar Front' },
-            { path: profile.aadhaar_back, url: profile.aadhaar_back_url, label: 'Aadhaar Back' },
-            { path: profile.pan_card, url: profile.pan_card_url, label: 'PAN Card' },
-            { path: profile.fssai_license, url: profile.fssai_license_url, label: 'FSSAI License' }
-        ];
-
-        kycDocs.forEach(doc => {
-            const rawUrl = doc.url || doc.path;
-            if (rawUrl) {
-                const cleanUrl = getHotelImageUrl(rawUrl);
-                if (cleanUrl && !images.some(i => i.url === cleanUrl)) {
-                    images.push({ url: cleanUrl, label: doc.label });
-                }
-            }
-        });
     }
 
     return images;
@@ -385,8 +361,8 @@ async function loadHotelsData() {
             const isApproved = h.status === 'approved' || h.status === 'active';
             const isPending = h.status === 'pending';
 
-            const ownerUploadedImages = getOwnerUploadedImages(h);
-            const primaryImgObj = ownerUploadedImages.length > 0 ? ownerUploadedImages[0] : null;
+            const hotelPhotos = getHotelPhotosOnly(h);
+            const primaryImgObj = hotelPhotos.length > 0 ? hotelPhotos[0] : null;
 
             let statusBadgeClass = isApproved ? 'confirmed' : (isPending ? 'pending' : 'failed');
             let statusText = isApproved ? 'APPROVED' : (isPending ? 'PENDING APPROVAL' : 'REJECTED / SUSPENDED');
@@ -402,8 +378,8 @@ async function loadHotelsData() {
                                 </span>
                             ` : `
                                 <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:var(--text-muted); font-size:12px;">
-                                    <i class="fa-solid fa-image-slash" style="font-size:24px; margin-bottom:6px; color:#475569;"></i>
-                                    <span>No Image Uploaded</span>
+                                    <i class="fa-solid fa-hotel" style="font-size:24px; margin-bottom:6px; color:#475569;"></i>
+                                    <span>No Hotel Photo Uploaded</span>
                                 </div>
                             `}
                             <span class="badge ${statusBadgeClass}" style="position:absolute; top:8px; right:8px; font-size:10px; font-weight:700; ${!isApproved && !isPending ? 'background:#e11d48; color:#fff;' : ''}">
@@ -486,7 +462,7 @@ async function openHotelDetailsModal(id) {
         const isApproved = h.status === 'approved' || h.status === 'active';
         const isPending = h.status === 'pending';
 
-        const ownerUploadedImages = getOwnerUploadedImages(h);
+        const hotelPhotos = getHotelPhotosOnly(h);
 
         body.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
@@ -514,14 +490,14 @@ async function openHotelDetailsModal(id) {
                 </div>
             </div>
 
-            <!-- Owner Uploaded Image Gallery -->
-            ${ownerUploadedImages.length > 0 ? `
+            <!-- Hotel Property Photos Gallery -->
+            ${hotelPhotos.length > 0 ? `
                 <div style="margin-bottom:14px;">
                     <h5 style="margin:0 0 8px 0; font-size:12px; color:var(--text-secondary); font-weight:700; text-transform:uppercase;">
-                        <i class="fa-solid fa-camera"></i> Owner Uploaded Photos & Documents (${ownerUploadedImages.length})
+                        <i class="fa-solid fa-camera"></i> Hotel Property Photos (${hotelPhotos.length})
                     </h5>
                     <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap:10px; max-height:220px; overflow-y:auto;">
-                        ${ownerUploadedImages.map(img => `
+                        ${hotelPhotos.map(img => `
                             <div style="position:relative; height:130px; border-radius:8px; overflow:hidden; background:#0f172a; border:1px solid var(--border);">
                                 <a href="${img.url}" target="_blank">
                                     <img src="${img.url}" alt="${img.label}" style="width:100%; height:100%; object-fit:cover;">
@@ -535,8 +511,8 @@ async function openHotelDetailsModal(id) {
                 </div>
             ` : `
                 <div style="padding:20px; background:var(--bg-dark); border:1px dashed var(--border); border-radius:8px; text-align:center; color:var(--text-muted); font-size:12px; margin-bottom:14px;">
-                    <i class="fa-solid fa-image-slash" style="font-size:24px; color:#475569; margin-bottom:6px; display:block;"></i>
-                    No hotel or registration images uploaded by owner yet.
+                    <i class="fa-solid fa-hotel" style="font-size:24px; color:#475569; margin-bottom:6px; display:block;"></i>
+                    No hotel property photos uploaded yet by owner.
                 </div>
             `}
 
