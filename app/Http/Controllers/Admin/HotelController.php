@@ -12,8 +12,9 @@ class HotelController extends Controller
     {
         $query = Hotel::with(['owner:id,name,email,phone', 'images', 'amenities']);
 
-        if ($request->has('status') && !empty($request->status)) {
-            $status = $request->status;
+        // Filter by Status
+        if ($request->has('status') && !empty($request->status) && $request->status !== 'all') {
+            $status = strtolower($request->status);
             if ($status === 'approved') {
                 $query->whereIn('status', ['approved', 'active']);
             } elseif ($status === 'suspended') {
@@ -23,18 +24,46 @@ class HotelController extends Controller
             }
         }
 
+        // Filter by City
+        if ($request->has('city') && !empty($request->city)) {
+            $city = trim($request->city);
+            $query->where('city', 'like', "%{$city}%");
+        }
+
+        // Filter by State / Region
+        if ($request->has('state') && !empty($request->state)) {
+            $state = trim($request->state);
+            $query->where(function($q) use ($state) {
+                $q->where('address', 'like', "%{$state}%")
+                  ->orWhere('city', 'like', "%{$state}%");
+            });
+        }
+
+        // Global Search (Name, City, State/Address, Owner Name, Owner Phone)
         if ($request->has('search') && !empty($request->search)) {
-            $search = $request->search;
+            $search = trim($request->search);
             $query->where(function($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
                   ->orWhere('city', 'like', "%{$search}%")
-                  ->orWhere('address', 'like', "%{$search}%");
+                  ->orWhere('address', 'like', "%{$search}%")
+                  ->orWhereHas('owner', function($oq) use ($search) {
+                      $oq->where('name', 'like', "%{$search}%")
+                         ->orWhere('phone', 'like', "%{$search}%");
+                  });
             });
         }
 
         $hotels = $query->latest()->paginate($request->input('per_page', 15));
 
         return response()->json($hotels);
+    }
+
+    public function getLocations()
+    {
+        $cities = Hotel::whereNotNull('city')->where('city', '!=', '')->distinct()->pluck('city');
+        return response()->json([
+            'cities' => $cities,
+        ]);
     }
 
     public function show($id)

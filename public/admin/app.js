@@ -238,50 +238,117 @@ function renderRecentHotels(hotels) {
 // ----------------------------------------------------
 // 2. HOTELS MANAGEMENT
 // ----------------------------------------------------
-async function loadHotelsData() {
-    const container = document.getElementById('hotels-container');
-    const status = document.getElementById('filter-hotel-status').value;
-    const search = document.getElementById('search-hotels').value;
+let currentHotelStatusFilter = 'approved';
 
-    container.innerHTML = `<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Loading hotels...</div>`;
+function filterHotelsByStatus(status, btnElem) {
+    currentHotelStatusFilter = status;
+    document.querySelectorAll('#tab-hotels .subtab-btn').forEach(b => b.classList.remove('active'));
+    if (btnElem) btnElem.classList.add('active');
+    loadHotelsData();
+}
+
+let loadedCitiesList = false;
+async function populateHotelCitiesDropdown(hotels) {
+    const citySelect = document.getElementById('filter-hotel-city');
+    if (!citySelect || loadedCitiesList) return;
 
     try {
-        let url = `${API_BASE}/admin/hotels?status=${status}&search=${encodeURIComponent(search)}`;
+        const res = await fetch(`${API_BASE}/admin/hotels/locations`, { headers: getHeaders() });
+        if (res.ok) {
+            const data = await res.json();
+            const cities = data.cities || [];
+            if (cities.length > 0) {
+                const currentVal = citySelect.value;
+                citySelect.innerHTML = `<option value="">All Cities (${cities.length})</option>` + 
+                    cities.map(c => `<option value="${c}" ${currentVal === c ? 'selected' : ''}>${c}</option>`).join('');
+                loadedCitiesList = true;
+            }
+        }
+    } catch(e) {}
+}
+
+async function loadHotelsData() {
+    const container = document.getElementById('hotels-container');
+    const searchInput = document.getElementById('search-hotels');
+    const citySelect   = document.getElementById('filter-hotel-city');
+    const stateSelect  = document.getElementById('filter-hotel-state');
+
+    const search = searchInput ? searchInput.value : '';
+    const city   = citySelect ? citySelect.value : '';
+    const state  = stateSelect ? stateSelect.value : '';
+
+    container.innerHTML = `<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Searching & loading hotel listings...</div>`;
+
+    try {
+        let url = `${API_BASE}/admin/hotels?status=${currentHotelStatusFilter}&search=${encodeURIComponent(search)}&city=${encodeURIComponent(city)}&state=${encodeURIComponent(state)}`;
         const res = await fetch(url, { headers: getHeaders() });
         if (!res.ok) await handleApiError(res);
         const data = await res.json();
         const hotels = data.data || [];
 
+        populateHotelCitiesDropdown(hotels);
+
         if (hotels.length === 0) {
-            container.innerHTML = `<div class="empty-state">No hotels found</div>`;
+            container.innerHTML = `
+                <div class="empty-state" style="padding:40px 20px; text-align:center; grid-column:1/-1;">
+                    <i class="fa-solid fa-hotel-slash" style="font-size:36px; color:var(--text-muted); margin-bottom:12px;"></i>
+                    <h3 style="margin:0 0 6px 0; font-size:16px;">No Hotels Found</h3>
+                    <p style="color:var(--text-muted); font-size:13px; margin:0;">No hotel listings match your current search ("${search || 'all'}"), city ("${city || 'all'}"), state ("${state || 'all'}"), or status filter.</p>
+                </div>
+            `;
             return;
         }
 
         container.innerHTML = hotels.map(h => {
-            const currentStatus = h.status || 'pending';
+            const isApproved = h.status === 'approved' || h.status === 'active';
+            const isPending  = h.status === 'pending';
+            const primaryImg = (h.primary_image && h.primary_image.image_path) 
+                ? (h.primary_image.image_path.startsWith('http') ? h.primary_image.image_path : `${STORAGE_BASE}/${h.primary_image.image_path}`)
+                : (h.images && h.images.length > 0 ? (h.images[0].image_path.startsWith('http') ? h.images[0].image_path : `${STORAGE_BASE}/${h.images[0].image_path}`) : 'https://via.placeholder.com/400x250?text=No+Hotel+Image');
+
+            let statusBadgeClass = isApproved ? 'confirmed' : (isPending ? 'pending' : 'failed');
+            let statusText       = isApproved ? 'APPROVED' : (isPending ? 'PENDING APPROVAL' : 'REJECTED / SUSPENDED');
+
             return `
-            <div class="data-card">
-                <div class="data-card-header">
-                    <div class="data-card-title">
-                        <h4>${h.name}</h4>
-                        <div class="data-card-sub"><i class="fa-solid fa-location-dot"></i> ${h.city || 'N/A'} • ${h.address || ''}</div>
+                <div class="data-card" style="display:flex; flex-direction:column; justify-content:space-between; position:relative; overflow:hidden;">
+                    <div>
+                        <div style="position:relative; height:150px; border-radius:8px; overflow:hidden; margin-bottom:12px; background:#0f172a;">
+                            <img src="${primaryImg}" alt="${h.name}" style="width:100%; height:100%; object-fit:cover;" onerror="this.src='https://via.placeholder.com/400x250?text=Hotel+Image'">
+                            <span class="badge ${statusBadgeClass}" style="position:absolute; top:8px; right:8px; font-size:10px; font-weight:700; ${!isApproved && !isPending ? 'background:#e11d48; color:#fff;' : ''}">
+                                ${statusText}
+                            </span>
+                            <div style="position:absolute; bottom:6px; left:8px; background:rgba(0,0,0,0.75); color:#f59e0b; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700;">
+                                <i class="fa-solid fa-star"></i> ${h.rating || '4.5'} (${h.review_count || 0})
+                            </div>
+                        </div>
+
+                        <h4 style="margin:0 0 4px 0; font-size:16px; color:var(--text-primary); font-weight:700;">${h.name}</h4>
+                        <div style="font-size:12px; color:#38bdf8; font-weight:600; margin-bottom:6px;">
+                            <i class="fa-solid fa-location-dot"></i> ${h.city || 'N/A'} • <span style="color:var(--text-muted); font-weight:normal;">${h.address || ''}</span>
+                        </div>
+                        <div style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
+                            <i class="fa-solid fa-user-tie"></i> Owner: <strong>${h.owner ? h.owner.name : 'N/A'}</strong> (${h.owner ? h.owner.phone : 'N/A'})
+                        </div>
                     </div>
-                    <span class="badge ${currentStatus}">${currentStatus}</span>
+
+                    <div style="border-top:1px solid var(--border); padding-top:10px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                        <div>
+                            <span style="font-size:15px; font-weight:700; color:var(--success);">₹${h.price_per_night}</span>
+                            <small style="font-size:10px; color:var(--text-muted);">/ night</small>
+                            <div style="font-size:10px; color:var(--text-muted);">${h.available_rooms || 0} / ${h.total_rooms || 0} Rooms Available</div>
+                        </div>
+                        <div style="display:flex; gap:6px;">
+                            <button class="btn-sm" style="background:#4f46e5; color:#fff;" onclick="openHotelDetailsModal(${h.id})">
+                                <i class="fa-solid fa-eye"></i> Details
+                            </button>
+                            ${isPending ? `
+                                <button class="btn-sm" style="background:#10b981; color:#fff;" onclick="updateHotelStatus(${h.id}, 'approved')">
+                                    <i class="fa-solid fa-check"></i> Approve
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
                 </div>
-                <div style="font-size:13px; color: var(--text-secondary); margin: 8px 0;">
-                    <div><strong>Owner:</strong> ${h.owner ? h.owner.name : 'Unknown'} (${h.owner ? h.owner.email : ''})</div>
-                    <div><strong>Rooms:</strong> ${h.total_rooms || 0} Total • ₹${h.price_per_night}/night</div>
-                </div>
-                <div style="margin-top: auto; display:flex; flex-direction:column; gap:6px;">
-                    <label style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">Approval Status:</label>
-                    <select class="status-select-dropdown" onchange="updateHotelStatus(${h.id}, this.value)">
-                        <option value="pending" ${currentStatus === 'pending' ? 'selected' : ''}>Pending Approval</option>
-                        <option value="approved" ${(currentStatus === 'approved' || currentStatus === 'active') ? 'selected' : ''}>Approved</option>
-                        <option value="rejected" ${currentStatus === 'rejected' ? 'selected' : ''}>Rejected</option>
-                        <option value="suspended" ${(currentStatus === 'suspended' || currentStatus === 'inactive') ? 'selected' : ''}>Suspended</option>
-                    </select>
-                </div>
-            </div>
             `;
         }).join('');
     } catch (err) {
@@ -307,6 +374,100 @@ async function updateHotelStatus(id, newStatus) {
         showToast(err.message, 'danger');
         loadHotelsData();
     }
+}
+
+async function openHotelDetailsModal(id) {
+    const modal = document.getElementById('hotel-modal');
+    const body  = document.getElementById('hotel-modal-body');
+    if (!modal || !body) return;
+
+    body.innerHTML = `<div style="padding:20px; text-align:center;"><i class="fa-solid fa-spinner fa-spin"></i> Loading Hotel Details & Gallery...</div>`;
+    modal.classList.remove('hidden');
+
+    try {
+        const res = await fetch(`${API_BASE}/admin/hotels/${id}`, { headers: getHeaders() });
+        if (!res.ok) await handleApiError(res);
+        const data = await res.json();
+        const h = data.hotel;
+        const isApproved = h.status === 'approved' || h.status === 'active';
+        const isPending  = h.status === 'pending';
+
+        const images = (h.images || []).map(img => {
+            return img.image_path.startsWith('http') ? img.image_path : `${STORAGE_BASE}/${img.image_path}`;
+        });
+        if (images.length === 0) images.push('https://via.placeholder.com/600x350?text=No+Hotel+Images+Uploaded');
+
+        body.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+                <div>
+                    <h3 style="margin:0; font-size:18px; color:var(--text-primary);">
+                        ${h.name}
+                        <span class="badge ${isApproved ? 'confirmed' : (isPending ? 'pending' : 'failed')}" style="margin-left:8px;">
+                            ${isApproved ? 'APPROVED' : (isPending ? 'PENDING APPROVAL' : 'REJECTED / SUSPENDED')}
+                        </span>
+                    </h3>
+                    <div style="font-size:12px; color:#38bdf8; font-weight:600; margin-top:2px;">
+                        <i class="fa-solid fa-location-dot"></i> ${h.city || 'N/A'} • ${h.address || 'N/A'}
+                    </div>
+                </div>
+                <div style="display:flex; gap:6px;">
+                    <button class="btn-sm" style="background:#10b981; color:#fff;" onclick="updateHotelStatus(${h.id}, 'approved'); closeHotelModal();">
+                        <i class="fa-solid fa-check-circle"></i> Approve Hotel
+                    </button>
+                    <button class="btn-sm" style="background:#f59e0b; color:#fff;" onclick="updateHotelStatus(${h.id}, 'suspended'); closeHotelModal();">
+                        <i class="fa-solid fa-pause"></i> Suspend
+                    </button>
+                    <button class="btn-sm" style="background:#e11d48; color:#fff;" onclick="updateHotelStatus(${h.id}, 'rejected'); closeHotelModal();">
+                        <i class="fa-solid fa-ban"></i> Reject
+                    </button>
+                </div>
+            </div>
+
+            <!-- Image Gallery -->
+            <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; gap:8px; height:180px; overflow:hidden; border-radius:8px; margin-bottom:14px;">
+                <img src="${images[0]}" style="width:100%; height:100%; object-fit:cover;" onerror="this.src='https://via.placeholder.com/600x350?text=Hotel+Image'">
+                ${images.slice(1, 3).map(img => `<img src="${img}" style="width:100%; height:100%; object-fit:cover;" onerror="this.src='https://via.placeholder.com/300x200?text=Gallery'">`).join('')}
+            </div>
+
+            <!-- Specs Grid -->
+            <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px; background:var(--bg-dark); padding:12px; border-radius:8px; border:1px solid var(--border); margin-bottom:14px; font-size:12px;">
+                <div><strong>Price Per Night:</strong> <br><span style="color:var(--success); font-weight:700; font-size:14px;">₹${h.price_per_night}</span></div>
+                <div><strong>Room Capacity:</strong> <br><span>${h.available_rooms || 0} / ${h.total_rooms || 0} Available</span></div>
+                <div><strong>Rating & Reviews:</strong> <br><span style="color:#f59e0b; font-weight:700;"><i class="fa-solid fa-star"></i> ${h.rating || '4.5'} (${h.review_count || 0})</span></div>
+            </div>
+
+            <!-- Owner Info & Description -->
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:14px; font-size:12px;">
+                <div style="background:var(--bg-dark); padding:12px; border-radius:8px; border:1px solid var(--border);">
+                    <h5 style="margin:0 0 6px 0; font-size:13px; color:var(--info);"><i class="fa-solid fa-user-tie"></i> Hotel Owner Info</h5>
+                    <div><strong>Name:</strong> ${h.owner ? h.owner.name : 'N/A'}</div>
+                    <div><strong>Email:</strong> ${h.owner ? h.owner.email : 'N/A'}</div>
+                    <div><strong>Phone:</strong> ${h.owner ? h.owner.phone : 'N/A'}</div>
+                </div>
+                <div style="background:var(--bg-dark); padding:12px; border-radius:8px; border:1px solid var(--border);">
+                    <h5 style="margin:0 0 6px 0; font-size:13px; color:var(--primary);"><i class="fa-solid fa-concierge-bell"></i> Description</h5>
+                    <div style="color:var(--text-secondary); line-height:1.4;">${h.description || 'No detailed description provided by owner.'}</div>
+                </div>
+            </div>
+
+            <!-- Amenities -->
+            ${(h.amenities || []).length > 0 ? `
+                <div style="background:var(--bg-dark); padding:12px; border-radius:8px; border:1px solid var(--border); font-size:12px;">
+                    <h5 style="margin:0 0 8px 0; font-size:13px; color:#a855f7;"><i class="fa-solid fa-wifi"></i> Hotel Amenities</h5>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                        ${h.amenities.map(a => `<span style="background:rgba(168,85,247,0.15); color:#c084fc; padding:4px 8px; border-radius:4px; border:1px solid rgba(168,85,247,0.3); font-weight:600;"><i class="fa-solid fa-check"></i> ${a.name}</span>`).join('')}
+                    </div>
+                </div>
+            ` : ''}
+        `;
+    } catch(err) {
+        body.innerHTML = `<div style="padding:20px; text-align:center; color:var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Failed to load hotel details'}</div>`;
+    }
+}
+
+function closeHotelModal() {
+    const modal = document.getElementById('hotel-modal');
+    if (modal) modal.classList.add('hidden');
 }
 
 // ----------------------------------------------------

@@ -231,20 +231,46 @@
                 <section id="tab-hotels" class="tab-content">
                     <div class="section-title">
                         <h2>Hotel Management</h2>
-                        <div class="filter-group">
-                            <select id="filter-hotel-status" onchange="loadHotelsData()">
-                                <option value="">All Statuses</option>
-                                <option value="pending">Pending Approval</option>
-                                <option value="approved">Approved</option>
-                                <option value="rejected">Rejected</option>
-                                <option value="suspended">Suspended</option>
-                            </select>
-                        </div>
                     </div>
 
-                    <div class="search-bar">
-                        <i class="fa-solid fa-magnifying-glass"></i>
-                        <input type="text" id="search-hotels" placeholder="Search hotel name, city, or address..." onkeyup="debounce(loadHotelsData, 400)()">
+                    <!-- Hotel Filter Navigation Subtabs -->
+                    <div class="txn-subtabs" style="margin-bottom:16px;">
+                        <button class="subtab-btn active" data-hotel-status="approved" onclick="filterHotelsByStatus('approved', this)">
+                            <i class="fa-solid fa-circle-check"></i> Approved Hotels
+                        </button>
+                        <button class="subtab-btn" data-hotel-status="pending" onclick="filterHotelsByStatus('pending', this)">
+                            <i class="fa-solid fa-clock"></i> Pending Approval
+                        </button>
+                        <button class="subtab-btn" data-hotel-status="all" onclick="filterHotelsByStatus('all', this)">
+                            <i class="fa-solid fa-hotel"></i> All Hotels
+                        </button>
+                        <button class="subtab-btn" data-hotel-status="rejected" onclick="filterHotelsByStatus('rejected', this)">
+                            <i class="fa-solid fa-circle-xmark"></i> Rejected / Suspended
+                        </button>
+                    </div>
+
+                    <!-- Multi-Filter Toolbar: Search, City, State -->
+                    <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; gap:10px; margin-bottom:16px;" class="hotel-filters-bar">
+                        <div class="search-bar" style="margin-bottom:0;">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="search-hotels" placeholder="Search by Hotel Name, City, State, or Owner..." onkeyup="debounce(loadHotelsData, 400)()">
+                        </div>
+                        <div>
+                            <select id="filter-hotel-city" class="custom-select" style="width:100%; padding:11px 14px; border-radius:8px; background:var(--bg-dark); border:1px solid var(--border); color:var(--text-primary); font-size:13px;" onchange="loadHotelsData()">
+                                <option value="">All Cities</option>
+                            </select>
+                        </div>
+                        <div>
+                            <select id="filter-hotel-state" class="custom-select" style="width:100%; padding:11px 14px; border-radius:8px; background:var(--bg-dark); border:1px solid var(--border); color:var(--text-primary); font-size:13px;" onchange="loadHotelsData()">
+                                <option value="">All States / Regions</option>
+                                <option value="Gujarat">Gujarat</option>
+                                <option value="Maharashtra">Maharashtra</option>
+                                <option value="Karnataka">Karnataka</option>
+                                <option value="Delhi">Delhi</option>
+                                <option value="Rajasthan">Rajasthan</option>
+                                <option value="Tamil Nadu">Tamil Nadu</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div id="hotels-container" class="data-cards-grid">
@@ -548,6 +574,19 @@
                     <button class="btn-sm" onclick="closeUserModal()"><i class="fa-solid fa-xmark"></i></button>
                 </div>
                 <div id="user-modal-body" class="modal-body">
+                    <!-- Populated dynamically by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Hotel Profile Inspection Modal -->
+        <div id="hotel-modal" class="modal-backdrop hidden">
+            <div class="modal-content" style="max-width: 780px;">
+                <div class="modal-header">
+                    <h3><i class="fa-solid fa-hotel"></i> Hotel Profile & Location Details</h3>
+                    <button class="btn-sm" onclick="closeHotelModal()"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div id="hotel-modal-body" class="modal-body">
                     <!-- Populated dynamically by JS -->
                 </div>
             </div>
