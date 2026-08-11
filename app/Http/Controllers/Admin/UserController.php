@@ -46,12 +46,15 @@ class UserController extends Controller
 
         $user = User::where('role', 'user')->findOrFail($id);
         $newStatus = filter_var($request->is_verified, FILTER_VALIDATE_BOOLEAN);
-        $user->is_verified = $newStatus;
-        $user->save();
+
+        $boolStr = $newStatus ? 'true' : 'false';
+        \Illuminate\Support\Facades\DB::statement("UPDATE users SET is_verified = {$boolStr}, updated_at = NOW() WHERE id = ?", [$user->id]);
 
         if (!$newStatus) {
             $user->tokens()->delete();
         }
+
+        $freshUser = User::where('role', 'user')->withCount('bookings')->find($id);
 
         $statusText = $newStatus ? 'Activated' : 'Disabled';
 
@@ -59,7 +62,7 @@ class UserController extends Controller
             'success'      => true,
             'message'      => "Customer #{$user->id} ({$user->name}) status updated to {$statusText}.",
             'is_verified'  => $newStatus,
-            'user'         => $user->fresh(),
+            'user'         => $freshUser,
         ]);
     }
 }

@@ -35,7 +35,15 @@ class User extends Authenticatable
 
     public function setIsVerifiedAttribute($value)
     {
-        $this->attributes['is_verified'] = filter_var($value, FILTER_VALIDATE_BOOLEAN) ? true : false;
+        $isTrue = filter_var($value, FILTER_VALIDATE_BOOLEAN);
+        try {
+            if (DB::getDriverName() === 'pgsql') {
+                $this->attributes['is_verified'] = $isTrue ? DB::raw('true') : DB::raw('false');
+                return;
+            }
+        } catch (\Throwable $e) {}
+
+        $this->attributes['is_verified'] = $isTrue ? 1 : 0;
     }
 
     public function ownerProfile()
