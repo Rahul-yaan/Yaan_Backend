@@ -295,13 +295,58 @@ async function populateHotelCitiesDropdown(hotels) {
 }
 
 function getHotelImageUrl(imgObj) {
-    const defaultFallback = 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80';
-    if (!imgObj) return defaultFallback;
+    if (!imgObj) return null;
     let path = typeof imgObj === 'string' ? imgObj : (imgObj.url || imgObj.image_path);
-    if (!path) return defaultFallback;
-    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    if (!path) return null;
+    if (path.startsWith('data:') || path.startsWith('http://') || path.startsWith('https://')) return path;
     const clean = path.replace(/^\/?storage\//, '').replace(/^\//, '');
     return `${STORAGE_BASE}/${clean}`;
+}
+
+function getOwnerUploadedImages(hotel) {
+    const images = [];
+
+    // 1. Hotel Images uploaded directly for the hotel
+    if (hotel.images && hotel.images.length > 0) {
+        hotel.images.forEach(img => {
+            const url = getHotelImageUrl(img);
+            if (url && !images.some(i => i.url === url)) {
+                images.push({ url: url, label: 'Hotel Photo' });
+            }
+        });
+    }
+
+    if (hotel.primary_image) {
+        const url = getHotelImageUrl(hotel.primary_image);
+        if (url && !images.some(i => i.url === url)) {
+            images.unshift({ url: url, label: 'Primary Photo' });
+        }
+    }
+
+    // 2. Registration / KYC Images uploaded by owner at register time
+    const profile = hotel.owner ? (hotel.owner.owner_profile || hotel.owner.ownerProfile) : null;
+    if (profile) {
+        const kycDocs = [
+            { path: profile.business_proof, url: profile.business_proof_url, label: 'Business Proof' },
+            { path: profile.gst_image, url: profile.gst_image_url, label: 'GST Certificate' },
+            { path: profile.aadhaar_front, url: profile.aadhaar_front_url, label: 'Aadhaar Front' },
+            { path: profile.aadhaar_back, url: profile.aadhaar_back_url, label: 'Aadhaar Back' },
+            { path: profile.pan_card, url: profile.pan_card_url, label: 'PAN Card' },
+            { path: profile.fssai_license, url: profile.fssai_license_url, label: 'FSSAI License' }
+        ];
+
+        kycDocs.forEach(doc => {
+            const rawUrl = doc.url || doc.path;
+            if (rawUrl) {
+                const cleanUrl = getHotelImageUrl(rawUrl);
+                if (cleanUrl && !images.some(i => i.url === cleanUrl)) {
+                    images.push({ url: cleanUrl, label: doc.label });
+                }
+            }
+        });
+    }
+
+    return images;
 }
 
 async function loadHotelsData() {
@@ -340,8 +385,8 @@ async function loadHotelsData() {
             const isApproved = h.status === 'approved' || h.status === 'active';
             const isPending = h.status === 'pending';
 
-            const rawImg = h.primary_image || (h.images && h.images.length > 0 ? h.images[0] : null);
-            const primaryImg = getHotelImageUrl(rawImg);
+            const ownerUploadedImages = getOwnerUploadedImages(h);
+            const primaryImgObj = ownerUploadedImages.length > 0 ? ownerUploadedImages[0] : null;
 
             let statusBadgeClass = isApproved ? 'confirmed' : (isPending ? 'pending' : 'failed');
             let statusText = isApproved ? 'APPROVED' : (isPending ? 'PENDING APPROVAL' : 'REJECTED / SUSPENDED');
@@ -350,7 +395,17 @@ async function loadHotelsData() {
                 <div class="data-card" style="display:flex; flex-direction:column; justify-content:space-between; position:relative; overflow:hidden;">
                     <div>
                         <div style="position:relative; height:160px; border-radius:8px; overflow:hidden; margin-bottom:12px; background:#0f172a;">
-                            <img src="${primaryImg}" alt="${h.name}" style="width:100%; height:100%; object-fit:cover;" onerror="this.src='https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80'">
+                            ${primaryImgObj ? `
+                                <img src="${primaryImgObj.url}" alt="${h.name}" style="width:100%; height:100%; object-fit:cover;">
+                                <span style="position:absolute; bottom:6px; right:8px; background:rgba(0,0,0,0.8); color:#38bdf8; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:700;">
+                                    ${primaryImgObj.label}
+                                </span>
+                            ` : `
+                                <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:var(--text-muted); font-size:12px;">
+                                    <i class="fa-solid fa-image-slash" style="font-size:24px; margin-bottom:6px; color:#475569;"></i>
+                                    <span>No Image Uploaded</span>
+                                </div>
+                            `}
                             <span class="badge ${statusBadgeClass}" style="position:absolute; top:8px; right:8px; font-size:10px; font-weight:700; ${!isApproved && !isPending ? 'background:#e11d48; color:#fff;' : ''}">
                                 ${statusText}
                             </span>
@@ -431,10 +486,7 @@ async function openHotelDetailsModal(id) {
         const isApproved = h.status === 'approved' || h.status === 'active';
         const isPending = h.status === 'pending';
 
-        const galleryImages = (h.images || []).map(img => getHotelImageUrl(img));
-        if (galleryImages.length === 0) {
-            galleryImages.push('https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80');
-        }
+        const ownerUploadedImages = getOwnerUploadedImages(h);
 
         body.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
@@ -462,11 +514,31 @@ async function openHotelDetailsModal(id) {
                 </div>
             </div>
 
-            <!-- Image Gallery -->
-            <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; gap:8px; height:180px; overflow:hidden; border-radius:8px; margin-bottom:14px; background:#0f172a;">
-                <img src="${galleryImages[0]}" style="width:100%; height:100%; object-fit:cover;" onerror="this.src='https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80'">
-                ${galleryImages.slice(1, 3).map(img => `<img src="${img}" style="width:100%; height:100%; object-fit:cover;" onerror="this.src='https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=400&q=80'">`).join('')}
-            </div>
+            <!-- Owner Uploaded Image Gallery -->
+            ${ownerUploadedImages.length > 0 ? `
+                <div style="margin-bottom:14px;">
+                    <h5 style="margin:0 0 8px 0; font-size:12px; color:var(--text-secondary); font-weight:700; text-transform:uppercase;">
+                        <i class="fa-solid fa-camera"></i> Owner Uploaded Photos & Documents (${ownerUploadedImages.length})
+                    </h5>
+                    <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap:10px; max-height:220px; overflow-y:auto;">
+                        ${ownerUploadedImages.map(img => `
+                            <div style="position:relative; height:130px; border-radius:8px; overflow:hidden; background:#0f172a; border:1px solid var(--border);">
+                                <a href="${img.url}" target="_blank">
+                                    <img src="${img.url}" alt="${img.label}" style="width:100%; height:100%; object-fit:cover;">
+                                </a>
+                                <span style="position:absolute; bottom:6px; left:6px; background:rgba(0,0,0,0.85); color:#38bdf8; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:700;">
+                                    ${img.label}
+                                </span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            ` : `
+                <div style="padding:20px; background:var(--bg-dark); border:1px dashed var(--border); border-radius:8px; text-align:center; color:var(--text-muted); font-size:12px; margin-bottom:14px;">
+                    <i class="fa-solid fa-image-slash" style="font-size:24px; color:#475569; margin-bottom:6px; display:block;"></i>
+                    No hotel or registration images uploaded by owner yet.
+                </div>
+            `}
 
             <!-- Hotel Financial Performance & Revenue Grid -->
             <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; background:var(--bg-dark); padding:14px; border-radius:8px; border:1px solid var(--border); margin-bottom:14px;">

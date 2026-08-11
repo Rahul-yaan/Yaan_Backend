@@ -10,7 +10,7 @@ class HotelController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Hotel::with(['owner:id,name,email,phone', 'images', 'amenities']);
+        $query = Hotel::with(['owner:id,name,email,phone', 'owner.ownerProfile', 'images', 'amenities']);
 
         // Filter by Status
         if ($request->has('status') && !empty($request->status) && $request->status !== 'all') {
@@ -68,7 +68,7 @@ class HotelController extends Controller
 
     public function show($id)
     {
-        $hotel = Hotel::with(['owner', 'images', 'amenities', 'reviews.user'])->findOrFail($id);
+        $hotel = Hotel::with(['owner', 'owner.ownerProfile', 'images', 'amenities', 'reviews.user'])->findOrFail($id);
 
         $bookings = \App\Models\Booking::where('hotel_id', $hotel->id)
             ->with(['user:id,name,email,phone'])
