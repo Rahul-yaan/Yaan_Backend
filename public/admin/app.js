@@ -83,15 +83,32 @@ function handleLogout() {
 }
 
 function showLoginScreen() {
-    document.getElementById('login-screen').classList.add('active');
-    document.getElementById('main-shell').classList.add('hidden');
+    const loginScreen = document.getElementById('login-screen');
+    const mainShell   = document.getElementById('main-shell');
+    if (loginScreen) {
+        loginScreen.style.display = 'flex';
+        loginScreen.classList.add('active');
+    }
+    if (mainShell) {
+        mainShell.style.display = 'none';
+        mainShell.classList.add('hidden');
+    }
 }
 
 function showMainApp() {
-    document.getElementById('login-screen').classList.remove('active');
-    document.getElementById('main-shell').classList.remove('hidden');
+    const loginScreen = document.getElementById('login-screen');
+    const mainShell   = document.getElementById('main-shell');
+    if (loginScreen) {
+        loginScreen.style.display = 'none';
+        loginScreen.classList.remove('active');
+    }
+    if (mainShell) {
+        mainShell.style.display = 'block';
+        mainShell.classList.remove('hidden');
+    }
     if (currentUser) {
-        document.getElementById('admin-name-display').textContent = currentUser.name || 'Admin';
+        const nameDisplay = document.getElementById('admin-name-display');
+        if (nameDisplay) nameDisplay.textContent = currentUser.name || 'Admin';
     }
     loadDashboardData();
 }

