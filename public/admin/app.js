@@ -1908,40 +1908,40 @@ async function loadHotelsData() {
             }
         }
 
-        // ----------------------------------------------------
-        // UTILITIES & TOAST NOTIFICATIONS
-        // ----------------------------------------------------
-        async function handleApiError(res) {
-            let errorMsg = `Server Error (${res.status})`;
-            try {
-                const data = await res.json();
-                errorMsg = data.error || data.message || errorMsg;
-            } catch (e) { }
+// ----------------------------------------------------
+// UTILITIES & TOAST NOTIFICATIONS
+// ----------------------------------------------------
+async function handleApiError(res) {
+    let errorMsg = `Server Error (${res.status})`;
+    try {
+        const data = await res.json();
+        errorMsg = data.error || data.message || errorMsg;
+    } catch (e) { }
 
-            if (res.status === 401 || res.status === 403) {
-                authToken = '';
-                localStorage.removeItem('yaan_admin_token');
-                localStorage.removeItem('yaan_admin_user');
-                showLoginScreen();
-                throw new Error(errorMsg || 'Session expired. Please login again.');
-            }
-            throw new Error(errorMsg);
-        }
-
-        function showToast(message, type = 'info') {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            toast.className = `toast toast-${type}`;
-
-            let icon = 'fa-circle-info';
-            if (type === 'success') icon = 'fa-circle-check';
-            if (type === 'danger') icon = 'fa-triangle-exclamation';
-
-            toast.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${message}</span>`;
-            container.appendChild(toast);
-
-            setTimeout(() => {
-                toast.remove();
-            }, 3500);
-        }
+    if (res.status === 401 || res.status === 403) {
+        authToken = '';
+        localStorage.removeItem('yaan_admin_token');
+        localStorage.removeItem('yaan_admin_user');
+        showLoginScreen();
+        throw new Error(errorMsg || 'Session expired. Please login again.');
     }
+    throw new Error(errorMsg);
+}
+
+function showToast(message, type = 'info') {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+
+    let icon = 'fa-circle-info';
+    if (type === 'success') icon = 'fa-circle-check';
+    if (type === 'danger') icon = 'fa-triangle-exclamation';
+
+    toast.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${message}</span>`;
+    container.appendChild(toast);
+
+    setTimeout(() => {
+        toast.remove();
+    }, 3500);
+}
