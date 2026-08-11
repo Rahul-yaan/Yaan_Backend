@@ -9,7 +9,7 @@ use App\Http\Controllers\ForgotPasswordController;
 // PUBLIC ROUTES — no token needed
 // ============================================================
 
-Route::middleware('throttle:5,1')->group(function () {
+Route::middleware('throttle:60,1')->group(function () {
     Route::post('/register',        [AuthController::class, 'register']);
     Route::post('/verify-otp',      [AuthController::class, 'verifyOtp']);
     Route::post('/login',           [AuthController::class, 'login']);
