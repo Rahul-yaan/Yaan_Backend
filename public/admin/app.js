@@ -1,5 +1,6 @@
 // Global State & API Configuration
 const API_BASE = '/api';
+const STORAGE_BASE = '/storage';
 let authToken = localStorage.getItem('yaan_admin_token') || '';
 let currentUser = JSON.parse(localStorage.getItem('yaan_admin_user') || 'null');
 let currentOwners = [];

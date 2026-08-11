@@ -66,7 +66,12 @@ class OwnerController extends Controller
             ->with(['ownerProfile', 'hotels.images'])
             ->findOrFail($id);
 
-        $hotelIds = $owner->hotels->pluck('id');
+        $hotelIds = Hotel::where('owner_id', $owner->id)->pluck('id');
+        if ($hotelIds->isEmpty() && $owner->ownerProfile && !empty($owner->ownerProfile->hotel_name)) {
+            $hotelIds = Hotel::where('name', 'like', "%{$owner->ownerProfile->hotel_name}%")->pluck('id');
+        }
+
+        $hotels = Hotel::whereIn('id', $hotelIds)->with('images')->get();
 
         $bookings = \App\Models\Booking::whereIn('hotel_id', $hotelIds)
             ->with(['user:id,name,email,phone', 'hotel:id,name,city'])
@@ -74,13 +79,21 @@ class OwnerController extends Controller
             ->get();
 
         $totalBookings     = $bookings->count();
-        $confirmedBookings = $bookings->whereIn('status', ['confirmed', 'completed'])->where('payment_status', '!=', 'refunded');
-        $totalRevenue      = (float) $confirmedBookings->sum('total_payable');
-        $totalCancelled    = $bookings->where('status', 'cancelled')->count();
+        $confirmedBookings = $bookings->filter(function($b) {
+            return ($b->payment_status === 'paid' || in_array($b->status, ['confirmed', 'completed'])) && $b->payment_status !== 'refunded';
+        });
+
+        $totalRevenue = (float) $confirmedBookings->sum(function($b) {
+            return (float) ($b->total_payable ?? $b->total_amount ?? 0);
+        });
+
+        $totalCancelled = $bookings->filter(function($b) {
+            return $b->status === 'cancelled' || in_array($b->payment_status, ['refunded', 'refund_initiated']);
+        })->count();
 
         return response()->json([
             'owner'       => $owner,
-            'hotels'      => $owner->hotels,
+            'hotels'      => $hotels->isNotEmpty() ? $hotels : $owner->hotels,
             'analytics'   => [
                 'total_revenue'      => $totalRevenue,
                 'total_bookings'     => $totalBookings,
