@@ -14,6 +14,20 @@ Route::get('/reset-password', function () {
     return view('reset_password');
 });
 
+// Explicitly serve Admin Portal with Cache-Control headers to ensure latest JS is always fetched
+Route::get('/admin/{any?}', function () {
+    $indexPath = public_path('admin/index.html');
+    if (!file_exists($indexPath)) {
+        abort(404, 'Admin Portal index file not found.');
+    }
+    return response()->file($indexPath, [
+        'Content-Type'  => 'text/html',
+        'Cache-Control' => 'no-cache, no-store, must-revalidate',
+        'Pragma'        => 'no-cache',
+        'Expires'       => '0',
+    ]);
+})->where('any', '.*');
+
 // Serve public storage files directly (bypassing missing symlink issues on Render/production)
 Route::get('/storage/{path}', function ($path) {
     $fullPath = storage_path('app/public/' . $path);
