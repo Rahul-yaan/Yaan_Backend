@@ -630,9 +630,10 @@ async function updateBookingStatus(id, status) {
 // ----------------------------------------------------
 async function loadUsersData() {
     const tbody = document.getElementById('users-table-body');
-    const search = document.getElementById('search-users').value;
+    const searchInput = document.getElementById('search-users');
+    const search = searchInput ? searchInput.value : '';
 
-    tbody.innerHTML = `<tr><td colspan="6" class="text-center"><i class="fa-solid fa-spinner fa-spin"></i> Loading users...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center"><i class="fa-solid fa-spinner fa-spin"></i> Loading customer accounts...</td></tr>`;
 
     try {
         let url = `${API_BASE}/admin/users?search=${encodeURIComponent(search)}`;
@@ -642,44 +643,150 @@ async function loadUsersData() {
         const users = data.data || [];
 
         if (users.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6" class="text-center">No users found</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center">No customer accounts found matching your search.</td></tr>`;
             return;
         }
 
-        tbody.innerHTML = users.map(u => `
-            <tr>
-                <td>#${u.id}</td>
-                <td><strong>${u.name}</strong></td>
-                <td>${u.email}<br><small class="text-muted">${u.phone}</small></td>
-                <td>${u.bookings_count || 0} bookings</td>
-                <td><span class="badge ${u.is_verified ? 'verified' : 'pending'}">${u.is_verified ? 'Active' : 'Unverified'}</span></td>
-                <td>
-                    <button class="btn-sm ${u.is_verified ? 'btn-warning' : 'btn-success'}" onclick="toggleUserStatus(${u.id}, ${!u.is_verified})">
-                        ${u.is_verified ? 'Disable' : 'Activate'}
-                    </button>
-                </td>
-            </tr>
-        `).join('');
+        tbody.innerHTML = users.map(u => {
+            const isActive = u.is_verified === true || u.is_verified === 1 || u.is_verified === '1' || u.is_verified === 'true';
+            const joinedDate = u.created_at ? new Date(u.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A';
+
+            return `
+                <tr>
+                    <td><strong>#${u.id}</strong></td>
+                    <td>
+                        <div style="font-weight:700; color:var(--text-primary); font-size:14px;">
+                            <i class="fa-solid fa-circle-user" style="color:var(--primary); margin-right:4px;"></i> ${u.name || 'Customer'}
+                        </div>
+                        <small class="text-muted" style="font-size:11px;">Joined: ${joinedDate}</small>
+                    </td>
+                    <td>
+                        <div style="font-size:12px; font-weight:600; color:#38bdf8;">
+                            <i class="fa-solid fa-envelope" style="font-size:11px;"></i> ${u.email || 'N/A'}
+                        </div>
+                        <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">
+                            <i class="fa-solid fa-phone" style="font-size:11px;"></i> ${u.phone || 'N/A'}
+                        </div>
+                    </td>
+                    <td>
+                        <span class="badge ${u.bookings_count > 0 ? 'confirmed' : 'pending'}" style="font-size:11px;">
+                            <i class="fa-solid fa-receipt"></i> ${u.bookings_count || 0} Bookings
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge ${isActive ? 'confirmed' : 'failed'}" style="font-size:11px; ${!isActive ? 'background:#e11d48; color:#ffffff;' : ''}">
+                            <i class="fa-solid ${isActive ? 'fa-circle-check' : 'fa-ban'}"></i>
+                            ${isActive ? 'Active' : 'Disabled'}
+                        </span>
+                    </td>
+                    <td>
+                        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                            <button class="btn-sm" style="background:${isActive ? '#f59e0b' : '#10b981'}; color:#ffffff; font-weight:600;" onclick="toggleUserStatus(${u.id}, ${!isActive}, '${(u.name || '').replace(/'/g, "\\'")}')">
+                                <i class="fa-solid ${isActive ? 'fa-ban' : 'fa-circle-check'}"></i>
+                                ${isActive ? 'Disable' : 'Activate'}
+                            </button>
+                            <button class="btn-sm" style="background:#4f46e5; color:#ffffff;" onclick="openUserDetailsModal(${u.id})">
+                                <i class="fa-solid fa-eye"></i> Details
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
     } catch (err) {
         tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading users'}</td></tr>`;
     }
 }
 
-async function toggleUserStatus(id, isVerified) {
+async function toggleUserStatus(id, newVerifiedState, name = 'Customer') {
+    const actionText = newVerifiedState ? 'Activate' : 'Disable';
+    const confirmed = confirm(`Are you sure you want to ${actionText} Customer #${id} (${name})?\n\n${!newVerifiedState ? 'Disabling will prevent this customer from logging into the mobile app.' : 'Activating will restore customer app access.'}`);
+    if (!confirmed) return;
+
     try {
         const res = await fetch(`${API_BASE}/admin/users/${id}/status`, {
             method: 'PUT',
             headers: getHeaders(),
-            body: JSON.stringify({ is_verified: isVerified })
+            body: JSON.stringify({ is_verified: newVerifiedState })
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || data.message || 'Failed to update user status');
 
-        showToast(data.message || 'User status updated', 'success');
+        showToast(data.message || `Customer account ${actionText}d successfully`, 'success');
         loadUsersData();
     } catch (err) {
         showToast(err.message, 'danger');
     }
+}
+
+async function openUserDetailsModal(id) {
+    const modal = document.getElementById('user-modal');
+    const body = document.getElementById('user-modal-body');
+    if (!modal || !body) return;
+
+    body.innerHTML = `<div style="padding:20px; text-align:center;"><i class="fa-solid fa-spinner fa-spin"></i> Loading Customer Profile...</div>`;
+    modal.classList.remove('hidden');
+
+    try {
+        const res = await fetch(`${API_BASE}/admin/users/${id}`, { headers: getHeaders() });
+        if (!res.ok) await handleApiError(res);
+        const data = await res.json();
+        const u = data.user;
+        const isActive = u.is_verified === true || u.is_verified === 1 || u.is_verified === '1' || u.is_verified === 'true';
+
+        body.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+                <div>
+                    <h3 style="margin:0; font-size:18px; color:var(--text-primary);">
+                        <i class="fa-solid fa-user-circle" style="color:var(--primary);"></i> ${u.name}
+                        <span class="badge ${isActive ? 'confirmed' : 'failed'}" style="margin-left:8px; ${!isActive ? 'background:#e11d48; color:#fff;' : ''}">
+                            ${isActive ? 'Active Customer' : 'Account Disabled'}
+                        </span>
+                    </h3>
+                    <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">Customer Account ID: #${u.id}</div>
+                </div>
+                <button class="btn-sm" style="background:${isActive ? '#f59e0b' : '#10b981'}; color:#fff;" onclick="toggleUserStatus(${u.id}, ${!isActive}, '${(u.name || '').replace(/'/g, "\\'")}'); closeUserModal();">
+                    <i class="fa-solid ${isActive ? 'fa-ban' : 'fa-circle-check'}"></i> ${isActive ? 'Disable Account' : 'Activate Account'}
+                </button>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; background:var(--bg-dark); padding:14px; border-radius:8px; border:1px solid var(--border); margin-bottom:16px;">
+                <div><strong>Email Address:</strong> <br><span style="color:#38bdf8; font-weight:600;"><i class="fa-solid fa-envelope"></i> ${u.email || 'N/A'}</span></div>
+                <div><strong>Phone Number:</strong> <br><span style="color:var(--text-primary); font-weight:600;"><i class="fa-solid fa-phone"></i> ${u.phone || 'N/A'}</span></div>
+                <div><strong>Total Bookings:</strong> <br><span style="color:var(--success); font-weight:700;">${u.bookings_count || 0} Bookings Made</span></div>
+                <div><strong>Joined Date:</strong> <br><span>${u.created_at ? new Date(u.created_at).toLocaleString('en-IN') : 'N/A'}</span></div>
+            </div>
+
+            <h4 style="margin:0 0 10px 0; font-size:14px; color:var(--info);"><i class="fa-solid fa-clock-rotate-left"></i> Recent Booking History (${(u.bookings || []).length})</h4>
+            ${(u.bookings || []).length === 0 ? `
+                <div style="padding:12px; background:var(--bg-dark); border-radius:6px; font-size:12px; color:var(--text-muted);">No booking history found for this customer.</div>
+            ` : `
+                <div style="max-height:220px; overflow-y:auto; display:flex; flex-direction:column; gap:8px;">
+                    ${(u.bookings || []).map(b => `
+                        <div style="background:var(--bg-dark); padding:10px 12px; border-radius:6px; border:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; font-size:12px;">
+                            <div>
+                                <strong>Booking #${b.id}</strong> • ${b.hotel ? b.hotel.name : 'Hotel'} (${b.hotel ? b.hotel.city : ''})<br>
+                                <small class="text-muted">Check-in: ${b.check_in || 'N/A'} to ${b.check_out || 'N/A'}</small>
+                            </div>
+                            <div style="text-align:right;">
+                                <strong style="color:var(--text-primary);">₹${b.total_payable || b.total_amount}</strong><br>
+                                <span class="badge ${b.status === 'confirmed' ? 'confirmed' : (b.payment_status === 'refunded' ? 'failed' : 'pending')}" style="font-size:10px;">
+                                    ${b.payment_status === 'refunded' ? 'REFUNDED' : b.status.toUpperCase()}
+                                </span>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `}
+        `;
+    } catch (err) {
+        body.innerHTML = `<div style="padding:20px; text-align:center; color:var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Failed to load customer details'}</div>`;
+    }
+}
+
+function closeUserModal() {
+    const modal = document.getElementById('user-modal');
+    if (modal) modal.classList.add('hidden');
 }
 
 // ----------------------------------------------------

@@ -35,8 +35,7 @@ class User extends Authenticatable
 
     public function setIsVerifiedAttribute($value)
     {
-        $isTrue = filter_var($value, FILTER_VALIDATE_BOOLEAN);
-        $this->attributes['is_verified'] = $isTrue ? DB::raw('true') : DB::raw('false');
+        $this->attributes['is_verified'] = filter_var($value, FILTER_VALIDATE_BOOLEAN) ? true : false;
     }
 
     public function ownerProfile()

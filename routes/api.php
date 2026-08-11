@@ -75,6 +75,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Users / Customers
         Route::get('/users',               [App\Http\Controllers\Admin\UserController::class, 'index']);
+        Route::get('/users/{id}',          [App\Http\Controllers\Admin\UserController::class, 'show']);
         Route::put('/users/{id}/status',   [App\Http\Controllers\Admin\UserController::class, 'toggleStatus']);
 
         // Bookings

@@ -26,19 +26,40 @@ class UserController extends Controller
         return response()->json($users);
     }
 
+    public function show($id)
+    {
+        $user = User::where('role', 'user')
+            ->with(['bookings' => function($b) {
+                $b->with('hotel:id,name,city')->latest()->take(10);
+            }])
+            ->withCount('bookings')
+            ->findOrFail($id);
+
+        return response()->json(['user' => $user]);
+    }
+
     public function toggleStatus(Request $request, $id)
     {
         $request->validate([
-            'is_verified' => 'required|boolean',
+            'is_verified' => 'required',
         ]);
 
         $user = User::where('role', 'user')->findOrFail($id);
-        $user->is_verified = $request->is_verified;
+        $newStatus = filter_var($request->is_verified, FILTER_VALIDATE_BOOLEAN);
+        $user->is_verified = $newStatus;
         $user->save();
 
+        if (!$newStatus) {
+            $user->tokens()->delete();
+        }
+
+        $statusText = $newStatus ? 'Activated' : 'Disabled';
+
         return response()->json([
-            'message' => "User status updated successfully.",
-            'user'    => $user,
+            'success'      => true,
+            'message'      => "Customer #{$user->id} ({$user->name}) status updated to {$statusText}.",
+            'is_verified'  => $newStatus,
+            'user'         => $user->fresh(),
         ]);
     }
 }
