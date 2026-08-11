@@ -49,6 +49,7 @@ class Booking extends Model
         'display_transaction_id',
         'is_confirmed',
         'region_time_formatted',
+        'refund_time_formatted',
     ];
 
     public function getDisplayTransactionIdAttribute()
@@ -73,6 +74,27 @@ class Booking extends Model
     public function getRegionTimeFormattedAttribute()
     {
         $dt = $this->created_at ? $this->created_at->timezone('Asia/Kolkata') : now()->timezone('Asia/Kolkata');
+        return $dt->format('d M Y, h:i:s A') . ' IST';
+    }
+
+    public function getRefundTimeFormattedAttribute()
+    {
+        $isRefunded = in_array($this->payment_status, ['refunded', 'refund_initiated']) || str_contains(strtolower($this->cancellation_reason ?? ''), 'refund');
+        if (!$isRefunded) {
+            return null;
+        }
+
+        if (!empty($this->gateway_response)) {
+            $gw = json_decode($this->gateway_response, true);
+            if (is_array($gw)) {
+                $epoch = $gw['created_at'] ?? ($gw['refund']['entity']['created_at'] ?? null);
+                if ($epoch && is_numeric($epoch)) {
+                    return \Carbon\Carbon::createFromTimestamp($epoch)->timezone('Asia/Kolkata')->format('d M Y, h:i:s A') . ' IST';
+                }
+            }
+        }
+
+        $dt = $this->updated_at ? $this->updated_at->timezone('Asia/Kolkata') : now()->timezone('Asia/Kolkata');
         return $dt->format('d M Y, h:i:s A') . ' IST';
     }
 

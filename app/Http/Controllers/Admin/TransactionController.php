@@ -482,6 +482,7 @@ class TransactionController extends Controller
                     'status'                 => $paymentStatusText,
                     'is_refunded'            => $isRefunded,
                     'refund_id'              => $refundId,
+                    'refund_time_formatted'  => $transaction->refund_time_formatted,
                     'payment_method'         => $transaction->payment_method ?? 'Razorpay / Online',
                     'display_transaction_id' => $transaction->display_transaction_id,
                     'transaction_id'         => $transaction->transaction_id,

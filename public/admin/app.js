@@ -872,6 +872,11 @@ async function loadTransactionsData() {
                     </td>
                     <td>
                         <div style="font-size:12px; font-weight:600;">${regionTime}</div>
+                        ${isRefunded && t.refund_time_formatted ? `
+                            <div style="font-size:11px; color:#c084fc; font-weight:700; margin-top:2px;" title="Exact Razorpay Refund Timestamp">
+                                <i class="fa-solid fa-arrow-rotate-left"></i> Refunded: ${t.refund_time_formatted}
+                            </div>
+                        ` : ''}
                         <small class="text-muted" style="font-size:10px;">Hotel: ${t.hotel ? t.hotel.name : 'N/A'}</small>
                     </td>
                     <td>
@@ -885,7 +890,12 @@ async function loadTransactionsData() {
                     </td>
                     <td>
                         <span class="badge ${statusBadgeClass}">${statusText}</span>
-                        ${reasonText ? `<div style="font-size:11px; color:#fca5a5; margin-top:3px; max-width:180px; line-height:1.2;"><i class="fa-solid fa-circle-info"></i> ${reasonText}</div>` : ''}
+                        ${isRefunded && t.refund_time_formatted ? `
+                            <div style="font-size:11px; color:#e9d5ff; font-weight:700; margin-top:3px;">
+                                <i class="fa-solid fa-clock"></i> Refunded At: ${t.refund_time_formatted}
+                            </div>
+                        ` : ''}
+                        ${reasonText ? `<div style="font-size:11px; color:#fca5a5; margin-top:3px; max-width:200px; line-height:1.2;"><i class="fa-solid fa-circle-info"></i> ${reasonText}</div>` : ''}
                     </td>
                     <td>
                         <div style="display:flex; flex-direction:column; gap:4px;">
@@ -989,8 +999,13 @@ async function openTransactionModal(txnId) {
             <div style="background:var(--bg-dark); padding:12px; border-radius:8px; border:1px solid var(--border); margin-bottom:16px;">
                 <h5 style="margin:0 0 8px 0; font-size:13px; color:var(--info);"><i class="fa-solid fa-clock"></i> Timestamps & Region Time</h5>
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:12px;">
-                    <div><strong>Region Time (IST):</strong> ${regionTime}</div>
+                    <div><strong>Booking Created (IST):</strong> ${regionTime}</div>
                     <div><strong>Server Timestamp:</strong> ${t.created_at || 'N/A'}</div>
+                    ${t.refund_time_formatted ? `
+                        <div style="grid-column: span 2; color:#c084fc; font-weight:700; margin-top:4px; padding-top:4px; border-top:1px dashed var(--border);">
+                            <i class="fa-solid fa-arrow-rotate-left"></i> <strong>Razorpay Refund Date & Time:</strong> ${t.refund_time_formatted}
+                        </div>
+                    ` : ''}
                 </div>
                 ${t.cancellation_reason ? `
                     <div style="margin-top:8px; padding:8px; background:rgba(239, 68, 68, 0.15); border:1px solid var(--danger); border-radius:6px; font-size:12px; color:#fca5a5;">
@@ -1152,7 +1167,8 @@ async function openInvoiceModal(txnId) {
                                     <i class="fa-solid fa-arrow-rotate-left"></i> Payment Refunded via Razorpay
                                 </div>
                                 ${pay.refund_id ? `<div><strong>Razorpay Refund ID:</strong> <span style="font-family:monospace; color:#f43f5e; font-weight:700;">${pay.refund_id}</span></div>` : ''}
-                                ${pay.cancellation_reason ? `<div style="font-size:11px; color:#fda4af; margin-top:2px;"><strong>Reason:</strong> ${pay.cancellation_reason}</div>` : ''}
+                                ${pay.refund_time_formatted ? `<div><strong>Refund Date & Time:</strong> <span style="color:#e9d5ff; font-weight:700;">${pay.refund_time_formatted}</span></div>` : ''}
+                                ${pay.cancellation_reason ? `<div style="font-size:11px; color:#fda4af; margin-top:2px;"><strong>Reason / Note:</strong> ${pay.cancellation_reason}</div>` : ''}
                             </div>
                         ` : ''}
                     </div>
