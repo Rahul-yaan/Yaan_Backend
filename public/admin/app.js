@@ -163,12 +163,15 @@ async function loadDashboardData() {
         const m = data.metrics || {};
 
         document.getElementById('stat-revenue').textContent = `₹${(m.total_revenue || 0).toLocaleString('en-IN')}`;
-        document.getElementById('stat-bookings').textContent = m.total_bookings || 0;
+        document.getElementById('stat-bookings').textContent = m.confirmed_bookings ?? m.total_bookings ?? 0;
         document.getElementById('stat-pending-hotels').textContent = m.pending_hotels || 0;
         document.getElementById('stat-pending-owners').textContent = m.pending_owners || 0;
         document.getElementById('stat-users').textContent = m.users_count || 0;
         document.getElementById('stat-owners').textContent = m.owners_count || 0;
         document.getElementById('stat-approved-hotels').textContent = m.approved_hotels || 0;
+        if (document.getElementById('stat-cancelled-bookings')) {
+            document.getElementById('stat-cancelled-bookings').textContent = m.cancelled_bookings || 0;
+        }
 
         // Badges in drawer
         const bHotels = document.getElementById('badge-pending-hotels');
