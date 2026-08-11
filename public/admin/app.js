@@ -883,12 +883,10 @@ async function deleteAdminHotelPhoto(hotelId, imageId) {
                         </span>
                     </div>
 
-                    <div style="font-size:12px; color:var(--text-secondary); display:flex; flex-direction:column; gap:4px; background:var(--bg-dark); padding:10px; border-radius:6px; border:1px solid var(--border); margin-bottom:12px;">
-                        <div><i class="fa-solid fa-envelope" style="color:#38bdf8; font-size:11px;"></i> <strong>Email:</strong> ${o.email || 'N/A'}</div>
-                        <div><i class="fa-solid fa-phone" style="color:var(--text-primary); font-size:11px;"></i> <strong>Phone:</strong> ${o.phone || 'N/A'}</div>
-                        <div><i class="fa-solid fa-hotel" style="color:var(--success); font-size:11px;"></i> <strong>Hotel Name:</strong> ${profile.hotel_name || 'N/A'}</div>
-                        <div><i class="fa-solid fa-building" style="font-size:11px;"></i> <strong>Listed Hotels:</strong> ${o.hotels_count || 0} Hotels</div>
-                        ${profile.gst_number ? `<div><strong>GSTIN:</strong> ${profile.gst_number}</div>` : ''}
+                    <div style="font-size:12px; color:var(--text-secondary); display:flex; flex-direction:column; gap:6px; background:var(--bg-dark); padding:12px; border-radius:6px; border:1px solid var(--border); margin-bottom:12px;">
+                        <div><i class="fa-solid fa-hotel" style="color:var(--success); font-size:12px; margin-right:4px;"></i> <strong>Hotel Property:</strong> <span style="color:var(--text-primary); font-weight:700;">${profile.hotel_name || 'N/A'}</span></div>
+                        <div><i class="fa-solid fa-location-dot" style="color:#38bdf8; font-size:12px; margin-right:4px;"></i> <strong>Location:</strong> ${profile.city || 'N/A'}${profile.state ? ', ' + profile.state : ''}</div>
+                        <div><i class="fa-solid fa-building-user" style="color:#a855f7; font-size:12px; margin-right:4px;"></i> <strong>Listings:</strong> ${o.hotels_count || 0} Registered Hotels</div>
                     </div>
                 </div>
 
@@ -938,25 +936,42 @@ async function deleteAdminHotelPhoto(hotelId, imageId) {
                 const gstImg = getImgUrl(profile.gst_image);
 
                 body.innerHTML = `
-            <!-- Header Status -->
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+            <!-- Header Status & Action Bar -->
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
                 <div>
-                    <h3 style="margin:0; font-size:18px; color:var(--text-primary);">
+                    <h3 style="margin:0; font-size:20px; font-weight:700; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
                         <i class="fa-solid fa-user-tie" style="color:var(--primary);"></i> ${owner.name}
-                        <span class="badge ${isVerified ? 'confirmed' : 'pending'}" style="margin-left:8px; ${!isVerified ? 'background:#f59e0b; color:#000;' : ''}">
+                        <span class="badge ${isVerified ? 'confirmed' : 'pending'}" style="font-size:11px; padding:4px 10px; border-radius:6px; font-weight:700; ${!isVerified ? 'background:#f59e0b; color:#000;' : ''}">
                             ${isVerified ? 'Verified Owner' : 'Pending KYC Verification'}
                         </span>
                     </h3>
-                    <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">
-                        <i class="fa-solid fa-envelope"></i> ${owner.email} • <i class="fa-solid fa-phone"></i> ${owner.phone}
-                    </div>
                 </div>
-                <div style="display:flex; gap:6px;">
+                <div style="display:flex; gap:8px;">
                     ${!isVerified ?
-                        `<button class="btn-sm btn-success" onclick="verifyOwner(${owner.id}, true); closeKycModal();"><i class="fa-solid fa-user-check"></i> Approve KYC</button>` :
-                        `<button class="btn-sm btn-warning" onclick="verifyOwner(${owner.id}, false); closeKycModal();"><i class="fa-solid fa-user-xmark"></i> Revoke KYC</button>`
+                        `<button class="btn-sm btn-success" style="padding:8px 14px; font-weight:700;" onclick="verifyOwner(${owner.id}, true); closeKycModal();"><i class="fa-solid fa-user-check"></i> Approve KYC</button>` :
+                        `<button class="btn-sm btn-warning" style="padding:8px 14px; font-weight:700;" onclick="verifyOwner(${owner.id}, false); closeKycModal();"><i class="fa-solid fa-user-xmark"></i> Revoke KYC</button>`
                     }
-                    <button class="btn-sm" style="background:#e11d48; color:white;" onclick="resetOwnerKyc(${owner.id}); closeKycModal();"><i class="fa-solid fa-trash-can"></i> Reset KYC Documents</button>
+                    <button class="btn-sm" style="background:#e11d48; color:white; padding:8px 14px; font-weight:700;" onclick="resetOwnerKyc(${owner.id}); closeKycModal();"><i class="fa-solid fa-trash-can"></i> Reset KYC</button>
+                </div>
+            </div>
+
+            <!-- Owner Detailed Contact & Business Info Bar -->
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:10px; background:var(--bg-dark); padding:12px 14px; border-radius:8px; border:1px solid var(--border); margin-bottom:16px; font-size:12px;">
+                <div>
+                    <span style="color:var(--text-muted); font-size:11px; display:block; font-weight:600;">Email Address</span>
+                    <strong style="color:#38bdf8; font-size:13px;"><i class="fa-solid fa-envelope"></i> ${owner.email || 'N/A'}</strong>
+                </div>
+                <div>
+                    <span style="color:var(--text-muted); font-size:11px; display:block; font-weight:600;">Phone Number</span>
+                    <strong style="color:var(--text-primary); font-size:13px;"><i class="fa-solid fa-phone"></i> ${owner.phone || 'N/A'}</strong>
+                </div>
+                <div>
+                    <span style="color:var(--text-muted); font-size:11px; display:block; font-weight:600;">Primary Hotel</span>
+                    <strong style="color:var(--success); font-size:13px;"><i class="fa-solid fa-hotel"></i> ${profile.hotel_name || (hotels[0] ? hotels[0].name : 'N/A')}</strong>
+                </div>
+                <div>
+                    <span style="color:var(--text-muted); font-size:11px; display:block; font-weight:600;">GSTIN / Tax ID</span>
+                    <strong style="color:#c084fc; font-size:13px;"><i class="fa-solid fa-file-invoice"></i> ${profile.gst_number || 'Not Provided'}</strong>
                 </div>
             </div>
 
