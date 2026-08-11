@@ -20,7 +20,7 @@ class TransactionController extends Controller
 
         $query = Booking::with(['user:id,name,email,phone', 'hotel:id,name,city,address']);
 
-        // Filter by Transaction Type / Status (Strict Success vs Temporary vs Cancelled/Refunded)
+        // Filter by Transaction Type / Status (Strict Success vs Temporary vs Refunded vs Cancelled)
         if ($request->has('type') && !empty($request->type)) {
             $type = strtolower($request->type);
             if ($type === 'confirmed' || $type === 'success') {
@@ -31,12 +31,20 @@ class TransactionController extends Controller
                 // Temporary / Incomplete Block: Pending payment attempts where payment has not been completed
                 $query->where('status', 'pending')
                       ->whereIn('payment_status', ['pending', 'failed']);
-            } elseif ($type === 'cancelled' || $type === 'failed') {
-                // Cancelled / Failed / Refunded Block: Cancelled bookings or refunded payments
+            } elseif ($type === 'refunded' || $type === 'refund') {
+                // Refunded Block: Bookings where payment was refunded or refund initiated
                 $query->where(function($q) {
-                    $q->where('status', 'cancelled')
-                      ->orWhere('payment_status', 'refunded');
+                    $q->whereIn('payment_status', ['refunded', 'refund_initiated'])
+                      ->orWhere('cancellation_reason', 'like', '%refund%');
                 });
+            } elseif ($type === 'cancelled' || $type === 'failed') {
+                // Cancelled / Failed Block: Cancelled bookings excluding refunded payments
+                $query->where('status', 'cancelled')
+                      ->whereNotIn('payment_status', ['refunded', 'refund_initiated'])
+                      ->where(function($q) {
+                          $q->whereNull('cancellation_reason')
+                            ->orWhere('cancellation_reason', 'not like', '%refund%');
+                      });
             }
         }
 
@@ -75,7 +83,8 @@ class TransactionController extends Controller
         $allBookings = Booking::all();
         $confirmedBookings = $allBookings->filter(fn($b) => $b->payment_status === 'paid' && in_array($b->status, ['confirmed', 'completed']));
         $temporaryBookings = $allBookings->filter(fn($b) => $b->status === 'pending' && in_array($b->payment_status, ['pending', 'failed']));
-        $cancelledBookings = $allBookings->filter(fn($b) => $b->status === 'cancelled' || $b->payment_status === 'refunded');
+        $refundedBookings  = $allBookings->filter(fn($b) => in_array($b->payment_status, ['refunded', 'refund_initiated']) || str_contains(strtolower($b->cancellation_reason ?? ''), 'refund'));
+        $cancelledBookings = $allBookings->filter(fn($b) => $b->status === 'cancelled' && !in_array($b->payment_status, ['refunded', 'refund_initiated']) && !str_contains(strtolower($b->cancellation_reason ?? ''), 'refund'));
 
         $metrics = [
             'total_count'       => $allBookings->count(),
@@ -84,6 +93,8 @@ class TransactionController extends Controller
             'confirmed_amount'  => (float) $confirmedBookings->sum('total_payable'),
             'temporary_count'   => $temporaryBookings->count(),
             'temporary_amount'  => (float) $temporaryBookings->sum('total_payable'),
+            'refunded_count'    => $refundedBookings->count(),
+            'refunded_amount'   => (float) $refundedBookings->sum('total_payable'),
             'cancelled_count'   => $cancelledBookings->count(),
             'cancelled_amount'  => (float) $cancelledBookings->sum('total_payable'),
         ];
@@ -294,30 +305,34 @@ class TransactionController extends Controller
                 ], 400);
             }
 
-            $refundData = $response->json();
-            $refundId   = $refundData['id'] ?? 'REF_' . time();
+            $refundData   = $response->json();
+            $refundId     = $refundData['id'] ?? 'REF_' . time();
+            $rfStatus     = strtolower($refundData['status'] ?? 'processed');
+
+            $finalPaymentStatus = in_array($rfStatus, ['processed', 'speed_processed']) ? 'refunded' : 'refund_initiated';
 
             // Record audit log for status change
             \App\Models\TransactionStatusOverride::create([
                 'booking_id'         => $transaction->id,
-                'admin_id'           => $request->user()->id,
+                'admin_id'           => $request->user() ? $request->user()->id : null,
                 'old_status'         => $transaction->status,
                 'new_status'         => 'cancelled',
                 'old_payment_status' => $transaction->payment_status,
-                'new_payment_status' => 'refund_initiated',
-                'reason'             => 'Razorpay Refund Initiated: ' . $request->reason . ' (Refund ID: ' . $refundId . ')',
+                'new_payment_status' => $finalPaymentStatus,
+                'reason'             => 'Razorpay Refund (' . ucfirst($rfStatus) . '): ' . $request->reason . ' (Refund ID: ' . $refundId . ')',
                 'ip_address'         => $request->ip(),
             ]);
 
-            // Update status to refund_initiated, defer final 'refunded' status to refund.processed webhook
-            $transaction->payment_status      = 'refund_initiated';
-            $transaction->cancellation_reason = 'Refund Initiated via Razorpay API: ' . $request->reason;
+            // Update status & cancellation reason
+            $transaction->payment_status      = $finalPaymentStatus;
+            $transaction->status              = 'cancelled';
+            $transaction->cancellation_reason = 'Refund Processed via Razorpay API: ' . $request->reason . ' (Refund ID: ' . $refundId . ')';
             $transaction->gateway_response    = json_encode($refundData);
             $transaction->save();
 
             return response()->json([
                 'success'     => true,
-                'message'     => "Refund of ₹{$transaction->total_payable} initiated successfully with Razorpay (Refund ID: {$refundId}). Status will finalize when refund.processed webhook fires.",
+                'message'     => "Refund of ₹{$transaction->total_payable} processed successfully with Razorpay! (Refund ID: {$refundId}). Payment returned to customer.",
                 'refund'      => $refundData,
                 'transaction' => $transaction,
             ]);

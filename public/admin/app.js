@@ -533,25 +533,32 @@ async function loadBookingsData() {
             return;
         }
 
-        tbody.innerHTML = bookings.map(b => `
-            <tr>
-                <td>#${b.id}</td>
-                <td><strong>${b.user ? b.user.name : 'Guest'}</strong><br><small class="text-muted">${b.user ? b.user.phone : ''}</small></td>
-                <td>${b.hotel ? b.hotel.name : 'N/A'}<br><small class="text-muted">${b.hotel ? b.hotel.city : ''}</small></td>
-                <td>${b.check_in || ''} to ${b.check_out || ''}</td>
-                <td><strong>₹${b.total_amount || 0}</strong></td>
-                <td><span class="badge ${b.payment_status || 'pending'}">${b.payment_status || 'pending'}</span></td>
-                <td><span class="badge ${b.status}">${b.status}</span></td>
-                <td>
-                    <select onchange="updateBookingStatus(${b.id}, this.value)" style="padding: 4px; font-size:12px;">
-                        <option value="">Change</option>
-                        <option value="confirmed">Confirmed</option>
-                        <option value="completed">Completed</option>
-                        <option value="cancelled">Cancelled</option>
-                    </select>
-                </td>
-            </tr>
-        `).join('');
+        tbody.innerHTML = bookings.map(b => {
+            const isRefunded = b.payment_status === 'refunded' || b.payment_status === 'refund_initiated' || (b.cancellation_reason && b.cancellation_reason.toLowerCase().includes('refund'));
+            const payBadgeClass = isRefunded ? 'failed' : (b.payment_status === 'paid' ? 'confirmed' : 'pending');
+            const payText = isRefunded ? (b.payment_status === 'refunded' ? 'Refunded' : 'Refund_initiated') : (b.payment_status || 'pending');
+
+            return `
+                <tr>
+                    <td>#${b.id}</td>
+                    <td><strong>${b.user ? b.user.name : 'Guest'}</strong><br><small class="text-muted">${b.user ? b.user.phone : ''}</small></td>
+                    <td>${b.hotel ? b.hotel.name : 'N/A'}<br><small class="text-muted">${b.hotel ? b.hotel.city : ''}</small></td>
+                    <td>${b.check_in || ''} to ${b.check_out || ''}</td>
+                    <td><strong>₹${b.total_payable || b.total_amount || 0}</strong></td>
+                    <td><span class="badge ${payBadgeClass}" style="${isRefunded ? 'background:#e11d48; color:#ffffff;' : ''}">${payText}</span></td>
+                    <td><span class="badge ${b.status}">${b.status}</span></td>
+                    <td>
+                        <select onchange="updateBookingStatus(${b.id}, this.value)" style="padding: 4px; font-size:12px;">
+                            <option value="">Change</option>
+                            <option value="confirmed">Confirmed</option>
+                            <option value="completed">Completed</option>
+                            <option value="cancelled">Cancelled</option>
+                            <option value="refund">Issue Refund (Razorpay)</option>
+                        </select>
+                    </td>
+                </tr>
+            `;
+        }).join('');
     } catch (err) {
         tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading bookings'}</td></tr>`;
     }
@@ -559,6 +566,45 @@ async function loadBookingsData() {
 
 async function updateBookingStatus(id, status) {
     if (!status) return;
+
+    if (status === 'refund') {
+        let reason = prompt(`[Razorpay Refund Request]\nEnter reason for refunding Booking #${id} (min 5 characters):`, 'Customer requested refund');
+        if (reason === null) {
+            loadBookingsData();
+            return;
+        }
+        reason = reason.trim();
+        if (reason.length < 5) {
+            showToast('Refund cancelled: A detailed reason (minimum 5 characters) is required.', 'danger');
+            loadBookingsData();
+            return;
+        }
+
+        const approved = confirm(`🔔 CONFIRM RAZORPAY REFUND:\n\nBooking ID: #${id}\nReason: ${reason}\n\nDo you explicitly APPROVE issuing this refund to the customer via Razorpay?`);
+        if (!approved) {
+            showToast('Refund request cancelled by Admin.', 'warning');
+            loadBookingsData();
+            return;
+        }
+
+        showToast('Initiating refund with Razorpay API...', 'info');
+        try {
+            const res = await fetch(`${API_BASE}/admin/transactions/${id}/refund`, {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify({ reason })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || data.message || 'Refund failed');
+
+            showToast(data.message || 'Refund processed successfully!', 'success');
+            loadBookingsData();
+        } catch (err) {
+            showToast(err.message, 'danger');
+            loadBookingsData();
+        }
+        return;
+    }
 
     try {
         const res = await fetch(`${API_BASE}/admin/bookings/${id}/status`, {
@@ -736,6 +782,9 @@ async function loadTransactionsData() {
         if (document.getElementById('stat-txn-temp-count')) {
             document.getElementById('stat-txn-temp-count').textContent = m.temporary_count || 0;
         }
+        if (document.getElementById('stat-txn-refunded-count')) {
+            document.getElementById('stat-txn-refunded-count').textContent = m.refunded_count || 0;
+        }
         if (document.getElementById('stat-txn-cancelled-count')) {
             document.getElementById('stat-txn-cancelled-count').textContent = m.cancelled_count || 0;
         }
@@ -800,7 +849,7 @@ async function loadTransactionsData() {
             }
 
             return `
-                <tr class="${isTemp ? 'temp-txn-row' : (isConfirmed ? 'confirmed-txn-row' : '')}">
+                <tr class="${isTemp ? 'temp-txn-row' : (isConfirmed ? 'confirmed-txn-row' : (isRefunded ? 'refunded-txn-row' : ''))}">
                     <td><strong>#${t.id}</strong></td>
                     <td>
                         <span class="badge ${typeBadgeClass}" style="font-size:10px;">

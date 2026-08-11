@@ -282,6 +282,7 @@
                                 <option value="confirmed">Confirmed</option>
                                 <option value="pending">Pending</option>
                                 <option value="completed">Completed</option>
+                                <option value="refunded">Refunded / Refund Initiated</option>
                                 <option value="cancelled">Cancelled</option>
                             </select>
                         </div>
@@ -395,6 +396,14 @@
                             </div>
                         </div>
 
+                        <div class="metric-card gradient-rose">
+                            <div class="metric-icon"><i class="fa-solid fa-arrow-rotate-left"></i></div>
+                            <div class="metric-info">
+                                <span class="metric-label">Refunded Payments</span>
+                                <h3 id="stat-txn-refunded-count">0</h3>
+                            </div>
+                        </div>
+
                         <div class="metric-card" style="background: linear-gradient(135deg, #e11d48, #be123c);">
                             <div class="metric-icon"><i class="fa-solid fa-circle-xmark"></i></div>
                             <div class="metric-info">
@@ -410,6 +419,7 @@
                             <button class="subtab-btn active" data-txntype="" onclick="filterTxnType('')">All Transactions</button>
                             <button class="subtab-btn" data-txntype="confirmed" onclick="filterTxnType('confirmed')"><i class="fa-solid fa-circle-check"></i> Confirmed (Success Block)</button>
                             <button class="subtab-btn" data-txntype="temporary" onclick="filterTxnType('temporary')"><i class="fa-solid fa-clock"></i> Temporary (Incomplete Block)</button>
+                            <button class="subtab-btn" data-txntype="refunded" onclick="filterTxnType('refunded')"><i class="fa-solid fa-arrow-rotate-left"></i> Refunded (Refund Block)</button>
                             <button class="subtab-btn" data-txntype="cancelled" onclick="filterTxnType('cancelled')"><i class="fa-solid fa-ban"></i> Cancelled / Failed</button>
                         </div>
                         <div class="filter-group">

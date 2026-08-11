@@ -385,6 +385,7 @@ body {
 .gradient-blue { background: linear-gradient(135deg, #2563eb, #0284c7); }
 .gradient-amber { background: linear-gradient(135deg, #d97706, #ca8a04); }
 .gradient-teal { background: linear-gradient(135deg, #0d9488, #059669); }
+.gradient-rose { background: linear-gradient(135deg, #7e22ce, #a855f7); }
 
 .metric-icon {
     width: 46px;
@@ -808,6 +809,10 @@ body {
 
 .confirmed-txn-row {
     background: rgba(16, 185, 129, 0.02);
+}
+
+.refunded-txn-row {
+    background: rgba(168, 85, 247, 0.04);
 }
 
 .pay-method-pill {

@@ -13,7 +13,15 @@ class BookingController extends Controller
         $query = Booking::with(['user:id,name,email,phone', 'hotel:id,name,city,address']);
 
         if ($request->has('status') && !empty($request->status)) {
-            $query->where('status', $request->status);
+            $st = strtolower($request->status);
+            if ($st === 'refunded' || $st === 'refund_initiated' || $st === 'refund') {
+                $query->where(function($q) {
+                    $q->whereIn('payment_status', ['refunded', 'refund_initiated'])
+                      ->orWhere('cancellation_reason', 'like', '%refund%');
+                });
+            } else {
+                $query->where('status', $request->status);
+            }
         }
 
         if ($request->has('payment_status') && !empty($request->payment_status)) {
