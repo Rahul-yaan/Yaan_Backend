@@ -536,10 +536,36 @@ async function openHotelDetailsModal(id) {
                 </div>
             </div>
 
+            <!-- Room Capacity & Available Slot Management Control -->
+            <div style="background:var(--bg-dark); padding:14px; border-radius:8px; border:1px solid var(--border); margin-bottom:14px;">
+                <h5 style="margin:0 0 10px 0; font-size:13px; color:#38bdf8; font-weight:700;">
+                    <i class="fa-solid fa-bed"></i> Room Inventory & Available Slots Control
+                </h5>
+                <div style="display:grid; grid-template-columns: 1fr 1fr 1fr auto; gap:10px; align-items:end;">
+                    <div>
+                        <label style="font-size:11px; color:var(--text-muted); font-weight:700; display:block; margin-bottom:4px;">Total Rooms</label>
+                        <input type="number" id="edit-hotel-total-rooms" value="${h.total_rooms || 10}" min="1" style="width:100%; background:#0f172a; border:1px solid var(--border); color:#fff; padding:6px 10px; border-radius:6px; font-weight:700; font-size:13px;">
+                    </div>
+                    <div>
+                        <label style="font-size:11px; color:var(--text-muted); font-weight:700; display:block; margin-bottom:4px;">Available Slots</label>
+                        <input type="number" id="edit-hotel-avail-rooms" value="${h.available_rooms || 10}" min="0" style="width:100%; background:#0f172a; border:1px solid var(--border); color:#fff; padding:6px 10px; border-radius:6px; font-weight:700; font-size:13px;">
+                    </div>
+                    <div>
+                        <label style="font-size:11px; color:var(--text-muted); font-weight:700; display:block; margin-bottom:4px;">Price / Night (₹)</label>
+                        <input type="number" id="edit-hotel-price" value="${h.price_per_night || 1500}" min="1" style="width:100%; background:#0f172a; border:1px solid var(--border); color:#fff; padding:6px 10px; border-radius:6px; font-weight:700; font-size:13px;">
+                    </div>
+                    <div>
+                        <button class="btn-sm" style="background:#6366f1; color:#fff; padding:8px 14px; border-radius:6px; font-weight:700;" onclick="saveHotelSlotSettings(${h.id})">
+                            <i class="fa-solid fa-floppy-disk"></i> Save Slots
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Specs Grid -->
             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px; background:var(--bg-dark); padding:12px; border-radius:8px; border:1px solid var(--border); margin-bottom:14px; font-size:12px;">
                 <div><strong>Price Per Night:</strong> <br><span style="color:var(--success); font-weight:700; font-size:14px;">₹${h.price_per_night}</span></div>
-                <div><strong>Room Capacity:</strong> <br><span>${h.available_rooms || 0} / ${h.total_rooms || 0} Available</span></div>
+                <div><strong>Room Capacity:</strong> <br><span style="color:#38bdf8; font-weight:700;">${h.available_rooms || 0} / ${h.total_rooms || 0} Available Slots</span></div>
                 <div><strong>Rating & Reviews:</strong> <br><span style="color:#f59e0b; font-weight:700;"><i class="fa-solid fa-star"></i> ${h.rating || '4.5'} (${h.review_count || 0})</span></div>
             </div>
 
@@ -598,6 +624,32 @@ async function openHotelDetailsModal(id) {
 function closeHotelModal() {
     const modal = document.getElementById('hotel-modal');
     if (modal) modal.classList.add('hidden');
+}
+
+async function saveHotelSlotSettings(id) {
+    const totalRooms = document.getElementById('edit-hotel-total-rooms').value;
+    const availRooms = document.getElementById('edit-hotel-avail-rooms').value;
+    const price = document.getElementById('edit-hotel-price').value;
+
+    try {
+        const res = await fetch(`${API_BASE}/admin/hotels/${id}/status`, {
+            method: 'PUT',
+            headers: getHeaders(),
+            body: JSON.stringify({
+                total_rooms: parseInt(totalRooms),
+                available_rooms: parseInt(availRooms),
+                price_per_night: parseFloat(price)
+            })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || data.message || 'Failed to update slot inventory');
+
+        showToast(data.message || 'Hotel slots and inventory updated successfully!', 'success');
+        openHotelDetailsModal(id);
+        loadHotelsData();
+    } catch (err) {
+        showToast(err.message, 'danger');
+    }
 }
 
         // ----------------------------------------------------

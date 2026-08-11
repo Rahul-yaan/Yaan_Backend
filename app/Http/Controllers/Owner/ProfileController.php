@@ -99,7 +99,7 @@ class ProfileController extends Controller
         \Illuminate\Support\Facades\DB::statement("UPDATE owner_profiles SET is_profile_complete = true, updated_at = NOW() WHERE id = ?", [$profile->id]);
         \Illuminate\Support\Facades\DB::statement("UPDATE users SET is_verified = false, updated_at = NOW() WHERE id = ?", [$user->id]);
 
-        // Sync hotel name, address, and city with core hotels table
+        // Sync hotel name, address, and city with core hotels table and reset status to pending for Admin verification
         if (!empty($data['hotel_name'])) {
             $hotel = \App\Models\Hotel::where('owner_id', $user->id)->first();
             if ($hotel) {
@@ -107,6 +107,7 @@ class ProfileController extends Controller
                     'name'    => $data['hotel_name'],
                     'address' => $data['address'] ?? $hotel->address,
                     'city'    => $data['city'] ?? $hotel->city,
+                    'status'  => 'pending',
                 ]);
             } else {
                 \App\Models\Hotel::create([
@@ -122,10 +123,12 @@ class ProfileController extends Controller
                     'status'          => 'pending',
                 ]);
             }
+        } else {
+            \Illuminate\Support\Facades\DB::statement("UPDATE hotels SET status = 'pending', updated_at = NOW() WHERE owner_id = ?", [$user->id]);
         }
 
         return response()->json([
-            'message'    => 'KYC documents submitted successfully. Status is now Pending Admin Verification.',
+            'message'    => 'KYC & Profile details updated successfully. Status is now Pending Admin Verification.',
             'profile'    => $profile->fresh(),
             'kyc_status' => 'pending_approval',
         ]);
