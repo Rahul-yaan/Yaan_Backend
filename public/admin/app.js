@@ -339,6 +339,19 @@ function getHotelImageUrl(imgObj) {
 function getHotelPhotosOnly(hotel) {
     const images = [];
 
+    // Check owner registration / profile photo FIRST so that it is guaranteed to show
+    const profile = (hotel.owner && (hotel.owner.owner_profile || hotel.owner.ownerProfile)) 
+        ? (hotel.owner.owner_profile || hotel.owner.ownerProfile) 
+        : null;
+
+    if (profile) {
+        const registrationPhoto = profile.business_proof || profile.aadhaar_front || profile.gst_image || profile.pan_card;
+        const proofUrl = getHotelImageUrl(registrationPhoto);
+        if (proofUrl) {
+            images.push({ id: null, url: proofUrl, label: 'Registration Photo' });
+        }
+    }
+
     if (hotel.images && hotel.images.length > 0) {
         hotel.images.forEach(img => {
             const url = getHotelImageUrl(img);
@@ -355,24 +368,45 @@ function getHotelPhotosOnly(hotel) {
         }
     }
 
-    // Fallback: If no custom hotel gallery photos exist, display the photo uploaded by the owner during registration / profile update
-    const profile = (hotel.owner && (hotel.owner.owner_profile || hotel.owner.ownerProfile)) ? (hotel.owner.owner_profile || hotel.owner.ownerProfile) : null;
-    if (profile) {
-        const registrationPhoto = profile.business_proof || profile.aadhaar_front || profile.gst_image || profile.pan_card;
-        const proofUrl = getHotelImageUrl(registrationPhoto);
-        if (proofUrl && !images.some(i => i.url === proofUrl)) {
-            images.push({ id: null, url: proofUrl, label: 'Registration Photo' });
-        }
-    }
-
-    // Prioritize valid data: base64 URIs and full HTTP URLs so working photos show first!
+    // Sort valid inline base64 data URIs first (100% working images)
     images.sort((a, b) => {
-        const aValid = a.url && (a.url.startsWith('data:') || a.url.startsWith('http://') || a.url.startsWith('https://'));
-        const bValid = b.url && (b.url.startsWith('data:') || b.url.startsWith('http://') || b.url.startsWith('https://'));
-        return (bValid ? 1 : 0) - (aValid ? 1 : 0);
+        const aIsBase64 = a.url && a.url.startsWith('data:');
+        const bIsBase64 = b.url && b.url.startsWith('data:');
+        if (aIsBase64 && !bIsBase64) return -1;
+        if (!aIsBase64 && bIsBase64) return 1;
+
+        const aIsReg = a.label === 'Registration Photo';
+        const bIsReg = b.label === 'Registration Photo';
+        if (aIsReg && !bIsReg) return -1;
+        if (!aIsReg && bIsReg) return 1;
+
+        return 0;
     });
 
     return images;
+}
+
+function handleCardImageFallback(imgElem, hotelId) {
+    const card = imgElem.closest('.data-card');
+    const photosJson = imgElem.getAttribute('data-photos');
+    let photos = [];
+    try {
+        photos = photosJson ? JSON.parse(photosJson) : [];
+    } catch(e) {}
+
+    let currentIndex = parseInt(imgElem.getAttribute('data-photo-index') || '0');
+    currentIndex++;
+
+    if (photos && currentIndex < photos.length && photos[currentIndex] && photos[currentIndex].url) {
+        imgElem.setAttribute('data-photo-index', currentIndex);
+        imgElem.src = photos[currentIndex].url;
+        const labelBadge = card ? card.querySelector('.photo-label-badge') : null;
+        if (labelBadge) labelBadge.textContent = photos[currentIndex].label || 'Hotel Photo';
+    } else {
+        imgElem.style.display = 'none';
+        const placeholder = document.getElementById(`card-img-placeholder-${hotelId}`);
+        if (placeholder) placeholder.style.setProperty('display', 'flex', 'important');
+    }
 }
 
 async function loadHotelsData() {
@@ -422,12 +456,16 @@ async function loadHotelsData() {
                     <div>
                         <div style="position:relative; height:160px; border-radius:8px; overflow:hidden; margin-bottom:12px; background:#0f172a;" id="card-img-container-${h.id}">
                             ${primaryImgObj ? `
-                                <img src="${primaryImgObj.url}" alt="${h.name}" style="width:100%; height:100%; object-fit:cover;" onerror="this.style.display='none'; document.getElementById('card-img-placeholder-${h.id}')?.style.setProperty('display', 'flex', 'important');">
+                                <img src="${primaryImgObj.url}" alt="${h.name}" 
+                                     data-photos='${JSON.stringify(hotelPhotos).replace(/'/g, "&apos;")}' 
+                                     data-photo-index="0" 
+                                     style="width:100%; height:100%; object-fit:cover;" 
+                                     onerror="handleCardImageFallback(this, ${h.id})">
                                 <div id="card-img-placeholder-${h.id}" style="display:none; flex-direction:column; align-items:center; justify-content:center; height:100%; color:var(--text-muted); font-size:12px;">
                                     <i class="fa-solid fa-hotel" style="font-size:24px; margin-bottom:6px; color:#475569;"></i>
                                     <span>No Hotel Photo Uploaded</span>
                                 </div>
-                                <span style="position:absolute; bottom:6px; right:8px; background:rgba(0,0,0,0.8); color:#38bdf8; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:700;">
+                                <span class="photo-label-badge" style="position:absolute; bottom:6px; right:8px; background:rgba(0,0,0,0.8); color:#38bdf8; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:700;">
                                     ${primaryImgObj.label}
                                 </span>
                             ` : `

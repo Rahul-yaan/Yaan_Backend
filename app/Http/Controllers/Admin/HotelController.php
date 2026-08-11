@@ -10,7 +10,7 @@ class HotelController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Hotel::with(['owner:id,name,email,phone', 'owner.ownerProfile', 'images', 'amenities']);
+        $query = Hotel::with(['owner', 'owner.ownerProfile', 'images', 'amenities']);
 
         // Filter by Status
         if ($request->has('status') && !empty($request->status) && $request->status !== 'all') {
