@@ -84,16 +84,33 @@ class Booking extends Model
             return null;
         }
 
+        // 1. Check audit log override for the exact timestamp when refund was triggered
+        $override = TransactionStatusOverride::where('booking_id', $this->id)
+            ->where(function($q) {
+                $q->whereIn('new_payment_status', ['refunded', 'refund_initiated'])
+                  ->orWhere('reason', 'like', '%Refund%');
+            })
+            ->latest('id')
+            ->first();
+
+        if ($override && $override->created_at) {
+            return $override->created_at->timezone('Asia/Kolkata')->format('d M Y, h:i:s A') . ' IST';
+        }
+
+        // 2. Check if gateway_response has an explicit refund entity timestamp (not payment timestamp)
         if (!empty($this->gateway_response)) {
             $gw = json_decode($this->gateway_response, true);
             if (is_array($gw)) {
-                $epoch = $gw['created_at'] ?? ($gw['refund']['entity']['created_at'] ?? null);
-                if ($epoch && is_numeric($epoch)) {
-                    return \Carbon\Carbon::createFromTimestamp($epoch)->timezone('Asia/Kolkata')->format('d M Y, h:i:s A') . ' IST';
+                if (isset($gw['entity']) && $gw['entity'] === 'refund' && isset($gw['created_at'])) {
+                    return \Carbon\Carbon::createFromTimestamp($gw['created_at'])->timezone('Asia/Kolkata')->format('d M Y, h:i:s A') . ' IST';
+                }
+                if (isset($gw['refund']['entity']['created_at'])) {
+                    return \Carbon\Carbon::createFromTimestamp($gw['refund']['entity']['created_at'])->timezone('Asia/Kolkata')->format('d M Y, h:i:s A') . ' IST';
                 }
             }
         }
 
+        // 3. Fallback to model updated_at timestamp formatted in IST
         $dt = $this->updated_at ? $this->updated_at->timezone('Asia/Kolkata') : now()->timezone('Asia/Kolkata');
         return $dt->format('d M Y, h:i:s A') . ' IST';
     }
