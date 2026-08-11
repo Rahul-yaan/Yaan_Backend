@@ -294,6 +294,16 @@ async function populateHotelCitiesDropdown(hotels) {
     } catch (e) { }
 }
 
+function getHotelImageUrl(imgObj) {
+    const defaultFallback = 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80';
+    if (!imgObj) return defaultFallback;
+    let path = typeof imgObj === 'string' ? imgObj : (imgObj.url || imgObj.image_path);
+    if (!path) return defaultFallback;
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    const clean = path.replace(/^\/?storage\//, '').replace(/^\//, '');
+    return `${STORAGE_BASE}/${clean}`;
+}
+
 async function loadHotelsData() {
     const container = document.getElementById('hotels-container');
     const searchInput = document.getElementById('search-hotels');
@@ -326,59 +336,17 @@ async function loadHotelsData() {
             return;
         }
 
-        function getHotelImageUrl(imgObj) {
-            const defaultFallback = 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80';
-            if (!imgObj) return defaultFallback;
-            let path = typeof imgObj === 'string' ? imgObj : (imgObj.url || imgObj.image_path);
-            if (!path) return defaultFallback;
-            if (path.startsWith('http://') || path.startsWith('https://')) return path;
-            const clean = path.replace(/^\/?storage\//, '').replace(/^\//, '');
-            return `${STORAGE_BASE}/${clean}`;
-        }
+        container.innerHTML = hotels.map(h => {
+            const isApproved = h.status === 'approved' || h.status === 'active';
+            const isPending = h.status === 'pending';
 
-        async function loadHotelsData() {
-            const container = document.getElementById('hotels-container');
-            const searchInput = document.getElementById('search-hotels');
-            const citySelect = document.getElementById('filter-hotel-city');
-            const stateSelect = document.getElementById('filter-hotel-state');
+            const rawImg = h.primary_image || (h.images && h.images.length > 0 ? h.images[0] : null);
+            const primaryImg = getHotelImageUrl(rawImg);
 
-            const search = searchInput ? searchInput.value : '';
-            const city = citySelect ? citySelect.value : '';
-            const state = stateSelect ? stateSelect.value : '';
+            let statusBadgeClass = isApproved ? 'confirmed' : (isPending ? 'pending' : 'failed');
+            let statusText = isApproved ? 'APPROVED' : (isPending ? 'PENDING APPROVAL' : 'REJECTED / SUSPENDED');
 
-            container.innerHTML = `<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Searching & loading hotel listings...</div>`;
-
-            try {
-                let url = `${API_BASE}/admin/hotels?status=${currentHotelStatusFilter}&search=${encodeURIComponent(search)}&city=${encodeURIComponent(city)}&state=${encodeURIComponent(state)}`;
-                const res = await fetch(url, { headers: getHeaders() });
-                if (!res.ok) await handleApiError(res);
-                const data = await res.json();
-                const hotels = data.data || [];
-
-                populateHotelCitiesDropdown(hotels);
-
-                if (hotels.length === 0) {
-                    container.innerHTML = `
-                <div class="empty-state" style="padding:40px 20px; text-align:center; grid-column:1/-1;">
-                    <i class="fa-solid fa-hotel-slash" style="font-size:36px; color:var(--text-muted); margin-bottom:12px;"></i>
-                    <h3 style="margin:0 0 6px 0; font-size:16px;">No Hotels Found</h3>
-                    <p style="color:var(--text-muted); font-size:13px; margin:0;">No hotel listings match your current search ("${search || 'all'}"), city ("${city || 'all'}"), state ("${state || 'all'}"), or status filter.</p>
-                </div>
-            `;
-                    return;
-                }
-
-                container.innerHTML = hotels.map(h => {
-                    const isApproved = h.status === 'approved' || h.status === 'active';
-                    const isPending = h.status === 'pending';
-
-                    const rawImg = h.primary_image || (h.images && h.images.length > 0 ? h.images[0] : null);
-                    const primaryImg = getHotelImageUrl(rawImg);
-
-                    let statusBadgeClass = isApproved ? 'confirmed' : (isPending ? 'pending' : 'failed');
-                    let statusText = isApproved ? 'APPROVED' : (isPending ? 'PENDING APPROVAL' : 'REJECTED / SUSPENDED');
-
-                    return `
+            return `
                 <div class="data-card" style="display:flex; flex-direction:column; justify-content:space-between; position:relative; overflow:hidden;">
                     <div>
                         <div style="position:relative; height:160px; border-radius:8px; overflow:hidden; margin-bottom:12px; background:#0f172a;">
@@ -419,56 +387,56 @@ async function loadHotelsData() {
                     </div>
                 </div>
             `;
-                }).join('');
-            } catch (err) {
-                container.innerHTML = `<div class="empty-state text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading hotels'}</div>`;
-            }
+        }).join('');
+    } catch (err) {
+        container.innerHTML = `<div class="empty-state text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading hotels'}</div>`;
+    }
+}
+
+async function updateHotelStatus(id, newStatus) {
+    if (!newStatus) return;
+
+    try {
+        const res = await fetch(`${API_BASE}/admin/hotels/${id}/status`, {
+            method: 'PUT',
+            headers: getHeaders(),
+            body: JSON.stringify({ status: newStatus })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || data.message || 'Failed to update hotel status');
+
+        showToast(data.message || `Hotel status updated to ${newStatus}`, 'success');
+        loadHotelsData();
+    } catch (err) {
+        showToast(err.message, 'danger');
+        loadHotelsData();
+    }
+}
+
+async function openHotelDetailsModal(id) {
+    const modal = document.getElementById('hotel-modal');
+    const body = document.getElementById('hotel-modal-body');
+    if (!modal || !body) return;
+
+    body.innerHTML = `<div style="padding:20px; text-align:center;"><i class="fa-solid fa-spinner fa-spin"></i> Loading Hotel Details & Gallery...</div>`;
+    modal.classList.remove('hidden');
+
+    try {
+        const res = await fetch(`${API_BASE}/admin/hotels/${id}`, { headers: getHeaders() });
+        if (!res.ok) await handleApiError(res);
+        const data = await res.json();
+        const h = data.hotel;
+        const analytics = data.analytics || {};
+        const visitingCustomers = data.visiting_customers || [];
+        const isApproved = h.status === 'approved' || h.status === 'active';
+        const isPending = h.status === 'pending';
+
+        const galleryImages = (h.images || []).map(img => getHotelImageUrl(img));
+        if (galleryImages.length === 0) {
+            galleryImages.push('https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80');
         }
 
-        async function updateHotelStatus(id, newStatus) {
-            if (!newStatus) return;
-
-            try {
-                const res = await fetch(`${API_BASE}/admin/hotels/${id}/status`, {
-                    method: 'PUT',
-                    headers: getHeaders(),
-                    body: JSON.stringify({ status: newStatus })
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || data.message || 'Failed to update hotel status');
-
-                showToast(data.message || `Hotel status updated to ${newStatus}`, 'success');
-                loadHotelsData();
-            } catch (err) {
-                showToast(err.message, 'danger');
-                loadHotelsData();
-            }
-        }
-
-        async function openHotelDetailsModal(id) {
-            const modal = document.getElementById('hotel-modal');
-            const body = document.getElementById('hotel-modal-body');
-            if (!modal || !body) return;
-
-            body.innerHTML = `<div style="padding:20px; text-align:center;"><i class="fa-solid fa-spinner fa-spin"></i> Loading Hotel Details & Gallery...</div>`;
-            modal.classList.remove('hidden');
-
-            try {
-                const res = await fetch(`${API_BASE}/admin/hotels/${id}`, { headers: getHeaders() });
-                if (!res.ok) await handleApiError(res);
-                const data = await res.json();
-                const h = data.hotel;
-                const analytics = data.analytics || {};
-                const visitingCustomers = data.visiting_customers || [];
-                const isApproved = h.status === 'approved' || h.status === 'active';
-                const isPending = h.status === 'pending';
-
-                const galleryImages = (h.images || []).map(img => getHotelImageUrl(img));
-                if (galleryImages.length === 0) {
-                    galleryImages.push('https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80');
-                }
-
-                body.innerHTML = `
+        body.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
                 <div>
                     <h3 style="margin:0; font-size:18px; color:var(--text-primary);">
@@ -574,15 +542,15 @@ async function loadHotelsData() {
                 </div>
             ` : ''}
         `;
-            } catch (err) {
-                body.innerHTML = `<div style="padding:20px; text-align:center; color:var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Failed to load hotel details'}</div>`;
-            }
-        }
+    } catch (err) {
+        body.innerHTML = `<div style="padding:20px; text-align:center; color:var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Failed to load hotel details'}</div>`;
+    }
+}
 
-        function closeHotelModal() {
-            const modal = document.getElementById('hotel-modal');
-            if (modal) modal.classList.add('hidden');
-        }
+function closeHotelModal() {
+    const modal = document.getElementById('hotel-modal');
+    if (modal) modal.classList.add('hidden');
+}
 
         // ----------------------------------------------------
         // 3. OWNER KYC & PERFORMANCE MANAGEMENT
@@ -834,109 +802,6 @@ async function loadHotelsData() {
             }
         }
 
-        function openKycModal(ownerId) {
-            const owner = currentOwners.find(o => o.id === ownerId);
-            if (!owner) return;
-
-            const profile = owner.owner_profile || owner.ownerProfile || {};
-            const isVerified = (owner.is_verified === true || owner.is_verified === 1) && (profile.is_profile_complete === true || profile.is_profile_complete === 1);
-
-            const getDocItem = (title, path, url) => {
-                const rawPath = (path && typeof path === 'string') ? path.trim() : '';
-                const rawUrl = (url && typeof url === 'string') ? url.trim() : '';
-
-                if (!rawPath && !rawUrl) {
-                    return `
-                <div class="doc-box" style="opacity:0.6; border:1px dashed var(--border); text-align:center; padding:12px; background:rgba(255,255,255,0.02); border-radius:6px;">
-                    <strong style="display:block; font-size:12px; margin-bottom:4px; color:var(--text-secondary);">${title}</strong>
-                    <span style="font-size:11px; color:#f87171;"><i class="fa-solid fa-file-circle-xmark"></i> Not Uploaded Yet</span>
-                </div>
-            `;
-                }
-
-                let docUrl = rawUrl;
-                if (!docUrl && rawPath) {
-                    if (rawPath.startsWith('data:') || rawPath.startsWith('http://') || rawPath.startsWith('https://')) {
-                        docUrl = rawPath;
-                    } else {
-                        const cleanPath = rawPath.replace(/^\/+/, '').replace(/^storage\//, '');
-                        docUrl = `${window.location.origin}/storage/${cleanPath}`;
-                    }
-                }
-
-                if (docUrl.startsWith('http://') && window.location.protocol === 'https:') {
-                    docUrl = docUrl.replace('http://', 'https://');
-                }
-
-                return `
-            <div class="doc-box" style="background:var(--bg-surface); padding:10px; border-radius:6px; border:1px solid var(--border); text-align:center;">
-                <strong style="display:block; font-size:12px; margin-bottom:6px; color:var(--text-primary);">${title}</strong>
-                <a href="${docUrl}" target="_blank" style="display:block; text-decoration:none; margin-bottom:8px;">
-                    <img src="${docUrl}" alt="${title}" style="max-height:140px; object-fit:contain; border-radius:6px; width:100%; display:block; background:#0f172a; border:1px solid var(--border);" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='block';">
-                    <div style="display:none; padding:10px; background:rgba(239,68,68,0.1); border:1px dashed #ef4444; border-radius:6px; color:#f87171; font-size:11px; margin-bottom:6px;">
-                        <i class="fa-solid fa-triangle-exclamation"></i> File Expired on Server<br><small style="color:var(--text-muted);">Click "Reset KYC" for re-upload</small>
-                    </div>
-                </a>
-                <a href="${docUrl}" target="_blank" class="btn-sm" style="display:inline-block; font-size:11px; text-decoration:none; background:var(--primary); color:#ffffff; padding:5px 12px; border-radius:4px; font-weight:600;">
-                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Open File
-                </a>
-            </div>
-        `;
-            };
-
-            const modalBody = document.getElementById('kyc-modal-body');
-            modalBody.innerHTML = `
-        <div style="margin-bottom:16px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                <h4 style="margin:0; font-size:18px;">${owner.name}</h4>
-                <span class="badge ${isVerified ? 'verified' : 'pending'}">${isVerified ? 'Verified KYC' : 'Pending KYC'}</span>
-            </div>
-            <div style="font-size:13px; color:var(--text-secondary); display:flex; flex-direction:column; gap:4px;">
-                <div><i class="fa-solid fa-envelope"></i> <strong>Email:</strong> ${owner.email}</div>
-                <div><i class="fa-solid fa-phone"></i> <strong>Phone:</strong> ${owner.phone}</div>
-                <div><i class="fa-solid fa-hotel"></i> <strong>Hotel Name:</strong> ${profile.hotel_name || 'N/A'}</div>
-                <div><i class="fa-solid fa-location-dot"></i> <strong>Address:</strong> ${profile.address || 'N/A'}, ${profile.city || ''}, ${profile.state || ''} ${profile.pincode || ''}</div>
-            </div>
-        </div>
-
-        <hr style="border:0; border-top:1px solid var(--border); margin:16px 0;">
-
-        <div style="margin-bottom:16px;">
-            <h5 style="margin:0 0 8px 0; font-size:14px;"><i class="fa-solid fa-building-columns"></i> Tax & Bank Information</h5>
-            <div style="font-size:13px; color:var(--text-secondary); display:grid; grid-template-columns:1fr 1fr; gap:8px; background:var(--bg-surface); padding:10px; border-radius:6px;">
-                <div><strong>GST Number:</strong> ${profile.gst_number || 'N/A'}</div>
-                <div><strong>FSSAI Number:</strong> ${profile.fssai_number || 'N/A'}</div>
-                <div><strong>Bank Name:</strong> ${profile.bank_name || 'N/A'}</div>
-                <div><strong>Account No:</strong> ${profile.account_number || 'N/A'}</div>
-                <div><strong>IFSC Code:</strong> ${profile.ifsc_code || 'N/A'}</div>
-            </div>
-        </div>
-
-        <div>
-            <h5 style="margin:0 0 8px 0; font-size:14px;"><i class="fa-solid fa-file-shield"></i> Uploaded KYC Documents</h5>
-            <div class="doc-grid">
-                ${getDocItem('Aadhaar Front', profile.aadhaar_front, profile.aadhaar_front_url)}
-                ${getDocItem('Aadhaar Back', profile.aadhaar_back, profile.aadhaar_back_url)}
-                ${getDocItem('PAN Card', profile.pan_card, profile.pan_card_url)}
-                ${getDocItem('GST Certificate', profile.gst_image, profile.gst_image_url)}
-                ${getDocItem('FSSAI License', profile.fssai_license, profile.fssai_license_url)}
-                ${getDocItem('Business Proof', profile.business_proof, profile.business_proof_url)}
-            </div>
-            ${(!profile.aadhaar_front && !profile.pan_card && !profile.business_proof) ? '<div class="empty-state">No document files uploaded by owner yet</div>' : ''}
-        </div>
-
-        <div style="display:flex; gap:10px; margin-top:20px; justify-content:flex-end; flex-wrap:wrap;">
-            ${!isVerified ?
-                    `<button class="btn-sm btn-success" style="padding:8px 16px;" onclick="verifyOwner(${owner.id}, true); closeKycModal();"><i class="fa-solid fa-check"></i> Approve Owner KYC</button>` :
-                    `<button class="btn-sm btn-warning" style="padding:8px 16px;" onclick="verifyOwner(${owner.id}, false); closeKycModal();"><i class="fa-solid fa-xmark"></i> Revoke Verification</button>`
-                }
-            <button class="btn-sm" style="background:#e11d48; color:white; padding:8px 16px;" onclick="resetOwnerKyc(${owner.id}); closeKycModal();"><i class="fa-solid fa-trash-can"></i> Remove & Reset KYC Data</button>
-            <button class="btn-sm" style="padding:8px 16px;" onclick="closeKycModal()">Close</button>
-        </div>
-    `;
-
-            document.getElementById('kyc-modal').classList.remove('hidden');
-        }
 
         function closeKycModal() {
             document.getElementById('kyc-modal').classList.add('hidden');
