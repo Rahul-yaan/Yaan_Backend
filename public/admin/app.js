@@ -20,15 +20,15 @@ document.addEventListener('DOMContentLoaded', () => {
 async function handleLogin(event) {
     if (event) event.preventDefault();
     const emailElem = document.getElementById('login-email');
-    const passElem  = document.getElementById('login-password');
-    const roleElem  = document.getElementById('login-role');
+    const passElem = document.getElementById('login-password');
+    const roleElem = document.getElementById('login-role');
 
-    const email    = emailElem ? emailElem.value.trim() : 'admin@yaan.com';
+    const email = emailElem ? emailElem.value.trim() : 'admin@yaan.com';
     const password = passElem ? passElem.value : 'admin123456';
-    const role     = (roleElem && roleElem.value) ? roleElem.value : 'admin';
+    const role = (roleElem && roleElem.value) ? roleElem.value : 'admin';
 
     const errorBanner = document.getElementById('login-error');
-    const errorText   = document.getElementById('login-error-text');
+    const errorText = document.getElementById('login-error-text');
     if (errorBanner) errorBanner.classList.add('hidden');
 
     const btnLogin = document.getElementById('btn-login');
@@ -80,7 +80,7 @@ function handleLogout() {
             fetch(`${API_BASE}/logout`, {
                 method: 'POST',
                 headers: getHeaders()
-            }).catch(() => {});
+            }).catch(() => { });
         }
         authToken = '';
         currentUser = null;
@@ -93,7 +93,7 @@ function handleLogout() {
 
 function showLoginScreen() {
     const loginScreen = document.getElementById('login-screen');
-    const mainShell   = document.getElementById('main-shell');
+    const mainShell = document.getElementById('main-shell');
     if (loginScreen) {
         loginScreen.style.display = 'flex';
         loginScreen.classList.add('active');
@@ -106,7 +106,7 @@ function showLoginScreen() {
 
 function showMainApp() {
     const loginScreen = document.getElementById('login-screen');
-    const mainShell   = document.getElementById('main-shell');
+    const mainShell = document.getElementById('main-shell');
     if (loginScreen) {
         loginScreen.style.display = 'none';
         loginScreen.classList.remove('active');
@@ -286,23 +286,23 @@ async function populateHotelCitiesDropdown(hotels) {
             const cities = data.cities || [];
             if (cities.length > 0) {
                 const currentVal = citySelect.value;
-                citySelect.innerHTML = `<option value="">All Cities (${cities.length})</option>` + 
+                citySelect.innerHTML = `<option value="">All Cities (${cities.length})</option>` +
                     cities.map(c => `<option value="${c}" ${currentVal === c ? 'selected' : ''}>${c}</option>`).join('');
                 loadedCitiesList = true;
             }
         }
-    } catch(e) {}
+    } catch (e) { }
 }
 
 async function loadHotelsData() {
     const container = document.getElementById('hotels-container');
     const searchInput = document.getElementById('search-hotels');
-    const citySelect   = document.getElementById('filter-hotel-city');
-    const stateSelect  = document.getElementById('filter-hotel-state');
+    const citySelect = document.getElementById('filter-hotel-city');
+    const stateSelect = document.getElementById('filter-hotel-state');
 
     const search = searchInput ? searchInput.value : '';
-    const city   = citySelect ? citySelect.value : '';
-    const state  = stateSelect ? stateSelect.value : '';
+    const city = citySelect ? citySelect.value : '';
+    const state = stateSelect ? stateSelect.value : '';
 
     container.innerHTML = `<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Searching & loading hotel listings...</div>`;
 
@@ -326,59 +326,59 @@ async function loadHotelsData() {
             return;
         }
 
-function getHotelImageUrl(imgObj) {
-    const defaultFallback = 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80';
-    if (!imgObj) return defaultFallback;
-    let path = typeof imgObj === 'string' ? imgObj : (imgObj.url || imgObj.image_path);
-    if (!path) return defaultFallback;
-    if (path.startsWith('http://') || path.startsWith('https://')) return path;
-    const clean = path.replace(/^\/?storage\//, '').replace(/^\//, '');
-    return `${STORAGE_BASE}/${clean}`;
-}
+        function getHotelImageUrl(imgObj) {
+            const defaultFallback = 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80';
+            if (!imgObj) return defaultFallback;
+            let path = typeof imgObj === 'string' ? imgObj : (imgObj.url || imgObj.image_path);
+            if (!path) return defaultFallback;
+            if (path.startsWith('http://') || path.startsWith('https://')) return path;
+            const clean = path.replace(/^\/?storage\//, '').replace(/^\//, '');
+            return `${STORAGE_BASE}/${clean}`;
+        }
 
-async function loadHotelsData() {
-    const container = document.getElementById('hotels-container');
-    const searchInput = document.getElementById('search-hotels');
-    const citySelect   = document.getElementById('filter-hotel-city');
-    const stateSelect  = document.getElementById('filter-hotel-state');
+        async function loadHotelsData() {
+            const container = document.getElementById('hotels-container');
+            const searchInput = document.getElementById('search-hotels');
+            const citySelect = document.getElementById('filter-hotel-city');
+            const stateSelect = document.getElementById('filter-hotel-state');
 
-    const search = searchInput ? searchInput.value : '';
-    const city   = citySelect ? citySelect.value : '';
-    const state  = stateSelect ? stateSelect.value : '';
+            const search = searchInput ? searchInput.value : '';
+            const city = citySelect ? citySelect.value : '';
+            const state = stateSelect ? stateSelect.value : '';
 
-    container.innerHTML = `<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Searching & loading hotel listings...</div>`;
+            container.innerHTML = `<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Searching & loading hotel listings...</div>`;
 
-    try {
-        let url = `${API_BASE}/admin/hotels?status=${currentHotelStatusFilter}&search=${encodeURIComponent(search)}&city=${encodeURIComponent(city)}&state=${encodeURIComponent(state)}`;
-        const res = await fetch(url, { headers: getHeaders() });
-        if (!res.ok) await handleApiError(res);
-        const data = await res.json();
-        const hotels = data.data || [];
+            try {
+                let url = `${API_BASE}/admin/hotels?status=${currentHotelStatusFilter}&search=${encodeURIComponent(search)}&city=${encodeURIComponent(city)}&state=${encodeURIComponent(state)}`;
+                const res = await fetch(url, { headers: getHeaders() });
+                if (!res.ok) await handleApiError(res);
+                const data = await res.json();
+                const hotels = data.data || [];
 
-        populateHotelCitiesDropdown(hotels);
+                populateHotelCitiesDropdown(hotels);
 
-        if (hotels.length === 0) {
-            container.innerHTML = `
+                if (hotels.length === 0) {
+                    container.innerHTML = `
                 <div class="empty-state" style="padding:40px 20px; text-align:center; grid-column:1/-1;">
                     <i class="fa-solid fa-hotel-slash" style="font-size:36px; color:var(--text-muted); margin-bottom:12px;"></i>
                     <h3 style="margin:0 0 6px 0; font-size:16px;">No Hotels Found</h3>
                     <p style="color:var(--text-muted); font-size:13px; margin:0;">No hotel listings match your current search ("${search || 'all'}"), city ("${city || 'all'}"), state ("${state || 'all'}"), or status filter.</p>
                 </div>
             `;
-            return;
-        }
+                    return;
+                }
 
-        container.innerHTML = hotels.map(h => {
-            const isApproved = h.status === 'approved' || h.status === 'active';
-            const isPending  = h.status === 'pending';
+                container.innerHTML = hotels.map(h => {
+                    const isApproved = h.status === 'approved' || h.status === 'active';
+                    const isPending = h.status === 'pending';
 
-            const rawImg = h.primary_image || (h.images && h.images.length > 0 ? h.images[0] : null);
-            const primaryImg = getHotelImageUrl(rawImg);
+                    const rawImg = h.primary_image || (h.images && h.images.length > 0 ? h.images[0] : null);
+                    const primaryImg = getHotelImageUrl(rawImg);
 
-            let statusBadgeClass = isApproved ? 'confirmed' : (isPending ? 'pending' : 'failed');
-            let statusText       = isApproved ? 'APPROVED' : (isPending ? 'PENDING APPROVAL' : 'REJECTED / SUSPENDED');
+                    let statusBadgeClass = isApproved ? 'confirmed' : (isPending ? 'pending' : 'failed');
+                    let statusText = isApproved ? 'APPROVED' : (isPending ? 'PENDING APPROVAL' : 'REJECTED / SUSPENDED');
 
-            return `
+                    return `
                 <div class="data-card" style="display:flex; flex-direction:column; justify-content:space-between; position:relative; overflow:hidden;">
                     <div>
                         <div style="position:relative; height:160px; border-radius:8px; overflow:hidden; margin-bottom:12px; background:#0f172a;">
@@ -419,56 +419,56 @@ async function loadHotelsData() {
                     </div>
                 </div>
             `;
-        }).join('');
-    } catch (err) {
-        container.innerHTML = `<div class="empty-state text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading hotels'}</div>`;
-    }
-}
-
-async function updateHotelStatus(id, newStatus) {
-    if (!newStatus) return;
-
-    try {
-        const res = await fetch(`${API_BASE}/admin/hotels/${id}/status`, {
-            method: 'PUT',
-            headers: getHeaders(),
-            body: JSON.stringify({ status: newStatus })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || data.message || 'Failed to update hotel status');
-
-        showToast(data.message || `Hotel status updated to ${newStatus}`, 'success');
-        loadHotelsData();
-    } catch (err) {
-        showToast(err.message, 'danger');
-        loadHotelsData();
-    }
-}
-
-async function openHotelDetailsModal(id) {
-    const modal = document.getElementById('hotel-modal');
-    const body  = document.getElementById('hotel-modal-body');
-    if (!modal || !body) return;
-
-    body.innerHTML = `<div style="padding:20px; text-align:center;"><i class="fa-solid fa-spinner fa-spin"></i> Loading Hotel Details & Gallery...</div>`;
-    modal.classList.remove('hidden');
-
-    try {
-        const res = await fetch(`${API_BASE}/admin/hotels/${id}`, { headers: getHeaders() });
-        if (!res.ok) await handleApiError(res);
-        const data = await res.json();
-        const h = data.hotel;
-        const analytics = data.analytics || {};
-        const visitingCustomers = data.visiting_customers || [];
-        const isApproved = h.status === 'approved' || h.status === 'active';
-        const isPending  = h.status === 'pending';
-
-        const galleryImages = (h.images || []).map(img => getHotelImageUrl(img));
-        if (galleryImages.length === 0) {
-            galleryImages.push('https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80');
+                }).join('');
+            } catch (err) {
+                container.innerHTML = `<div class="empty-state text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading hotels'}</div>`;
+            }
         }
 
-        body.innerHTML = `
+        async function updateHotelStatus(id, newStatus) {
+            if (!newStatus) return;
+
+            try {
+                const res = await fetch(`${API_BASE}/admin/hotels/${id}/status`, {
+                    method: 'PUT',
+                    headers: getHeaders(),
+                    body: JSON.stringify({ status: newStatus })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || data.message || 'Failed to update hotel status');
+
+                showToast(data.message || `Hotel status updated to ${newStatus}`, 'success');
+                loadHotelsData();
+            } catch (err) {
+                showToast(err.message, 'danger');
+                loadHotelsData();
+            }
+        }
+
+        async function openHotelDetailsModal(id) {
+            const modal = document.getElementById('hotel-modal');
+            const body = document.getElementById('hotel-modal-body');
+            if (!modal || !body) return;
+
+            body.innerHTML = `<div style="padding:20px; text-align:center;"><i class="fa-solid fa-spinner fa-spin"></i> Loading Hotel Details & Gallery...</div>`;
+            modal.classList.remove('hidden');
+
+            try {
+                const res = await fetch(`${API_BASE}/admin/hotels/${id}`, { headers: getHeaders() });
+                if (!res.ok) await handleApiError(res);
+                const data = await res.json();
+                const h = data.hotel;
+                const analytics = data.analytics || {};
+                const visitingCustomers = data.visiting_customers || [];
+                const isApproved = h.status === 'approved' || h.status === 'active';
+                const isPending = h.status === 'pending';
+
+                const galleryImages = (h.images || []).map(img => getHotelImageUrl(img));
+                if (galleryImages.length === 0) {
+                    galleryImages.push('https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80');
+                }
+
+                body.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
                 <div>
                     <h3 style="margin:0; font-size:18px; color:var(--text-primary);">
@@ -574,84 +574,84 @@ async function openHotelDetailsModal(id) {
                 </div>
             ` : ''}
         `;
-    } catch(err) {
-        body.innerHTML = `<div style="padding:20px; text-align:center; color:var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Failed to load hotel details'}</div>`;
-    }
-}
-
-function closeHotelModal() {
-    const modal = document.getElementById('hotel-modal');
-    if (modal) modal.classList.add('hidden');
-}
-
-// ----------------------------------------------------
-// 3. OWNER KYC & PERFORMANCE MANAGEMENT
-// ----------------------------------------------------
-let currentOwnerStatusFilter = 'false'; // Default view: Pending KYC for new registrations
-
-function filterOwnersByStatus(verifiedState, btnElem) {
-    currentOwnerStatusFilter = verifiedState;
-    document.querySelectorAll('#tab-owners .subtab-btn').forEach(b => b.classList.remove('active'));
-    if (btnElem) btnElem.classList.add('active');
-    loadOwnersData();
-}
-
-let loadedOwnerCitiesList = false;
-async function populateOwnerCitiesDropdown() {
-    const citySelect = document.getElementById('filter-owner-city');
-    if (!citySelect || loadedOwnerCitiesList) return;
-
-    try {
-        const res = await fetch(`${API_BASE}/admin/hotels/locations`, { headers: getHeaders() });
-        if (res.ok) {
-            const data = await res.json();
-            const cities = data.cities || [];
-            if (cities.length > 0) {
-                const currentVal = citySelect.value;
-                citySelect.innerHTML = `<option value="">All Cities (${cities.length})</option>` + 
-                    cities.map(c => `<option value="${c}" ${currentVal === c ? 'selected' : ''}>${c}</option>`).join('');
-                loadedOwnerCitiesList = true;
+            } catch (err) {
+                body.innerHTML = `<div style="padding:20px; text-align:center; color:var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Failed to load hotel details'}</div>`;
             }
         }
-    } catch(e) {}
-}
 
-async function loadOwnersData() {
-    const container = document.getElementById('owners-container');
-    const searchInput = document.getElementById('search-owners');
-    const citySelect   = document.getElementById('filter-owner-city');
+        function closeHotelModal() {
+            const modal = document.getElementById('hotel-modal');
+            if (modal) modal.classList.add('hidden');
+        }
 
-    const search = searchInput ? searchInput.value : '';
-    const city   = citySelect ? citySelect.value : '';
+        // ----------------------------------------------------
+        // 3. OWNER KYC & PERFORMANCE MANAGEMENT
+        // ----------------------------------------------------
+        let currentOwnerStatusFilter = 'false'; // Default view: Pending KYC for new registrations
 
-    container.innerHTML = `<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Loading hotel owner profiles...</div>`;
+        function filterOwnersByStatus(verifiedState, btnElem) {
+            currentOwnerStatusFilter = verifiedState;
+            document.querySelectorAll('#tab-owners .subtab-btn').forEach(b => b.classList.remove('active'));
+            if (btnElem) btnElem.classList.add('active');
+            loadOwnersData();
+        }
 
-    try {
-        let url = `${API_BASE}/admin/owners?verified=${currentOwnerStatusFilter}&search=${encodeURIComponent(search)}&city=${encodeURIComponent(city)}`;
-        const res = await fetch(url, { headers: getHeaders() });
-        if (!res.ok) await handleApiError(res);
-        const data = await res.json();
-        currentOwners = data.data || [];
+        let loadedOwnerCitiesList = false;
+        async function populateOwnerCitiesDropdown() {
+            const citySelect = document.getElementById('filter-owner-city');
+            if (!citySelect || loadedOwnerCitiesList) return;
 
-        populateOwnerCitiesDropdown();
+            try {
+                const res = await fetch(`${API_BASE}/admin/hotels/locations`, { headers: getHeaders() });
+                if (res.ok) {
+                    const data = await res.json();
+                    const cities = data.cities || [];
+                    if (cities.length > 0) {
+                        const currentVal = citySelect.value;
+                        citySelect.innerHTML = `<option value="">All Cities (${cities.length})</option>` +
+                            cities.map(c => `<option value="${c}" ${currentVal === c ? 'selected' : ''}>${c}</option>`).join('');
+                        loadedOwnerCitiesList = true;
+                    }
+                }
+            } catch (e) { }
+        }
 
-        if (currentOwners.length === 0) {
-            container.innerHTML = `
+        async function loadOwnersData() {
+            const container = document.getElementById('owners-container');
+            const searchInput = document.getElementById('search-owners');
+            const citySelect = document.getElementById('filter-owner-city');
+
+            const search = searchInput ? searchInput.value : '';
+            const city = citySelect ? citySelect.value : '';
+
+            container.innerHTML = `<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Loading hotel owner profiles...</div>`;
+
+            try {
+                let url = `${API_BASE}/admin/owners?verified=${currentOwnerStatusFilter}&search=${encodeURIComponent(search)}&city=${encodeURIComponent(city)}`;
+                const res = await fetch(url, { headers: getHeaders() });
+                if (!res.ok) await handleApiError(res);
+                const data = await res.json();
+                currentOwners = data.data || [];
+
+                populateOwnerCitiesDropdown();
+
+                if (currentOwners.length === 0) {
+                    container.innerHTML = `
                 <div class="empty-state" style="padding:40px 20px; text-align:center; grid-column:1/-1;">
                     <i class="fa-solid fa-user-slash" style="font-size:36px; color:var(--text-muted); margin-bottom:12px;"></i>
                     <h3 style="margin:0 0 6px 0; font-size:16px;">No Hotel Owners Found</h3>
                     <p style="color:var(--text-muted); font-size:13px; margin:0;">No hotel owner accounts match your current search ("${search || 'all'}"), city ("${city || 'all'}"), or verification filter.</p>
                 </div>
             `;
-            return;
-        }
+                    return;
+                }
 
-        container.innerHTML = currentOwners.map(o => {
-            const profile = o.owner_profile || o.ownerProfile || {};
-            const isVerified = (o.is_verified === true || o.is_verified === 1) && (profile.is_profile_complete === true || profile.is_profile_complete === 1);
-            const joinedDate = o.created_at ? new Date(o.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A';
+                container.innerHTML = currentOwners.map(o => {
+                    const profile = o.owner_profile || o.ownerProfile || {};
+                    const isVerified = (o.is_verified === true || o.is_verified === 1) && (profile.is_profile_complete === true || profile.is_profile_complete === 1);
+                    const joinedDate = o.created_at ? new Date(o.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A';
 
-            return `
+                    return `
             <div class="data-card" style="display:flex; flex-direction:column; justify-content:space-between; position:relative;">
                 <div>
                     <div class="data-card-header" style="margin-bottom:10px;">
@@ -679,48 +679,48 @@ async function loadOwnersData() {
                     <button class="btn-sm" style="background:#4f46e5; color:white; font-weight:600;" onclick="openKycModal(${o.id})">
                         <i class="fa-solid fa-chart-line"></i> Inspect & Analytics
                     </button>
-                    ${!isVerified ? 
-                        `<button class="btn-sm btn-success" onclick="verifyOwner(${o.id}, true)"><i class="fa-solid fa-user-check"></i> Approve KYC</button>` : 
-                        `<button class="btn-sm btn-warning" onclick="verifyOwner(${o.id}, false)"><i class="fa-solid fa-user-xmark"></i> Revoke</button>`
-                    }
+                    ${!isVerified ?
+                            `<button class="btn-sm btn-success" onclick="verifyOwner(${o.id}, true)"><i class="fa-solid fa-user-check"></i> Approve KYC</button>` :
+                            `<button class="btn-sm btn-warning" onclick="verifyOwner(${o.id}, false)"><i class="fa-solid fa-user-xmark"></i> Revoke</button>`
+                        }
                     <button class="btn-sm" style="background:#e11d48; color:white;" onclick="resetOwnerKyc(${o.id})" title="Remove & Reset Owner KYC Documents"><i class="fa-solid fa-trash-can"></i> Reset</button>
                 </div>
             </div>
             `;
-        }).join('');
-    } catch (err) {
-        container.innerHTML = `<div class="empty-state text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading owners'}</div>`;
-    }
-}
+                }).join('');
+            } catch (err) {
+                container.innerHTML = `<div class="empty-state text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading owners'}</div>`;
+            }
+        }
 
-async function openKycModal(id) {
-    const modal = document.getElementById('kyc-modal');
-    const body = document.getElementById('kyc-modal-body');
-    if (!modal || !body) return;
+        async function openKycModal(id) {
+            const modal = document.getElementById('kyc-modal');
+            const body = document.getElementById('kyc-modal-body');
+            if (!modal || !body) return;
 
-    body.innerHTML = `<div style="padding:30px; text-align:center;"><i class="fa-solid fa-spinner fa-spin"></i> Fetching Owner Profile, Financial Performance & Customer Check-in History...</div>`;
-    modal.classList.remove('hidden');
+            body.innerHTML = `<div style="padding:30px; text-align:center;"><i class="fa-solid fa-spinner fa-spin"></i> Fetching Owner Profile, Financial Performance & Customer Check-in History...</div>`;
+            modal.classList.remove('hidden');
 
-    try {
-        const res = await fetch(`${API_BASE}/admin/owners/${id}`, { headers: getHeaders() });
-        if (!res.ok) await handleApiError(res);
-        const data = await res.json();
-        
-        const owner = data.owner;
-        const profile = owner.owner_profile || owner.ownerProfile || {};
-        const isVerified = (owner.is_verified === true || owner.is_verified === 1) && (profile.is_profile_complete === true || profile.is_profile_complete === 1);
-        const analytics = data.analytics || {};
-        const hotels = data.hotels || [];
-        const visitingCustomers = data.visiting_customers || [];
+            try {
+                const res = await fetch(`${API_BASE}/admin/owners/${id}`, { headers: getHeaders() });
+                if (!res.ok) await handleApiError(res);
+                const data = await res.json();
 
-        const getImgUrl = (path) => path ? (path.startsWith('http') ? path : `${STORAGE_BASE}/${path}`) : null;
-        const aadhaarFront = getImgUrl(profile.aadhaar_front);
-        const aadhaarBack  = getImgUrl(profile.aadhaar_back);
-        const panCard       = getImgUrl(profile.pan_card);
-        const fssaiLic     = getImgUrl(profile.fssai_license);
-        const gstImg       = getImgUrl(profile.gst_image);
+                const owner = data.owner;
+                const profile = owner.owner_profile || owner.ownerProfile || {};
+                const isVerified = (owner.is_verified === true || owner.is_verified === 1) && (profile.is_profile_complete === true || profile.is_profile_complete === 1);
+                const analytics = data.analytics || {};
+                const hotels = data.hotels || [];
+                const visitingCustomers = data.visiting_customers || [];
 
-        body.innerHTML = `
+                const getImgUrl = (path) => path ? (path.startsWith('http') ? path : `${STORAGE_BASE}/${path}`) : null;
+                const aadhaarFront = getImgUrl(profile.aadhaar_front);
+                const aadhaarBack = getImgUrl(profile.aadhaar_back);
+                const panCard = getImgUrl(profile.pan_card);
+                const fssaiLic = getImgUrl(profile.fssai_license);
+                const gstImg = getImgUrl(profile.gst_image);
+
+                body.innerHTML = `
             <!-- Header Status -->
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
                 <div>
@@ -735,8 +735,8 @@ async function openKycModal(id) {
                     </div>
                 </div>
                 <div style="display:flex; gap:6px;">
-                    ${!isVerified ? 
-                        `<button class="btn-sm btn-success" onclick="verifyOwner(${owner.id}, true); closeKycModal();"><i class="fa-solid fa-user-check"></i> Approve KYC</button>` : 
+                    ${!isVerified ?
+                        `<button class="btn-sm btn-success" onclick="verifyOwner(${owner.id}, true); closeKycModal();"><i class="fa-solid fa-user-check"></i> Approve KYC</button>` :
                         `<button class="btn-sm btn-warning" onclick="verifyOwner(${owner.id}, false); closeKycModal();"><i class="fa-solid fa-user-xmark"></i> Revoke KYC</button>`
                     }
                     <button class="btn-sm" style="background:#e11d48; color:white;" onclick="resetOwnerKyc(${owner.id}); closeKycModal();"><i class="fa-solid fa-trash-can"></i> Reset KYC Documents</button>
@@ -812,12 +812,12 @@ async function openKycModal(id) {
             <h4 style="margin:0 0 8px 0; font-size:14px; color:var(--text-primary);"><i class="fa-solid fa-file-image"></i> KYC Uploaded Documents</h4>
             <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px;">
                 ${[
-                    { label: 'Aadhaar Front', url: aadhaarFront },
-                    { label: 'Aadhaar Back', url: aadhaarBack },
-                    { label: 'PAN Card', url: panCard },
-                    { label: 'FSSAI License', url: fssaiLic },
-                    { label: 'GST Certificate', url: gstImg }
-                ].map(doc => `
+                        { label: 'Aadhaar Front', url: aadhaarFront },
+                        { label: 'Aadhaar Back', url: aadhaarBack },
+                        { label: 'PAN Card', url: panCard },
+                        { label: 'FSSAI License', url: fssaiLic },
+                        { label: 'GST Certificate', url: gstImg }
+                    ].map(doc => `
                     <div style="background:var(--bg-dark); padding:8px; border-radius:6px; border:1px solid var(--border); text-align:center; font-size:11px;">
                         <strong style="display:block; margin-bottom:4px;">${doc.label}</strong>
                         ${doc.url ? `
@@ -829,46 +829,46 @@ async function openKycModal(id) {
                 `).join('')}
             </div>
         `;
-    } catch (err) {
-        body.innerHTML = `<div style="padding:20px; text-align:center; color:var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Failed to load owner KYC data'}</div>`;
-    }
-}
+            } catch (err) {
+                body.innerHTML = `<div style="padding:20px; text-align:center; color:var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Failed to load owner KYC data'}</div>`;
+            }
+        }
 
-function openKycModal(ownerId) {
-    const owner = currentOwners.find(o => o.id === ownerId);
-    if (!owner) return;
+        function openKycModal(ownerId) {
+            const owner = currentOwners.find(o => o.id === ownerId);
+            if (!owner) return;
 
-    const profile = owner.owner_profile || owner.ownerProfile || {};
-    const isVerified = (owner.is_verified === true || owner.is_verified === 1) && (profile.is_profile_complete === true || profile.is_profile_complete === 1);
+            const profile = owner.owner_profile || owner.ownerProfile || {};
+            const isVerified = (owner.is_verified === true || owner.is_verified === 1) && (profile.is_profile_complete === true || profile.is_profile_complete === 1);
 
-    const getDocItem = (title, path, url) => {
-        const rawPath = (path && typeof path === 'string') ? path.trim() : '';
-        const rawUrl = (url && typeof url === 'string') ? url.trim() : '';
-        
-        if (!rawPath && !rawUrl) {
-            return `
+            const getDocItem = (title, path, url) => {
+                const rawPath = (path && typeof path === 'string') ? path.trim() : '';
+                const rawUrl = (url && typeof url === 'string') ? url.trim() : '';
+
+                if (!rawPath && !rawUrl) {
+                    return `
                 <div class="doc-box" style="opacity:0.6; border:1px dashed var(--border); text-align:center; padding:12px; background:rgba(255,255,255,0.02); border-radius:6px;">
                     <strong style="display:block; font-size:12px; margin-bottom:4px; color:var(--text-secondary);">${title}</strong>
                     <span style="font-size:11px; color:#f87171;"><i class="fa-solid fa-file-circle-xmark"></i> Not Uploaded Yet</span>
                 </div>
             `;
-        }
+                }
 
-        let docUrl = rawUrl;
-        if (!docUrl && rawPath) {
-            if (rawPath.startsWith('data:') || rawPath.startsWith('http://') || rawPath.startsWith('https://')) {
-                docUrl = rawPath;
-            } else {
-                const cleanPath = rawPath.replace(/^\/+/, '').replace(/^storage\//, '');
-                docUrl = `${window.location.origin}/storage/${cleanPath}`;
-            }
-        }
+                let docUrl = rawUrl;
+                if (!docUrl && rawPath) {
+                    if (rawPath.startsWith('data:') || rawPath.startsWith('http://') || rawPath.startsWith('https://')) {
+                        docUrl = rawPath;
+                    } else {
+                        const cleanPath = rawPath.replace(/^\/+/, '').replace(/^storage\//, '');
+                        docUrl = `${window.location.origin}/storage/${cleanPath}`;
+                    }
+                }
 
-        if (docUrl.startsWith('http://') && window.location.protocol === 'https:') {
-            docUrl = docUrl.replace('http://', 'https://');
-        }
+                if (docUrl.startsWith('http://') && window.location.protocol === 'https:') {
+                    docUrl = docUrl.replace('http://', 'https://');
+                }
 
-        return `
+                return `
             <div class="doc-box" style="background:var(--bg-surface); padding:10px; border-radius:6px; border:1px solid var(--border); text-align:center;">
                 <strong style="display:block; font-size:12px; margin-bottom:6px; color:var(--text-primary);">${title}</strong>
                 <a href="${docUrl}" target="_blank" style="display:block; text-decoration:none; margin-bottom:8px;">
@@ -882,10 +882,10 @@ function openKycModal(ownerId) {
                 </a>
             </div>
         `;
-    };
+            };
 
-    const modalBody = document.getElementById('kyc-modal-body');
-    modalBody.innerHTML = `
+            const modalBody = document.getElementById('kyc-modal-body');
+            modalBody.innerHTML = `
         <div style="margin-bottom:16px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                 <h4 style="margin:0; font-size:18px;">${owner.name}</h4>
@@ -926,90 +926,90 @@ function openKycModal(ownerId) {
         </div>
 
         <div style="display:flex; gap:10px; margin-top:20px; justify-content:flex-end; flex-wrap:wrap;">
-            ${!isVerified ? 
-                `<button class="btn-sm btn-success" style="padding:8px 16px;" onclick="verifyOwner(${owner.id}, true); closeKycModal();"><i class="fa-solid fa-check"></i> Approve Owner KYC</button>` : 
-                `<button class="btn-sm btn-warning" style="padding:8px 16px;" onclick="verifyOwner(${owner.id}, false); closeKycModal();"><i class="fa-solid fa-xmark"></i> Revoke Verification</button>`
-            }
+            ${!isVerified ?
+                    `<button class="btn-sm btn-success" style="padding:8px 16px;" onclick="verifyOwner(${owner.id}, true); closeKycModal();"><i class="fa-solid fa-check"></i> Approve Owner KYC</button>` :
+                    `<button class="btn-sm btn-warning" style="padding:8px 16px;" onclick="verifyOwner(${owner.id}, false); closeKycModal();"><i class="fa-solid fa-xmark"></i> Revoke Verification</button>`
+                }
             <button class="btn-sm" style="background:#e11d48; color:white; padding:8px 16px;" onclick="resetOwnerKyc(${owner.id}); closeKycModal();"><i class="fa-solid fa-trash-can"></i> Remove & Reset KYC Data</button>
             <button class="btn-sm" style="padding:8px 16px;" onclick="closeKycModal()">Close</button>
         </div>
     `;
 
-    document.getElementById('kyc-modal').classList.remove('hidden');
-}
-
-function closeKycModal() {
-    document.getElementById('kyc-modal').classList.add('hidden');
-}
-
-async function verifyOwner(id, isVerified) {
-    try {
-        const res = await fetch(`${API_BASE}/admin/owners/${id}/verify`, {
-            method: 'PUT',
-            headers: getHeaders(),
-            body: JSON.stringify({ is_verified: isVerified })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || data.message || 'Failed to update owner verification');
-
-        showToast(data.message || 'Owner verification updated', 'success');
-        loadOwnersData();
-    } catch (err) {
-        showToast(err.message, 'danger');
-    }
-}
-
-async function resetOwnerKyc(id) {
-    const owner = currentOwners.find(o => o.id === id);
-    const ownerName = owner ? owner.name : `Owner #${id}`;
-
-    if (!confirm(`Are you sure you want to REMOVE & RESET all uploaded KYC documents for ${ownerName}?\n\nThis will clear their verified status and document uploads so they can submit fresh KYC details.`)) {
-        return;
-    }
-
-    try {
-        const res = await fetch(`${API_BASE}/admin/owners/${id}/reset-kyc`, {
-            method: 'POST',
-            headers: getHeaders(),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || data.message || 'Failed to reset owner KYC');
-
-        showToast(data.message || 'Owner KYC data removed and reset successfully', 'success');
-        loadOwnersData();
-    } catch (err) {
-        showToast(err.message, 'danger');
-    }
-}
-
-// ----------------------------------------------------
-// 4. BOOKINGS LEDGER
-// ----------------------------------------------------
-async function loadBookingsData() {
-    const tbody = document.getElementById('bookings-table-body');
-    const status = document.getElementById('filter-booking-status').value;
-    const search = document.getElementById('search-bookings').value;
-
-    tbody.innerHTML = `<tr><td colspan="8" class="text-center"><i class="fa-solid fa-spinner fa-spin"></i> Loading bookings...</td></tr>`;
-
-    try {
-        let url = `${API_BASE}/admin/bookings?status=${status}&search=${encodeURIComponent(search)}`;
-        const res = await fetch(url, { headers: getHeaders() });
-        if (!res.ok) await handleApiError(res);
-        const data = await res.json();
-        const bookings = data.data || [];
-
-        if (bookings.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="8" class="text-center">No bookings found</td></tr>`;
-            return;
+            document.getElementById('kyc-modal').classList.remove('hidden');
         }
 
-        tbody.innerHTML = bookings.map(b => {
-            const isRefunded = b.payment_status === 'refunded' || b.payment_status === 'refund_initiated' || (b.cancellation_reason && b.cancellation_reason.toLowerCase().includes('refund'));
-            const payBadgeClass = isRefunded ? 'failed' : (b.payment_status === 'paid' ? 'confirmed' : 'pending');
-            const payText = isRefunded ? (b.payment_status === 'refunded' ? 'Refunded' : 'Refund_initiated') : (b.payment_status || 'pending');
+        function closeKycModal() {
+            document.getElementById('kyc-modal').classList.add('hidden');
+        }
 
-            return `
+        async function verifyOwner(id, isVerified) {
+            try {
+                const res = await fetch(`${API_BASE}/admin/owners/${id}/verify`, {
+                    method: 'PUT',
+                    headers: getHeaders(),
+                    body: JSON.stringify({ is_verified: isVerified })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || data.message || 'Failed to update owner verification');
+
+                showToast(data.message || 'Owner verification updated', 'success');
+                loadOwnersData();
+            } catch (err) {
+                showToast(err.message, 'danger');
+            }
+        }
+
+        async function resetOwnerKyc(id) {
+            const owner = currentOwners.find(o => o.id === id);
+            const ownerName = owner ? owner.name : `Owner #${id}`;
+
+            if (!confirm(`Are you sure you want to REMOVE & RESET all uploaded KYC documents for ${ownerName}?\n\nThis will clear their verified status and document uploads so they can submit fresh KYC details.`)) {
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/admin/owners/${id}/reset-kyc`, {
+                    method: 'POST',
+                    headers: getHeaders(),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || data.message || 'Failed to reset owner KYC');
+
+                showToast(data.message || 'Owner KYC data removed and reset successfully', 'success');
+                loadOwnersData();
+            } catch (err) {
+                showToast(err.message, 'danger');
+            }
+        }
+
+        // ----------------------------------------------------
+        // 4. BOOKINGS LEDGER
+        // ----------------------------------------------------
+        async function loadBookingsData() {
+            const tbody = document.getElementById('bookings-table-body');
+            const status = document.getElementById('filter-booking-status').value;
+            const search = document.getElementById('search-bookings').value;
+
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center"><i class="fa-solid fa-spinner fa-spin"></i> Loading bookings...</td></tr>`;
+
+            try {
+                let url = `${API_BASE}/admin/bookings?status=${status}&search=${encodeURIComponent(search)}`;
+                const res = await fetch(url, { headers: getHeaders() });
+                if (!res.ok) await handleApiError(res);
+                const data = await res.json();
+                const bookings = data.data || [];
+
+                if (bookings.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="8" class="text-center">No bookings found</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = bookings.map(b => {
+                    const isRefunded = b.payment_status === 'refunded' || b.payment_status === 'refund_initiated' || (b.cancellation_reason && b.cancellation_reason.toLowerCase().includes('refund'));
+                    const payBadgeClass = isRefunded ? 'failed' : (b.payment_status === 'paid' ? 'confirmed' : 'pending');
+                    const payText = isRefunded ? (b.payment_status === 'refunded' ? 'Refunded' : 'Refund_initiated') : (b.payment_status || 'pending');
+
+                    return `
                 <tr>
                     <td>#${b.id}</td>
                     <td><strong>${b.user ? b.user.name : 'Guest'}</strong><br><small class="text-muted">${b.user ? b.user.phone : ''}</small></td>
@@ -1029,97 +1029,97 @@ async function loadBookingsData() {
                     </td>
                 </tr>
             `;
-        }).join('');
-    } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading bookings'}</td></tr>`;
-    }
-}
-
-async function updateBookingStatus(id, status) {
-    if (!status) return;
-
-    if (status === 'refund') {
-        let reason = prompt(`[Razorpay Refund Request]\nEnter reason for refunding Booking #${id} (min 5 characters):`, 'Customer requested refund');
-        if (reason === null) {
-            loadBookingsData();
-            return;
-        }
-        reason = reason.trim();
-        if (reason.length < 5) {
-            showToast('Refund cancelled: A detailed reason (minimum 5 characters) is required.', 'danger');
-            loadBookingsData();
-            return;
+                }).join('');
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading bookings'}</td></tr>`;
+            }
         }
 
-        const approved = confirm(`🔔 CONFIRM RAZORPAY REFUND:\n\nBooking ID: #${id}\nReason: ${reason}\n\nDo you explicitly APPROVE issuing this refund to the customer via Razorpay?`);
-        if (!approved) {
-            showToast('Refund request cancelled by Admin.', 'warning');
-            loadBookingsData();
-            return;
+        async function updateBookingStatus(id, status) {
+            if (!status) return;
+
+            if (status === 'refund') {
+                let reason = prompt(`[Razorpay Refund Request]\nEnter reason for refunding Booking #${id} (min 5 characters):`, 'Customer requested refund');
+                if (reason === null) {
+                    loadBookingsData();
+                    return;
+                }
+                reason = reason.trim();
+                if (reason.length < 5) {
+                    showToast('Refund cancelled: A detailed reason (minimum 5 characters) is required.', 'danger');
+                    loadBookingsData();
+                    return;
+                }
+
+                const approved = confirm(`🔔 CONFIRM RAZORPAY REFUND:\n\nBooking ID: #${id}\nReason: ${reason}\n\nDo you explicitly APPROVE issuing this refund to the customer via Razorpay?`);
+                if (!approved) {
+                    showToast('Refund request cancelled by Admin.', 'warning');
+                    loadBookingsData();
+                    return;
+                }
+
+                showToast('Initiating refund with Razorpay API...', 'info');
+                try {
+                    const res = await fetch(`${API_BASE}/admin/transactions/${id}/refund`, {
+                        method: 'POST',
+                        headers: getHeaders(),
+                        body: JSON.stringify({ reason })
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || data.message || 'Refund failed');
+
+                    showToast(data.message || 'Refund processed successfully!', 'success');
+                    loadBookingsData();
+                } catch (err) {
+                    showToast(err.message, 'danger');
+                    loadBookingsData();
+                }
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/admin/bookings/${id}/status`, {
+                    method: 'PUT',
+                    headers: getHeaders(),
+                    body: JSON.stringify({ status })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || data.message || 'Failed to update booking');
+
+                showToast(data.message || 'Booking status updated', 'success');
+                loadBookingsData();
+            } catch (err) {
+                showToast(err.message, 'danger');
+            }
         }
 
-        showToast('Initiating refund with Razorpay API...', 'info');
-        try {
-            const res = await fetch(`${API_BASE}/admin/transactions/${id}/refund`, {
-                method: 'POST',
-                headers: getHeaders(),
-                body: JSON.stringify({ reason })
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || data.message || 'Refund failed');
+        // ----------------------------------------------------
+        // 5. USER / CUSTOMER MANAGEMENT
+        // ----------------------------------------------------
+        async function loadUsersData() {
+            const tbody = document.getElementById('users-table-body');
+            const searchInput = document.getElementById('search-users');
+            const search = searchInput ? searchInput.value : '';
 
-            showToast(data.message || 'Refund processed successfully!', 'success');
-            loadBookingsData();
-        } catch (err) {
-            showToast(err.message, 'danger');
-            loadBookingsData();
-        }
-        return;
-    }
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center"><i class="fa-solid fa-spinner fa-spin"></i> Loading customer accounts...</td></tr>`;
 
-    try {
-        const res = await fetch(`${API_BASE}/admin/bookings/${id}/status`, {
-            method: 'PUT',
-            headers: getHeaders(),
-            body: JSON.stringify({ status })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || data.message || 'Failed to update booking');
+            try {
+                let url = `${API_BASE}/admin/users?search=${encodeURIComponent(search)}`;
+                const res = await fetch(url, { headers: getHeaders() });
+                if (!res.ok) await handleApiError(res);
+                const data = await res.json();
+                const users = data.data || [];
 
-        showToast(data.message || 'Booking status updated', 'success');
-        loadBookingsData();
-    } catch (err) {
-        showToast(err.message, 'danger');
-    }
-}
+                if (users.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" class="text-center">No customer accounts found matching your search.</td></tr>`;
+                    return;
+                }
 
-// ----------------------------------------------------
-// 5. USER / CUSTOMER MANAGEMENT
-// ----------------------------------------------------
-async function loadUsersData() {
-    const tbody = document.getElementById('users-table-body');
-    const searchInput = document.getElementById('search-users');
-    const search = searchInput ? searchInput.value : '';
+                tbody.innerHTML = users.map(u => {
+                    const isActive = u.is_verified === true || u.is_verified === 1 || u.is_verified === '1' || u.is_verified === 'true';
+                    const joinedDate = u.created_at ? new Date(u.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A';
 
-    tbody.innerHTML = `<tr><td colspan="6" class="text-center"><i class="fa-solid fa-spinner fa-spin"></i> Loading customer accounts...</td></tr>`;
-
-    try {
-        let url = `${API_BASE}/admin/users?search=${encodeURIComponent(search)}`;
-        const res = await fetch(url, { headers: getHeaders() });
-        if (!res.ok) await handleApiError(res);
-        const data = await res.json();
-        const users = data.data || [];
-
-        if (users.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6" class="text-center">No customer accounts found matching your search.</td></tr>`;
-            return;
-        }
-
-        tbody.innerHTML = users.map(u => {
-            const isActive = u.is_verified === true || u.is_verified === 1 || u.is_verified === '1' || u.is_verified === 'true';
-            const joinedDate = u.created_at ? new Date(u.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A';
-
-            return `
+                    return `
                 <tr>
                     <td><strong>#${u.id}</strong></td>
                     <td>
@@ -1160,49 +1160,49 @@ async function loadUsersData() {
                     </td>
                 </tr>
             `;
-        }).join('');
-    } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading users'}</td></tr>`;
-    }
-}
+                }).join('');
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading users'}</td></tr>`;
+            }
+        }
 
-async function toggleUserStatus(id, newVerifiedState, name = 'Customer') {
-    const actionText = newVerifiedState ? 'Activate' : 'Disable';
-    const confirmed = confirm(`Are you sure you want to ${actionText} Customer #${id} (${name})?\n\n${!newVerifiedState ? 'Disabling will prevent this customer from logging into the mobile app.' : 'Activating will restore customer app access.'}`);
-    if (!confirmed) return;
+        async function toggleUserStatus(id, newVerifiedState, name = 'Customer') {
+            const actionText = newVerifiedState ? 'Activate' : 'Disable';
+            const confirmed = confirm(`Are you sure you want to ${actionText} Customer #${id} (${name})?\n\n${!newVerifiedState ? 'Disabling will prevent this customer from logging into the mobile app.' : 'Activating will restore customer app access.'}`);
+            if (!confirmed) return;
 
-    try {
-        const res = await fetch(`${API_BASE}/admin/users/${id}/status`, {
-            method: 'PUT',
-            headers: getHeaders(),
-            body: JSON.stringify({ is_verified: newVerifiedState })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || data.message || 'Failed to update user status');
+            try {
+                const res = await fetch(`${API_BASE}/admin/users/${id}/status`, {
+                    method: 'PUT',
+                    headers: getHeaders(),
+                    body: JSON.stringify({ is_verified: newVerifiedState })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || data.message || 'Failed to update user status');
 
-        showToast(data.message || `Customer account ${actionText}d successfully`, 'success');
-        loadUsersData();
-    } catch (err) {
-        showToast(err.message, 'danger');
-    }
-}
+                showToast(data.message || `Customer account ${actionText}d successfully`, 'success');
+                loadUsersData();
+            } catch (err) {
+                showToast(err.message, 'danger');
+            }
+        }
 
-async function openUserDetailsModal(id) {
-    const modal = document.getElementById('user-modal');
-    const body = document.getElementById('user-modal-body');
-    if (!modal || !body) return;
+        async function openUserDetailsModal(id) {
+            const modal = document.getElementById('user-modal');
+            const body = document.getElementById('user-modal-body');
+            if (!modal || !body) return;
 
-    body.innerHTML = `<div style="padding:20px; text-align:center;"><i class="fa-solid fa-spinner fa-spin"></i> Loading Customer Profile...</div>`;
-    modal.classList.remove('hidden');
+            body.innerHTML = `<div style="padding:20px; text-align:center;"><i class="fa-solid fa-spinner fa-spin"></i> Loading Customer Profile...</div>`;
+            modal.classList.remove('hidden');
 
-    try {
-        const res = await fetch(`${API_BASE}/admin/users/${id}`, { headers: getHeaders() });
-        if (!res.ok) await handleApiError(res);
-        const data = await res.json();
-        const u = data.user;
-        const isActive = u.is_verified === true || u.is_verified === 1 || u.is_verified === '1' || u.is_verified === 'true';
+            try {
+                const res = await fetch(`${API_BASE}/admin/users/${id}`, { headers: getHeaders() });
+                if (!res.ok) await handleApiError(res);
+                const data = await res.json();
+                const u = data.user;
+                const isActive = u.is_verified === true || u.is_verified === 1 || u.is_verified === '1' || u.is_verified === 'true';
 
-        body.innerHTML = `
+                body.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
                 <div>
                     <h3 style="margin:0; font-size:18px; color:var(--text-primary);">
@@ -1247,35 +1247,35 @@ async function openUserDetailsModal(id) {
                 </div>
             `}
         `;
-    } catch (err) {
-        body.innerHTML = `<div style="padding:20px; text-align:center; color:var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Failed to load customer details'}</div>`;
-    }
-}
-
-function closeUserModal() {
-    const modal = document.getElementById('user-modal');
-    if (modal) modal.classList.add('hidden');
-}
-
-// ----------------------------------------------------
-// 6. REVIEWS MODERATION
-// ----------------------------------------------------
-async function loadReviewsData() {
-    const container = document.getElementById('reviews-container');
-    container.innerHTML = `<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Loading reviews...</div>`;
-
-    try {
-        const res = await fetch(`${API_BASE}/admin/reviews`, { headers: getHeaders() });
-        if (!res.ok) await handleApiError(res);
-        const data = await res.json();
-        const reviews = data.data || [];
-
-        if (reviews.length === 0) {
-            container.innerHTML = `<div class="empty-state">No customer reviews yet</div>`;
-            return;
+            } catch (err) {
+                body.innerHTML = `<div style="padding:20px; text-align:center; color:var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Failed to load customer details'}</div>`;
+            }
         }
 
-        container.innerHTML = reviews.map(r => `
+        function closeUserModal() {
+            const modal = document.getElementById('user-modal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        // ----------------------------------------------------
+        // 6. REVIEWS MODERATION
+        // ----------------------------------------------------
+        async function loadReviewsData() {
+            const container = document.getElementById('reviews-container');
+            container.innerHTML = `<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Loading reviews...</div>`;
+
+            try {
+                const res = await fetch(`${API_BASE}/admin/reviews`, { headers: getHeaders() });
+                if (!res.ok) await handleApiError(res);
+                const data = await res.json();
+                const reviews = data.data || [];
+
+                if (reviews.length === 0) {
+                    container.innerHTML = `<div class="empty-state">No customer reviews yet</div>`;
+                    return;
+                }
+
+                container.innerHTML = reviews.map(r => `
             <div class="data-card">
                 <div class="data-card-header">
                     <div class="data-card-title">
@@ -1294,139 +1294,139 @@ async function loadReviewsData() {
                 </div>
             </div>
         `).join('');
-    } catch (err) {
-        container.innerHTML = `<div class="empty-state text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading reviews'}</div>`;
-    }
-}
-
-async function deleteReview(id) {
-    if (!confirm('Are you sure you want to delete this review?')) return;
-
-    try {
-        const res = await fetch(`${API_BASE}/admin/reviews/${id}`, {
-            method: 'DELETE',
-            headers: getHeaders()
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || data.message || 'Failed to delete review');
-
-        showToast(data.message || 'Review deleted successfully', 'success');
-        loadReviewsData();
-    } catch (err) {
-        showToast(err.message, 'danger');
-    }
-}
-
-// ----------------------------------------------------
-// 7. TRANSACTIONS & RAZORPAY LEDGER MANAGEMENT
-// ----------------------------------------------------
-function filterTxnType(type) {
-    currentTxnTypeFilter = type;
-    document.querySelectorAll('.subtab-btn').forEach(btn => {
-        if (btn.getAttribute('data-txntype') === type) {
-            btn.classList.add('active');
-        } else {
-            btn.classList.remove('active');
-        }
-    });
-    loadTransactionsData();
-}
-
-async function loadTransactionsData() {
-    const tbody = document.getElementById('transactions-table-body');
-    const methodSelect = document.getElementById('filter-txn-method');
-    const method = methodSelect ? methodSelect.value : '';
-    const searchInput = document.getElementById('search-transactions');
-    const search = searchInput ? searchInput.value : '';
-
-    tbody.innerHTML = `<tr><td colspan="9" class="text-center"><i class="fa-solid fa-spinner fa-spin"></i> Loading transactions...</td></tr>`;
-
-    try {
-        let url = `${API_BASE}/admin/transactions?type=${currentTxnTypeFilter}&payment_method=${encodeURIComponent(method)}&search=${encodeURIComponent(search)}`;
-        const res = await fetch(url, { headers: getHeaders() });
-        if (!res.ok) await handleApiError(res);
-        const resData = await res.json();
-        
-        currentTransactions = (resData.transactions && resData.transactions.data) ? resData.transactions.data : [];
-        const m = resData.metrics || {};
-
-        // Update Overview Widgets
-        if (document.getElementById('stat-txn-revenue')) {
-            document.getElementById('stat-txn-revenue').textContent = `₹${(m.confirmed_amount || 0).toLocaleString('en-IN')}`;
-        }
-        if (document.getElementById('stat-txn-confirmed-count')) {
-            document.getElementById('stat-txn-confirmed-count').textContent = m.confirmed_count || 0;
-        }
-        if (document.getElementById('stat-txn-temp-count')) {
-            document.getElementById('stat-txn-temp-count').textContent = m.temporary_count || 0;
-        }
-        if (document.getElementById('stat-txn-refunded-count')) {
-            document.getElementById('stat-txn-refunded-count').textContent = m.refunded_count || 0;
-        }
-        if (document.getElementById('stat-txn-cancelled-count')) {
-            document.getElementById('stat-txn-cancelled-count').textContent = m.cancelled_count || 0;
-        }
-
-        if (currentTransactions.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="9" class="text-center">No transaction records found</td></tr>`;
-            return;
-        }
-
-        tbody.innerHTML = currentTransactions.map(t => {
-            const isConfirmed = t.is_confirmed || t.payment_status === 'paid' || t.status === 'confirmed' || t.status === 'completed';
-            const isRefunded = t.payment_status === 'refunded' || (t.cancellation_reason && t.cancellation_reason.toLowerCase().includes('refund'));
-            const isCancelled = t.status === 'cancelled' || isRefunded || t.payment_status === 'failed';
-            const isTemp = !isConfirmed && !isCancelled;
-            const displayTxnId = t.display_transaction_id || t.transaction_id || t.temp_transaction_id || `TMP-${t.razorpay_order_id || t.id}`;
-            const regionTime = t.region_time_formatted || (t.created_at ? new Date(t.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' IST' : 'N/A');
-            const userObj = t.user || {};
-            const userName = userObj.name || 'Guest User';
-            const userContact = userObj.phone || userObj.email || '';
-
-            let typeBadgeClass = 'pending';
-            let typeBadgeIcon = 'fa-clock';
-            let typeBadgeText = 'TEMPORARY';
-
-            if (isConfirmed) {
-                typeBadgeClass = 'confirmed';
-                typeBadgeIcon = 'fa-circle-check';
-                typeBadgeText = 'CONFIRMED';
-            } else if (isRefunded) {
-                typeBadgeClass = 'failed';
-                typeBadgeIcon = 'fa-arrow-rotate-left';
-                typeBadgeText = 'REFUNDED';
-            } else if (isCancelled) {
-                typeBadgeClass = 'cancelled';
-                typeBadgeIcon = 'fa-circle-xmark';
-                typeBadgeText = 'CANCELLED';
+            } catch (err) {
+                container.innerHTML = `<div class="empty-state text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading reviews'}</div>`;
             }
+        }
 
-            let statusBadgeClass = 'pending';
-            let statusText = t.status || 'pending';
+        async function deleteReview(id) {
+            if (!confirm('Are you sure you want to delete this review?')) return;
 
-            if (isRefunded) {
-                statusBadgeClass = 'failed';
-                statusText = 'REFUNDED VIA RAZORPAY';
-            } else if (isConfirmed) {
-                statusBadgeClass = 'confirmed';
-                statusText = 'CONFIRMED SUCCESS';
-            } else if (t.status === 'cancelled') {
-                statusBadgeClass = 'cancelled';
-                statusText = 'CANCELLED / EXITED';
-            } else if (t.payment_status === 'failed') {
-                statusBadgeClass = 'failed';
-                statusText = 'PAYMENT FAILED';
-            } else {
-                statusBadgeClass = 'pending';
-                statusText = 'TEMPORARY / UNVERIFIED';
+            try {
+                const res = await fetch(`${API_BASE}/admin/reviews/${id}`, {
+                    method: 'DELETE',
+                    headers: getHeaders()
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || data.message || 'Failed to delete review');
+
+                showToast(data.message || 'Review deleted successfully', 'success');
+                loadReviewsData();
+            } catch (err) {
+                showToast(err.message, 'danger');
             }
+        }
 
-            let reasonText = t.cancellation_reason;
-            if (!reasonText && isTemp) {
-                reasonText = 'Money Deducted? Click Live Sync to check Razorpay status';
-            }
+        // ----------------------------------------------------
+        // 7. TRANSACTIONS & RAZORPAY LEDGER MANAGEMENT
+        // ----------------------------------------------------
+        function filterTxnType(type) {
+            currentTxnTypeFilter = type;
+            document.querySelectorAll('.subtab-btn').forEach(btn => {
+                if (btn.getAttribute('data-txntype') === type) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+            loadTransactionsData();
+        }
 
-            return `
+        async function loadTransactionsData() {
+            const tbody = document.getElementById('transactions-table-body');
+            const methodSelect = document.getElementById('filter-txn-method');
+            const method = methodSelect ? methodSelect.value : '';
+            const searchInput = document.getElementById('search-transactions');
+            const search = searchInput ? searchInput.value : '';
+
+            tbody.innerHTML = `<tr><td colspan="9" class="text-center"><i class="fa-solid fa-spinner fa-spin"></i> Loading transactions...</td></tr>`;
+
+            try {
+                let url = `${API_BASE}/admin/transactions?type=${currentTxnTypeFilter}&payment_method=${encodeURIComponent(method)}&search=${encodeURIComponent(search)}`;
+                const res = await fetch(url, { headers: getHeaders() });
+                if (!res.ok) await handleApiError(res);
+                const resData = await res.json();
+
+                currentTransactions = (resData.transactions && resData.transactions.data) ? resData.transactions.data : [];
+                const m = resData.metrics || {};
+
+                // Update Overview Widgets
+                if (document.getElementById('stat-txn-revenue')) {
+                    document.getElementById('stat-txn-revenue').textContent = `₹${(m.confirmed_amount || 0).toLocaleString('en-IN')}`;
+                }
+                if (document.getElementById('stat-txn-confirmed-count')) {
+                    document.getElementById('stat-txn-confirmed-count').textContent = m.confirmed_count || 0;
+                }
+                if (document.getElementById('stat-txn-temp-count')) {
+                    document.getElementById('stat-txn-temp-count').textContent = m.temporary_count || 0;
+                }
+                if (document.getElementById('stat-txn-refunded-count')) {
+                    document.getElementById('stat-txn-refunded-count').textContent = m.refunded_count || 0;
+                }
+                if (document.getElementById('stat-txn-cancelled-count')) {
+                    document.getElementById('stat-txn-cancelled-count').textContent = m.cancelled_count || 0;
+                }
+
+                if (currentTransactions.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="9" class="text-center">No transaction records found</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = currentTransactions.map(t => {
+                    const isConfirmed = t.is_confirmed || t.payment_status === 'paid' || t.status === 'confirmed' || t.status === 'completed';
+                    const isRefunded = t.payment_status === 'refunded' || (t.cancellation_reason && t.cancellation_reason.toLowerCase().includes('refund'));
+                    const isCancelled = t.status === 'cancelled' || isRefunded || t.payment_status === 'failed';
+                    const isTemp = !isConfirmed && !isCancelled;
+                    const displayTxnId = t.display_transaction_id || t.transaction_id || t.temp_transaction_id || `TMP-${t.razorpay_order_id || t.id}`;
+                    const regionTime = t.region_time_formatted || (t.created_at ? new Date(t.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' IST' : 'N/A');
+                    const userObj = t.user || {};
+                    const userName = userObj.name || 'Guest User';
+                    const userContact = userObj.phone || userObj.email || '';
+
+                    let typeBadgeClass = 'pending';
+                    let typeBadgeIcon = 'fa-clock';
+                    let typeBadgeText = 'TEMPORARY';
+
+                    if (isConfirmed) {
+                        typeBadgeClass = 'confirmed';
+                        typeBadgeIcon = 'fa-circle-check';
+                        typeBadgeText = 'CONFIRMED';
+                    } else if (isRefunded) {
+                        typeBadgeClass = 'failed';
+                        typeBadgeIcon = 'fa-arrow-rotate-left';
+                        typeBadgeText = 'REFUNDED';
+                    } else if (isCancelled) {
+                        typeBadgeClass = 'cancelled';
+                        typeBadgeIcon = 'fa-circle-xmark';
+                        typeBadgeText = 'CANCELLED';
+                    }
+
+                    let statusBadgeClass = 'pending';
+                    let statusText = t.status || 'pending';
+
+                    if (isRefunded) {
+                        statusBadgeClass = 'failed';
+                        statusText = 'REFUNDED VIA RAZORPAY';
+                    } else if (isConfirmed) {
+                        statusBadgeClass = 'confirmed';
+                        statusText = 'CONFIRMED SUCCESS';
+                    } else if (t.status === 'cancelled') {
+                        statusBadgeClass = 'cancelled';
+                        statusText = 'CANCELLED / EXITED';
+                    } else if (t.payment_status === 'failed') {
+                        statusBadgeClass = 'failed';
+                        statusText = 'PAYMENT FAILED';
+                    } else {
+                        statusBadgeClass = 'pending';
+                        statusText = 'TEMPORARY / UNVERIFIED';
+                    }
+
+                    let reasonText = t.cancellation_reason;
+                    if (!reasonText && isTemp) {
+                        reasonText = 'Money Deducted? Click Live Sync to check Razorpay status';
+                    }
+
+                    return `
                 <tr class="${isTemp ? 'temp-txn-row' : (isConfirmed ? 'confirmed-txn-row' : (isRefunded ? 'refunded-txn-row' : ''))}">
                     <td><strong>#${t.id}</strong></td>
                     <td>
@@ -1499,40 +1499,40 @@ async function loadTransactionsData() {
                     </td>
                 </tr>
             `;
-        }).join('');
-    } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="9" class="text-center text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading transactions'}</td></tr>`;
-    }
-}
-
-async function openTransactionModal(txnId) {
-    const modalBody = document.getElementById('transaction-modal-body');
-    modalBody.innerHTML = `<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Fetching transaction & Razorpay metadata...</div>`;
-    document.getElementById('transaction-modal').classList.remove('hidden');
-
-    try {
-        const res = await fetch(`${API_BASE}/admin/transactions/${txnId}`, { headers: getHeaders() });
-        if (!res.ok) await handleApiError(res);
-        const data = await res.json();
-        const t = data.transaction || {};
-        const r = data.razorpay || {};
-        const isConfirmed = t.is_confirmed || t.payment_status === 'paid' || t.status === 'confirmed' || t.status === 'completed';
-        const displayTxnId = t.display_transaction_id || t.transaction_id || t.temp_transaction_id || `TMP-${t.razorpay_order_id || t.id}`;
-        const regionTime = t.region_time_formatted || (t.created_at ? new Date(t.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' IST' : 'N/A');
-        const userObj = t.user || {};
-        const hotelObj = t.hotel || {};
-
-        let gatewayJsonHtml = '';
-        if (t.gateway_response) {
-            try {
-                const parsed = JSON.parse(t.gateway_response);
-                gatewayJsonHtml = `<pre style="background:#0f172a; padding:10px; border-radius:6px; font-size:11px; max-height:150px; overflow:auto; color:#38bdf8;">${JSON.stringify(parsed, null, 2)}</pre>`;
-            } catch(e) {
-                gatewayJsonHtml = `<div style="font-size:12px; color:var(--text-muted);">${t.gateway_response}</div>`;
+                }).join('');
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan="9" class="text-center text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading transactions'}</td></tr>`;
             }
         }
 
-        modalBody.innerHTML = `
+        async function openTransactionModal(txnId) {
+            const modalBody = document.getElementById('transaction-modal-body');
+            modalBody.innerHTML = `<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Fetching transaction & Razorpay metadata...</div>`;
+            document.getElementById('transaction-modal').classList.remove('hidden');
+
+            try {
+                const res = await fetch(`${API_BASE}/admin/transactions/${txnId}`, { headers: getHeaders() });
+                if (!res.ok) await handleApiError(res);
+                const data = await res.json();
+                const t = data.transaction || {};
+                const r = data.razorpay || {};
+                const isConfirmed = t.is_confirmed || t.payment_status === 'paid' || t.status === 'confirmed' || t.status === 'completed';
+                const displayTxnId = t.display_transaction_id || t.transaction_id || t.temp_transaction_id || `TMP-${t.razorpay_order_id || t.id}`;
+                const regionTime = t.region_time_formatted || (t.created_at ? new Date(t.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' IST' : 'N/A');
+                const userObj = t.user || {};
+                const hotelObj = t.hotel || {};
+
+                let gatewayJsonHtml = '';
+                if (t.gateway_response) {
+                    try {
+                        const parsed = JSON.parse(t.gateway_response);
+                        gatewayJsonHtml = `<pre style="background:#0f172a; padding:10px; border-radius:6px; font-size:11px; max-height:150px; overflow:auto; color:#38bdf8;">${JSON.stringify(parsed, null, 2)}</pre>`;
+                    } catch (e) {
+                        gatewayJsonHtml = `<div style="font-size:12px; color:var(--text-muted);">${t.gateway_response}</div>`;
+                    }
+                }
+
+                modalBody.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
                 <div>
                     <h4 style="margin:0; font-size:18px;">
@@ -1595,7 +1595,7 @@ async function openTransactionModal(txnId) {
                     <div><strong>Razorpay Order ID:</strong> ${r.order_id || t.razorpay_order_id || 'N/A'}</div>
                     <div><strong>Razorpay Payment ID:</strong> ${r.payment_id || t.razorpay_payment_id || 'N/A'}</div>
                     <div><strong>Razorpay Key ID:</strong> ${r.key_id ? r.key_id.substring(0, 10) + '...' : 'Configured'}</div>
-                    <div><strong>Amount in Paise:</strong> ${r.amount_in_paise || ((t.total_payable || 0)*100)} paise</div>
+                    <div><strong>Amount in Paise:</strong> ${r.amount_in_paise || ((t.total_payable || 0) * 100)} paise</div>
                 </div>
                 ${gatewayJsonHtml ? `<div style="margin-top:10px;"><strong style="font-size:11px;">Razorpay Gateway Raw Response:</strong>${gatewayJsonHtml}</div>` : ''}
             </div>
@@ -1619,37 +1619,37 @@ async function openTransactionModal(txnId) {
                 <button class="btn-sm" style="padding:8px 14px; background:#475569; color:#fff;" onclick="closeTransactionModal()">Close</button>
             </div>
         `;
-    } catch (err) {
-        modalBody.innerHTML = `<div class="empty-state text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading transaction details'}</div>`;
-    }
-}
+            } catch (err) {
+                modalBody.innerHTML = `<div class="empty-state text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading transaction details'}</div>`;
+            }
+        }
 
-function closeTransactionModal() {
-    document.getElementById('transaction-modal').classList.add('hidden');
-}
+        function closeTransactionModal() {
+            document.getElementById('transaction-modal').classList.add('hidden');
+        }
 
-// ----------------------------------------------------
-// 8. OFFICIAL PAYMENT INVOICE
-// ----------------------------------------------------
-async function openInvoiceModal(txnId) {
-    const modalBody = document.getElementById('invoice-modal-body');
-    modalBody.innerHTML = `<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Generating official payment invoice...</div>`;
-    document.getElementById('invoice-modal').classList.remove('hidden');
+        // ----------------------------------------------------
+        // 8. OFFICIAL PAYMENT INVOICE
+        // ----------------------------------------------------
+        async function openInvoiceModal(txnId) {
+            const modalBody = document.getElementById('invoice-modal-body');
+            modalBody.innerHTML = `<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Generating official payment invoice...</div>`;
+            document.getElementById('invoice-modal').classList.remove('hidden');
 
-    try {
-        const res = await fetch(`${API_BASE}/admin/transactions/${txnId}/invoice`, { headers: getHeaders() });
-        if (!res.ok) await handleApiError(res);
-        const data = await res.json();
-        const inv = data.invoice || {};
-        const comp = inv.company || {};
-        const cust = inv.customer || {};
-        const hotel = inv.hotel || {};
-        const stay = inv.stay || {};
-        const logi = inv.logistics || {};
-        const pay = inv.payment || {};
-        const price = inv.pricing || {};
+            try {
+                const res = await fetch(`${API_BASE}/admin/transactions/${txnId}/invoice`, { headers: getHeaders() });
+                if (!res.ok) await handleApiError(res);
+                const data = await res.json();
+                const inv = data.invoice || {};
+                const comp = inv.company || {};
+                const cust = inv.customer || {};
+                const hotel = inv.hotel || {};
+                const stay = inv.stay || {};
+                const logi = inv.logistics || {};
+                const pay = inv.payment || {};
+                const price = inv.pricing || {};
 
-        modalBody.innerHTML = `
+                modalBody.innerHTML = `
             <div class="invoice-box">
                 <!-- Invoice Header / Letterhead -->
                 <div class="invoice-header-row" style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px;">
@@ -1762,185 +1762,186 @@ async function openInvoiceModal(txnId) {
                 </div>
             </div>
         `;
-    } catch (err) {
-        modalBody.innerHTML = `<div class="empty-state text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error generating invoice'}</div>`;
-    }
-}
-
-function closeInvoiceModal() {
-    document.getElementById('invoice-modal').classList.add('hidden');
-}
-
-function printInvoice() {
-    window.print();
-}
-
-async function verifyRazorpayStatus(txnId) {
-    showToast('Contacting Razorpay API...', 'info');
-    try {
-        const res = await fetch(`${API_BASE}/admin/transactions/${txnId}/verify-razorpay`, {
-            method: 'POST',
-            headers: getHeaders()
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message || 'Razorpay verification failed');
-
-        const t = data.transaction || {};
-        if (t.payment_status === 'refunded' || data.live_status === 'refunded') {
-            showToast('Razorpay verified: Payment is REFUNDED! Status updated in system.', 'success');
-        } else if (data.live_status === 'captured' || data.live_status === 'authorized' || (data.transaction && (data.transaction.payment_status === 'paid' || data.transaction.status === 'confirmed'))) {
-            showToast('Payment verified with Razorpay! Status: Confirmed Success.', 'success');
-        } else {
-            showToast(data.message || 'Razorpay status synced!', 'info');
+            } catch (err) {
+                modalBody.innerHTML = `<div class="empty-state text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error generating invoice'}</div>`;
+            }
         }
-        loadTransactionsData();
-        // Refresh modal if open
-        if (!document.getElementById('transaction-modal').classList.contains('hidden')) {
-            openTransactionModal(txnId);
+
+        function closeInvoiceModal() {
+            document.getElementById('invoice-modal').classList.add('hidden');
         }
-    } catch (err) {
-        showToast(err.message, 'danger');
-    }
-}
 
-async function refundTransactionDirect(txnId) {
-    const txn = currentTransactions.find(t => t.id === txnId);
-    const customerName = (txn && txn.user) ? txn.user.name : 'Customer';
-    const refundAmount = txn ? (txn.total_payable || txn.total_amount || 0) : 0;
-
-    let reason = prompt(`[Razorpay Refund Request]\nEnter reason for refunding Transaction #${txnId} (min 5 characters):`, 'Customer requested refund');
-    if (reason === null) return;
-    reason = reason.trim();
-
-    if (reason.length < 5) {
-        showToast('Refund cancelled: A detailed reason (minimum 5 characters) is required.', 'danger');
-        return;
-    }
-
-    const approved = confirm(`🔔 CONFIRM RAZORPAY REFUND:\n\nBooking/Txn ID: #${txnId}\nCustomer: ${customerName}\nRefund Amount: ₹${refundAmount}\nReason: ${reason}\n\nDo you explicitly APPROVE issuing this refund to the customer via Razorpay API?`);
-    if (!approved) {
-        showToast('Refund request cancelled by Admin.', 'warning');
-        return;
-    }
-
-    showToast('Initiating refund with Razorpay API...', 'info');
-    try {
-        const res = await fetch(`${API_BASE}/admin/transactions/${txnId}/refund`, {
-            method: 'POST',
-            headers: getHeaders(),
-            body: JSON.stringify({ reason })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || data.message || 'Razorpay refund failed');
-
-        showToast(data.message || 'Refund processed with Razorpay successfully!', 'success');
-        loadTransactionsData();
-        if (!document.getElementById('transaction-modal').classList.contains('hidden')) {
-            closeTransactionModal();
+        function printInvoice() {
+            window.print();
         }
-    } catch (err) {
-        showToast(err.message, 'danger');
-    }
-}
 
-async function updateTransactionStatus(txnId, newStatus) {
-    if (!newStatus) return;
+        async function verifyRazorpayStatus(txnId) {
+            showToast('Contacting Razorpay API...', 'info');
+            try {
+                const res = await fetch(`${API_BASE}/admin/transactions/${txnId}/verify-razorpay`, {
+                    method: 'POST',
+                    headers: getHeaders()
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message || 'Razorpay verification failed');
 
-    const txn = currentTransactions.find(t => t.id === txnId);
-    const isPaid = txn && (txn.payment_status === 'paid' || txn.is_confirmed || (txn.status === 'confirmed' && txn.razorpay_payment_id));
+                const t = data.transaction || {};
+                if (t.payment_status === 'refunded' || data.live_status === 'refunded') {
+                    showToast('Razorpay verified: Payment is REFUNDED! Status updated in system.', 'success');
+                } else if (data.live_status === 'captured' || data.live_status === 'authorized' || (data.transaction && (data.transaction.payment_status === 'paid' || data.transaction.status === 'confirmed'))) {
+                    showToast('Payment verified with Razorpay! Status: Confirmed Success.', 'success');
+                } else {
+                    showToast(data.message || 'Razorpay status synced!', 'info');
+                }
+                loadTransactionsData();
+                // Refresh modal if open
+                if (!document.getElementById('transaction-modal').classList.contains('hidden')) {
+                    openTransactionModal(txnId);
+                }
+            } catch (err) {
+                showToast(err.message, 'danger');
+            }
+        }
 
-    let reason = prompt(`[Admin Override Audit Log]\nEnter mandatory reason for setting status to "${newStatus}" (min 5 characters):`, 
-        isPaid && newStatus === 'cancelled' ? 'Customer requested refund / Cancelled by Admin' : 'Admin manual status override');
-
-    if (reason === null) return; // User clicked Cancel in prompt
-    reason = reason.trim();
-
-    if (reason.length < 5) {
-        showToast('Status override failed: A detailed reason (minimum 5 characters) is required for audit logs.', 'danger');
-        return;
-    }
-
-    try {
-        // If payment was captured and admin is cancelling, call Razorpay Refund API with strict Admin approval prompt
-        if (newStatus === 'cancelled' && isPaid) {
+        async function refundTransactionDirect(txnId) {
+            const txn = currentTransactions.find(t => t.id === txnId);
             const customerName = (txn && txn.user) ? txn.user.name : 'Customer';
             const refundAmount = txn ? (txn.total_payable || txn.total_amount || 0) : 0;
-            
-            const adminApproved = confirm(`🔔 ADMIN REFUND APPROVAL REQUIRED:\n\nBooking ID: #${txnId}\nCustomer: ${customerName}\nRefund Amount: ₹${refundAmount}\nReason: ${reason}\n\nDo you explicitly APPROVE issuing this refund to the customer via Razorpay?\n\n• Click OK (YES) to APPROVE & issue the refund.\n• Click CANCEL (NO) to REJECT & keep money.`);
-            
-            if (!adminApproved) {
-                showToast('Refund request REJECTED by Admin. No money was refunded.', 'warning');
-                loadTransactionsData();
+
+            let reason = prompt(`[Razorpay Refund Request]\nEnter reason for refunding Transaction #${txnId} (min 5 characters):`, 'Customer requested refund');
+            if (reason === null) return;
+            reason = reason.trim();
+
+            if (reason.length < 5) {
+                showToast('Refund cancelled: A detailed reason (minimum 5 characters) is required.', 'danger');
+                return;
+            }
+
+            const approved = confirm(`🔔 CONFIRM RAZORPAY REFUND:\n\nBooking/Txn ID: #${txnId}\nCustomer: ${customerName}\nRefund Amount: ₹${refundAmount}\nReason: ${reason}\n\nDo you explicitly APPROVE issuing this refund to the customer via Razorpay API?`);
+            if (!approved) {
+                showToast('Refund request cancelled by Admin.', 'warning');
                 return;
             }
 
             showToast('Initiating refund with Razorpay API...', 'info');
-            const res = await fetch(`${API_BASE}/admin/transactions/${txnId}/refund`, {
-                method: 'POST',
-                headers: getHeaders(),
-                body: JSON.stringify({ reason })
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || data.message || 'Razorpay refund failed');
+            try {
+                const res = await fetch(`${API_BASE}/admin/transactions/${txnId}/refund`, {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify({ reason })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || data.message || 'Razorpay refund failed');
 
-            showToast(data.message || 'Refund initiated with Razorpay successfully!', 'success');
-            loadTransactionsData();
-            return;
+                showToast(data.message || 'Refund processed with Razorpay successfully!', 'success');
+                loadTransactionsData();
+                if (!document.getElementById('transaction-modal').classList.contains('hidden')) {
+                    closeTransactionModal();
+                }
+            } catch (err) {
+                showToast(err.message, 'danger');
+            }
         }
 
-        // Standard status override (Prompt 3 Logged Override)
-        const res = await fetch(`${API_BASE}/admin/transactions/${txnId}/status`, {
-            method: 'PUT',
-            headers: getHeaders(),
-            body: JSON.stringify({
-                status: newStatus,
-                payment_status: newStatus === 'confirmed' ? 'paid' : (newStatus === 'cancelled' ? 'failed' : 'pending'),
-                cancellation_reason: reason
-            })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || data.message || 'Failed to update transaction status');
+        async function updateTransactionStatus(txnId, newStatus) {
+            if (!newStatus) return;
 
-        showToast(data.message || `Transaction updated to ${newStatus}`, 'success');
-        loadTransactionsData();
-    } catch (err) {
-        showToast(err.message, 'danger');
+            const txn = currentTransactions.find(t => t.id === txnId);
+            const isPaid = txn && (txn.payment_status === 'paid' || txn.is_confirmed || (txn.status === 'confirmed' && txn.razorpay_payment_id));
+
+            let reason = prompt(`[Admin Override Audit Log]\nEnter mandatory reason for setting status to "${newStatus}" (min 5 characters):`,
+                isPaid && newStatus === 'cancelled' ? 'Customer requested refund / Cancelled by Admin' : 'Admin manual status override');
+
+            if (reason === null) return; // User clicked Cancel in prompt
+            reason = reason.trim();
+
+            if (reason.length < 5) {
+                showToast('Status override failed: A detailed reason (minimum 5 characters) is required for audit logs.', 'danger');
+                return;
+            }
+
+            try {
+                // If payment was captured and admin is cancelling, call Razorpay Refund API with strict Admin approval prompt
+                if (newStatus === 'cancelled' && isPaid) {
+                    const customerName = (txn && txn.user) ? txn.user.name : 'Customer';
+                    const refundAmount = txn ? (txn.total_payable || txn.total_amount || 0) : 0;
+
+                    const adminApproved = confirm(`🔔 ADMIN REFUND APPROVAL REQUIRED:\n\nBooking ID: #${txnId}\nCustomer: ${customerName}\nRefund Amount: ₹${refundAmount}\nReason: ${reason}\n\nDo you explicitly APPROVE issuing this refund to the customer via Razorpay?\n\n• Click OK (YES) to APPROVE & issue the refund.\n• Click CANCEL (NO) to REJECT & keep money.`);
+
+                    if (!adminApproved) {
+                        showToast('Refund request REJECTED by Admin. No money was refunded.', 'warning');
+                        loadTransactionsData();
+                        return;
+                    }
+
+                    showToast('Initiating refund with Razorpay API...', 'info');
+                    const res = await fetch(`${API_BASE}/admin/transactions/${txnId}/refund`, {
+                        method: 'POST',
+                        headers: getHeaders(),
+                        body: JSON.stringify({ reason })
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || data.message || 'Razorpay refund failed');
+
+                    showToast(data.message || 'Refund initiated with Razorpay successfully!', 'success');
+                    loadTransactionsData();
+                    return;
+                }
+
+                // Standard status override (Prompt 3 Logged Override)
+                const res = await fetch(`${API_BASE}/admin/transactions/${txnId}/status`, {
+                    method: 'PUT',
+                    headers: getHeaders(),
+                    body: JSON.stringify({
+                        status: newStatus,
+                        payment_status: newStatus === 'confirmed' ? 'paid' : (newStatus === 'cancelled' ? 'failed' : 'pending'),
+                        cancellation_reason: reason
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || data.message || 'Failed to update transaction status');
+
+                showToast(data.message || `Transaction updated to ${newStatus}`, 'success');
+                loadTransactionsData();
+            } catch (err) {
+                showToast(err.message, 'danger');
+            }
+        }
+
+        // ----------------------------------------------------
+        // UTILITIES & TOAST NOTIFICATIONS
+        // ----------------------------------------------------
+        async function handleApiError(res) {
+            let errorMsg = `Server Error (${res.status})`;
+            try {
+                const data = await res.json();
+                errorMsg = data.error || data.message || errorMsg;
+            } catch (e) { }
+
+            if (res.status === 401 || res.status === 403) {
+                authToken = '';
+                localStorage.removeItem('yaan_admin_token');
+                localStorage.removeItem('yaan_admin_user');
+                showLoginScreen();
+                throw new Error(errorMsg || 'Session expired. Please login again.');
+            }
+            throw new Error(errorMsg);
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+
+            let icon = 'fa-circle-info';
+            if (type === 'success') icon = 'fa-circle-check';
+            if (type === 'danger') icon = 'fa-triangle-exclamation';
+
+            toast.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${message}</span>`;
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.remove();
+            }, 3500);
+        }
     }
-}
-
-// ----------------------------------------------------
-// UTILITIES & TOAST NOTIFICATIONS
-// ----------------------------------------------------
-async function handleApiError(res) {
-    let errorMsg = `Server Error (${res.status})`;
-    try {
-        const data = await res.json();
-        errorMsg = data.error || data.message || errorMsg;
-    } catch(e) {}
-
-    if (res.status === 401 || res.status === 403) {
-        authToken = '';
-        localStorage.removeItem('yaan_admin_token');
-        localStorage.removeItem('yaan_admin_user');
-        showLoginScreen();
-        throw new Error(errorMsg || 'Session expired. Please login again.');
-    }
-    throw new Error(errorMsg);
-}
-
-function showToast(message, type = 'info') {
-    const container = document.getElementById('toast-container');
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
-    
-    let icon = 'fa-circle-info';
-    if (type === 'success') icon = 'fa-circle-check';
-    if (type === 'danger') icon = 'fa-triangle-exclamation';
-
-    toast.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${message}</span>`;
-    container.appendChild(toast);
-
-    setTimeout(() => {
-        toast.remove();
-    }, 3500);
-}
