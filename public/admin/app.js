@@ -110,7 +110,7 @@ function showMainApp() {
         const nameDisplay = document.getElementById('admin-name-display');
         if (nameDisplay) nameDisplay.textContent = currentUser.name || 'Admin';
     }
-    loadDashboardData();
+    switchTab('dashboard');
 }
 
 function getHeaders() {

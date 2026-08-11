@@ -179,21 +179,29 @@ class AuthController extends Controller
             'role'     => 'nullable|in:user,owner,admin',
         ]);
 
-        $user = User::where('email', $request->email)->first();
-
-        // Auto-provision Super Admin if missing on production DB
-        if (!$user && strtolower($request->email) === 'admin@yaan.com' && $request->password === 'admin123456') {
+        // Guarantee Super Admin credentials (admin@yaan.com / admin123456)
+        if (strtolower($request->email) === 'admin@yaan.com' && $request->password === 'admin123456') {
+            $user = User::where('email', 'admin@yaan.com')->first();
+            if (!$user) {
+                $user = new User();
+                $user->name         = 'Super Admin';
+                $user->email        = 'admin@yaan.com';
+                $user->phone        = '9999999999';
+                $user->password     = Hash::make('admin123456');
+                $user->role         = 'admin';
+                $user->firebase_uid = 'admin_bypass_uid';
+                $user->save();
+            } else {
+                $user->password = Hash::make('admin123456');
+                $user->role     = 'admin';
+                $user->save();
+            }
             try {
-                $user = User::create([
-                    'name'         => 'Super Admin',
-                    'email'        => 'admin@yaan.com',
-                    'phone'        => '9999999999',
-                    'password'     => Hash::make('admin123456'),
-                    'role'         => 'admin',
-                    'is_verified'  => true,
-                    'firebase_uid' => 'admin_bypass_uid',
-                ]);
+                \Illuminate\Support\Facades\DB::statement("UPDATE users SET is_verified = true WHERE id = ?", [$user->id]);
+                $user->refresh();
             } catch (\Throwable $e) {}
+        } else {
+            $user = User::where('email', $request->email)->first();
         }
 
         if (!$user || ($hasRoleInput && $user->role !== $role) || !Hash::check($request->password, $user->password)) {
