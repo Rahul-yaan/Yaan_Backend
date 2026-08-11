@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\OwnerProfile;
+use App\Models\Hotel;
 use Illuminate\Http\Request;
 
 class OwnerController extends Controller
