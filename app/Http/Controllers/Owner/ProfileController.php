@@ -16,6 +16,7 @@ class ProfileController extends Controller
     {
         $user = $request->user();
         $profile = OwnerProfile::where('user_id', $user->id)->first();
+        $hotel = \App\Models\Hotel::where('owner_id', $user->id)->first();
 
         $isVerified = (bool) $user->is_verified;
         $isComplete = $profile ? (bool) $profile->is_profile_complete : false;
@@ -23,19 +24,21 @@ class ProfileController extends Controller
         $kycStatus = 'action_required';
         $kycMessage = 'Admin has requested fresh KYC submission. Please fill in your hotel details and upload document images.';
 
-        if ($isVerified) {
+        if ($isVerified && ($hotel && in_array($hotel->status, ['approved', 'active']))) {
             $kycStatus = 'verified';
-            $kycMessage = 'Your Owner KYC is fully verified and active.';
-        } elseif ($isComplete) {
+            $kycMessage = 'Your Owner KYC and hotel profile are fully verified and active.';
+        } elseif ($isComplete || ($hotel && $hotel->status === 'pending') || !$isVerified) {
             $kycStatus = 'pending_approval';
-            $kycMessage = 'Your KYC documents have been submitted successfully and are currently pending Admin verification.';
+            $kycMessage = 'Your profile/KYC update has been submitted successfully and is currently pending Admin verification.';
         }
 
         return response()->json([
-            'profile'    => $profile,
-            'user'       => $user,
-            'kyc_status' => $kycStatus,
-            'kyc_message' => $kycMessage,
+            'profile'      => $profile,
+            'user'         => $user,
+            'hotel'        => $hotel,
+            'kyc_status'   => $kycStatus,
+            'kyc_message'  => $kycMessage,
+            'hotel_status' => $hotel ? $hotel->status : 'pending',
         ]);
     }
 

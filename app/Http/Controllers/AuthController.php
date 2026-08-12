@@ -221,25 +221,26 @@ class AuthController extends Controller
                     $user->refresh();
                 } catch (\Throwable $e) {}
             }
-        } else if (!$user->is_verified) {
+        } elseif ($user->role !== 'owner' && !$user->is_verified) {
             return response()->json([
-                'error'   => 'Your account has been disabled. Please contact the admin.',
-                'message' => 'Your account has been disabled. Please contact the admin.',
+                'error'   => 'Your account is pending verification. Please contact the admin.',
+                'message' => 'Your account is pending verification. Please contact the admin.',
             ], 403);
         }
 
-        // FIX: Only delete tokens for THIS device type, not all sessions.
-        // If you want single-device login (one token only), keep tokens()->delete().
-        // If you want multi-device login (each device keeps its session), remove it.
-        // Current choice: single active token per user — uncomment below for multi-device.
         $user->tokens()->delete();
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
+        $targetHotel = \App\Models\Hotel::where('owner_id', $user->id)->first();
+        $kycStatus = $user->is_verified ? 'verified' : 'pending_approval';
+
         return response()->json([
-            'message' => 'Login successful.',
-            'token'   => $token,
-            'user'    => $user,
+            'message'      => $user->is_verified ? 'Login successful.' : 'Login successful. Your profile update is currently pending Admin approval.',
+            'token'        => $token,
+            'user'         => $user,
+            'kyc_status'   => $kycStatus,
+            'hotel_status' => $targetHotel ? $targetHotel->status : 'pending',
         ]);
     }
 
@@ -251,16 +252,21 @@ class AuthController extends Controller
     public function me(Request $request)
     {
         $user = $request->user();
-        if ($user && $user->role !== 'admin' && !$user->is_verified) {
-            $user->tokens()->delete();
+        if ($user && $user->role !== 'admin' && $user->role !== 'owner' && !$user->is_verified) {
             return response()->json([
-                'error'   => 'Your account has been disabled. Please contact the admin.',
-                'message' => 'Your account has been disabled. Please contact the admin.',
+                'error'   => 'Your account is pending verification. Please contact the admin.',
+                'message' => 'Your account is pending verification. Please contact the admin.',
             ], 403);
         }
 
+        $targetHotel = \App\Models\Hotel::where('owner_id', $user->id)->first();
+        $kycStatus = $user->is_verified ? 'verified' : 'pending_approval';
+
         return response()->json([
-            'user' => $user,
+            'user'         => $user,
+            'kyc_status'   => $kycStatus,
+            'hotel_status' => $targetHotel ? $targetHotel->status : 'pending',
+            'message'      => $user->is_verified ? 'Account verified.' : 'Your profile update is currently pending Admin approval.',
         ]);
     }
 
