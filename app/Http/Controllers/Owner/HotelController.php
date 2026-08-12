@@ -341,7 +341,7 @@ class HotelController extends Controller
 
             if ($isPrimary) {
                 HotelImage::where('hotel_id', $hotel->id)->update([
-                    'is_primary' => \Illuminate\Support\Facades\DB::raw('false')
+                    'is_primary' => false
                 ]);
             }
 
@@ -356,6 +356,8 @@ class HotelController extends Controller
                 $hasPrimary = true;
             }
         }
+
+        $hotel->ensurePrimaryImageExists();
 
         return $uploaded;
     }

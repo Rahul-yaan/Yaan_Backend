@@ -133,6 +133,10 @@ class ProfileController extends Controller
             ]);
         }
 
+        if ($targetHotel) {
+            $targetHotel->ensurePrimaryImageExists();
+        }
+
         return response()->json([
             'message'    => 'KYC & Profile details updated successfully. Status is now Pending Admin Verification.',
             'profile'    => $profile->fresh(),

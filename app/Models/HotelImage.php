@@ -22,7 +22,7 @@ class HotelImage extends Model
     public function setIsPrimaryAttribute($value)
     {
         $isTrue = filter_var($value, FILTER_VALIDATE_BOOLEAN);
-        $this->attributes['is_primary'] = $isTrue ? DB::raw('true') : DB::raw('false');
+        $this->attributes['is_primary'] = (bool) $isTrue;
     }
 
     public function getUrlAttribute()
@@ -31,14 +31,21 @@ class HotelImage extends Model
             return null;
         }
         if (str_starts_with($this->image_path, 'data:') || str_starts_with($this->image_path, 'http://') || str_starts_with($this->image_path, 'https://')) {
-            return preg_replace('/^http:/i', 'https:', $this->image_path);
+            $url = $this->image_path;
+            if (str_starts_with($url, 'http://') && !str_contains($url, 'localhost') && !str_contains($url, '127.0.0.1') && !str_contains($url, '192.168.') && !str_contains($url, '10.0.2.2')) {
+                return preg_replace('/^http:/i', 'https:', $url);
+            }
+            return $url;
         }
         $cleanPath = ltrim($this->image_path, '/');
         if (str_starts_with($cleanPath, 'storage/')) {
             $cleanPath = substr($cleanPath, 8);
         }
         $url = asset('storage/' . ltrim($cleanPath, '/'));
-        return preg_replace('/^http:/i', 'https:', $url);
+        if (str_starts_with($url, 'http://') && !str_contains($url, 'localhost') && !str_contains($url, '127.0.0.1') && !str_contains($url, '192.168.') && !str_contains($url, '10.0.2.2')) {
+            return preg_replace('/^http:/i', 'https:', $url);
+        }
+        return $url;
     }
 
     public function hotel()

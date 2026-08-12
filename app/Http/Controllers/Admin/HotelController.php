@@ -118,9 +118,13 @@ class HotelController extends Controller
         $hotel->status = $request->status;
         $hotel->save();
 
+        if (in_array(strtolower($request->status), ['approved', 'active'])) {
+            $hotel->ensurePrimaryImageExists();
+        }
+
         return response()->json([
             'message' => "Hotel status successfully updated to {$request->status}.",
-            'hotel'   => $hotel,
+            'hotel'   => $hotel->load(['images', 'primaryImage', 'amenities']),
         ]);
     }
 
@@ -137,15 +141,20 @@ class HotelController extends Controller
             return response()->json(['error' => 'No image provided.'], 422);
         }
 
+        $hasPrimary = $hotel->images()->whereRaw('("is_primary" = true OR "is_primary" IS TRUE)')->exists();
+
         $image = \App\Models\HotelImage::create([
             'hotel_id'   => $hotel->id,
             'image_path' => $path,
-            'is_primary' => false,
+            'is_primary' => !$hasPrimary,
         ]);
+
+        $hotel->ensurePrimaryImageExists();
 
         return response()->json([
             'message' => 'Hotel photo uploaded successfully.',
             'image'   => $image,
+            'hotel'   => $hotel->load(['images', 'primaryImage', 'amenities']),
         ]);
     }
 

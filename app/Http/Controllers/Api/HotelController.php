@@ -23,7 +23,7 @@ class HotelController extends Controller
     // GET /api/hotels
     public function index(Request $request)
     {
-        $query = Hotel::with(['primaryImage', 'amenities'])->withAvg('reviews', 'rating');
+        $query = Hotel::with(['images', 'primaryImage', 'amenities', 'owner.ownerProfile'])->withAvg('reviews', 'rating');
 
         $query = $this->applyApprovedScope($query);
 
@@ -31,15 +31,21 @@ class HotelController extends Controller
             $query->where('city', 'LIKE', '%' . $request->city . '%');
         }
 
-        return response()->json($query->get());
+        $hotels = $query->get();
+        foreach ($hotels as $h) {
+            $h->ensurePrimaryImageExists();
+        }
+
+        return response()->json($hotels);
     }
 
     // GET /api/hotels/{id}
     public function show($id)
     {
-        $query = Hotel::with(['reviews', 'amenities']);
+        $query = Hotel::with(['images', 'primaryImage', 'reviews', 'amenities', 'owner.ownerProfile']);
         $query = $this->applyApprovedScope($query);
         $hotel = $query->findOrFail($id);
+        $hotel->ensurePrimaryImageExists();
 
         return response()->json($hotel);
     }
@@ -47,9 +53,9 @@ class HotelController extends Controller
     // GET /api/hotels/search
     public function search(Request $request) 
     {
-        $destinationCity = $request->query('destination');
+        $destinationCity = $request->query('destination') ?? $request->query('city') ?? $request->query('search');
         
-        $query = Hotel::with(['primaryImage', 'amenities'])->withAvg('reviews', 'rating');
+        $query = Hotel::with(['images', 'primaryImage', 'amenities', 'owner.ownerProfile'])->withAvg('reviews', 'rating');
         $query = $this->applyApprovedScope($query);
 
         if ($destinationCity) {
@@ -57,6 +63,9 @@ class HotelController extends Controller
         }
 
         $hotels = $query->get();
+        foreach ($hotels as $h) {
+            $h->ensurePrimaryImageExists();
+        }
         
         return response()->json([
             'success' => true,
