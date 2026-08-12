@@ -223,7 +223,8 @@ class AuthController extends Controller
             }
         } else if (!$user->is_verified) {
             return response()->json([
-                'error' => 'Account not verified. Please complete OTP verification first.',
+                'error'   => 'Your account has been disabled. Please contact the admin.',
+                'message' => 'Your account has been disabled. Please contact the admin.',
             ], 403);
         }
 
@@ -249,8 +250,17 @@ class AuthController extends Controller
     // ============================================================
     public function me(Request $request)
     {
+        $user = $request->user();
+        if ($user && $user->role !== 'admin' && !$user->is_verified) {
+            $user->tokens()->delete();
+            return response()->json([
+                'error'   => 'Your account has been disabled. Please contact the admin.',
+                'message' => 'Your account has been disabled. Please contact the admin.',
+            ], 403);
+        }
+
         return response()->json([
-            'user' => $request->user(),
+            'user' => $user,
         ]);
     }
 

@@ -22,6 +22,14 @@ class RoleMiddleware
             ], 403);
         }
 
+        if ($request->user()->role !== 'admin' && !$request->user()->is_verified) {
+            $request->user()->tokens()->delete();
+            return response()->json([
+                'error'   => 'Your account has been disabled. Please contact the admin.',
+                'message' => 'Your account has been disabled. Please contact the admin.'
+            ], 403);
+        }
+
         return $next($request);
     }
 }
