@@ -120,6 +120,7 @@ function showMainApp() {
         if (nameDisplay) nameDisplay.textContent = currentUser.name || 'Admin';
     }
     switchTab('dashboard');
+    startBadgeAutoRefresh();
 }
 
 function getHeaders() {
@@ -177,6 +178,48 @@ function debounce(func, wait) {
         clearTimeout(timeout);
         timeout = setTimeout(later, wait);
     };
+}
+
+// Auto refresh timer for drawer badges
+let badgeAutoRefreshInterval = null;
+
+function startBadgeAutoRefresh() {
+    fetchBadgeCounts();
+    if (!badgeAutoRefreshInterval) {
+        badgeAutoRefreshInterval = setInterval(fetchBadgeCounts, 10000);
+    }
+}
+
+async function fetchBadgeCounts() {
+    if (!authToken) return;
+    try {
+        const res = await fetch(`${API_BASE}/admin/dashboard`, { headers: getHeaders() });
+        if (!res.ok) return;
+        const data = await res.json();
+        const m = data.metrics || {};
+
+        const bHotels = document.getElementById('badge-pending-hotels');
+        const bOwners = document.getElementById('badge-pending-owners');
+        if (bHotels) {
+            if (m.pending_hotels > 0) {
+                bHotels.textContent = m.pending_hotels;
+                bHotels.classList.remove('hidden');
+            } else {
+                bHotels.classList.add('hidden');
+            }
+        }
+
+        if (bOwners) {
+            if (m.pending_owners > 0) {
+                bOwners.textContent = m.pending_owners;
+                bOwners.classList.remove('hidden');
+            } else {
+                bOwners.classList.add('hidden');
+            }
+        }
+    } catch (e) {
+        console.error('Badge refresh error:', e);
+    }
 }
 
 // ----------------------------------------------------
@@ -530,6 +573,7 @@ async function updateHotelStatus(id, newStatus) {
 
         showToast(data.message || `Hotel status updated to ${newStatus}`, 'success');
         loadHotelsData();
+        fetchBadgeCounts();
     } catch (err) {
         showToast(err.message, 'danger');
         loadHotelsData();
@@ -1093,6 +1137,7 @@ async function deleteAdminHotelPhoto(hotelId, imageId) {
 
                 showToast(data.message || 'Owner verification updated', 'success');
                 loadOwnersData();
+                fetchBadgeCounts();
             } catch (err) {
                 showToast(err.message, 'danger');
             }
