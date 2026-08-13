@@ -27,17 +27,12 @@ class Banner extends Model
 
     protected $appends = [
         'image_url',
+        'promo_code',
     ];
 
-    public function setIsActiveAttribute($value)
+    public function getPromoCodeAttribute()
     {
-        $isTrue = filter_var($value, FILTER_VALIDATE_BOOLEAN);
-        $this->attributes['is_active'] = $isTrue ? \Illuminate\Support\Facades\DB::raw('true') : \Illuminate\Support\Facades\DB::raw('false');
-    }
-
-    public function getIsActiveAttribute($value)
-    {
-        return filter_var($value, FILTER_VALIDATE_BOOLEAN);
+        return $this->discount_code;
     }
 
     public function getImageUrlAttribute()
