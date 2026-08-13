@@ -209,7 +209,7 @@ class DashboardController extends Controller
                   ->orWhereDoesntHave('ownerProfile');
             })->get();
 
-        $activeBannersCount = \App\Models\Banner::where('is_active', true)->count();
+        $activeBannersCount = \App\Models\Banner::whereRaw('("is_active" = true OR "is_active" IS TRUE)')->count();
         $avgPricePerNight   = (float) Hotel::whereIn('status', ['approved', 'active'])->avg('price_per_night');
         $approvedCount      = Hotel::whereIn('status', ['approved', 'active'])->count();
 
