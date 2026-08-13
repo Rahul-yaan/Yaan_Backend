@@ -73,14 +73,19 @@ class DashboardController extends Controller
               ->orWhere('cancellation_reason', 'not like', '%refund%');
         });
 
-        // 1. Gross Customer Revenue (total_payable e.g. ₹118)
+        // 1. Gross Customer Revenue (total_payable e.g. ₹118 per ₹100 base room price)
         $totalRevenue = (float) (clone $confirmedBookingsQuery)->sum(DB::raw('COALESCE(total_payable, total_amount)'));
 
-        // 2. Admin Platform Revenue (GST 18% / Platform fee e.g. ₹18)
-        $adminPlatformRevenue = (float) (clone $confirmedBookingsQuery)->sum(DB::raw('COALESCE(gst_amount, 0)'));
+        $baseRevenueSum = (float) (clone $confirmedBookingsQuery)->sum(DB::raw('COALESCE(total_amount, price_per_night)'));
 
-        // 3. Hotel Owners Total Net Share (Base room price e.g. ₹100)
-        $hotelOwnersRevenue = (float) (clone $confirmedBookingsQuery)->sum(DB::raw('COALESCE(total_amount, price_per_night)'));
+        // 2. Admin Platform Fee Revenue (34% Platform Fee = ₹34 per ₹100 base price)
+        $adminPlatformRevenue = round($baseRevenueSum * 0.34, 2);
+
+        // 3. Hotel Owners Net Payable Share (66% Net Share = ₹66 per ₹100 base price)
+        $hotelOwnersRevenue = round($baseRevenueSum * 0.66, 2);
+
+        // 4. Hotel Owners GST Total (18% GST on ₹66 net share = ₹11.88 per ₹66 net)
+        $hotelOwnersGstTotal = round($hotelOwnersRevenue * 0.18, 2);
 
         // Current Month Revenue
         $startOfMonth = Carbon::now()->startOfMonth();

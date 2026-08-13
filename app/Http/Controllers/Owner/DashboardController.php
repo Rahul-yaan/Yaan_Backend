@@ -36,14 +36,18 @@ class DashboardController extends Controller
             ->whereNotIn('status', ['cancelled'])
             ->whereNotIn('payment_status', ['refunded', 'refund_initiated']);
 
-        // Financial Calculation Logic:
-        // Owner Base Amount (e.g. ₹100 set by owner) -> Owner Net Earnings (total_amount / price_per_night)
-        // Platform Fee (GST 18% = ₹18) -> Collected by platform (gst_amount)
-        // Customer Total Paid -> ₹118 (total_payable)
-        $ownerPayableEarnings = (float) (clone $ownerBookingsQuery)->sum(DB::raw('COALESCE(total_amount, price_per_night)'));
+        // Financial Calculation Model (34% Admin Platform Fee & 66% Owner Net Revenue):
+        // Example: Base Price = ₹100 | GST (18%) = ₹18 | User Pays = ₹118
+        // Admin Platform Fee (34%) = ₹34
+        // Owner Net Revenue (66%) = ₹66
+        // Owner GST (18% on ₹66) = ₹11.88
+        $baseRevenueSum       = (float) (clone $ownerBookingsQuery)->sum(DB::raw('COALESCE(total_amount, price_per_night)'));
         $totalCustomerPaid    = (float) (clone $ownerBookingsQuery)->sum(DB::raw('COALESCE(total_payable, total_amount)'));
-        $platformFeeCollected = (float) (clone $ownerBookingsQuery)->sum(DB::raw('COALESCE(gst_amount, 0)'));
         $totalDiscountApplied = (float) (clone $ownerBookingsQuery)->sum(DB::raw('COALESCE(promotion_applied, 0)'));
+
+        $platformFeeCollected = round($baseRevenueSum * 0.34, 2);       // ₹34 per ₹100 base
+        $ownerPayableEarnings = round($baseRevenueSum * 0.66, 2);       // ₹66 per ₹100 base
+        $ownerGstAmount       = round($ownerPayableEarnings * 0.18, 2);  // ₹11.88 GST on ₹66 net
 
         $pendingBookings = Booking::whereIn('hotel_id', $hotelIds)
             ->where('status', 'pending')
@@ -64,19 +68,21 @@ class DashboardController extends Controller
                 'total_hotels'           => $totalHotels,
                 'total_bookings'         => $totalBookings,
                 'today_bookings'         => $todayBookings,
-                'total_earnings'         => $ownerPayableEarnings, // Base Owner Revenue (e.g. ₹100 or ₹95 net)
-                'owner_payable_revenue'  => $ownerPayableEarnings, // Base Owner Revenue
-                'total_customer_paid'    => $totalCustomerPaid,    // Total Customer Paid (e.g. ₹118)
-                'platform_fee_collected' => $platformFeeCollected, // Platform Fee / GST (e.g. ₹18)
-                'total_discount_applied' => $totalDiscountApplied, // Discount (e.g. 5% discount)
+                'total_earnings'         => $ownerPayableEarnings, // ₹66 Owner Net Share per ₹100 base price
+                'owner_payable_revenue'  => $ownerPayableEarnings, // ₹66 Owner Net Share per ₹100 base price
+                'owner_gst_amount'       => $ownerGstAmount,       // ₹11.88 (18% GST on ₹66)
+                'platform_fee_collected' => $platformFeeCollected, // ₹34 Platform Fee (34%)
+                'total_customer_paid'    => $totalCustomerPaid,    // ₹118 Total Paid by User
+                'total_discount_applied' => $totalDiscountApplied,
                 'pending_bookings'       => $pendingBookings,
                 'confirmed_bookings'     => $confirmedBookings,
             ],
             'financial_breakdown' => [
-                'owner_base_price'       => $ownerPayableEarnings,
-                'total_discount_applied' => $totalDiscountApplied,
-                'gst_platform_fee'       => $platformFeeCollected,
-                'total_paid_by_customer' => $totalCustomerPaid,
+                'base_room_price_total'  => $baseRevenueSum,
+                'owner_net_share_66'     => $ownerPayableEarnings, // ₹66
+                'owner_gst_18_percent'   => $ownerGstAmount,       // ₹11.88
+                'admin_platform_fee_34'  => $platformFeeCollected, // ₹34
+                'total_paid_by_customer' => $totalCustomerPaid,    // ₹118
             ],
             'recent_bookings' => $recentBookings,
         ]);

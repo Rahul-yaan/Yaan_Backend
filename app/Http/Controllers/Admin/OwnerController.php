@@ -84,17 +84,17 @@ class OwnerController extends Controller
             return ($b->payment_status === 'paid' || in_array($b->status, ['confirmed', 'completed'])) && $b->payment_status !== 'refunded';
         });
 
+        $baseRevenueSum = (float) $confirmedBookings->sum(function($b) {
+            return (float) ($b->total_amount ?? $b->price_per_night ?? 0);
+        });
+
         $totalCustomerPaid = (float) $confirmedBookings->sum(function($b) {
             return (float) ($b->total_payable ?? $b->total_amount ?? 0);
         });
 
-        $ownerPayableRevenue = (float) $confirmedBookings->sum(function($b) {
-            return (float) ($b->total_amount ?? $b->price_per_night ?? 0);
-        });
-
-        $platformFeeCollected = (float) $confirmedBookings->sum(function($b) {
-            return (float) ($b->gst_amount ?? 0);
-        });
+        $ownerPayableRevenue  = round($baseRevenueSum * 0.66, 2);      // ₹66 per ₹100 base
+        $ownerGstAmount       = round($ownerPayableRevenue * 0.18, 2); // ₹11.88 GST on ₹66
+        $platformFeeCollected = round($baseRevenueSum * 0.34, 2);      // ₹34 Platform Fee (34%)
 
         $totalCancelled = $bookings->filter(function($b) {
             return $b->status === 'cancelled' || in_array($b->payment_status, ['refunded', 'refund_initiated']);
@@ -104,9 +104,10 @@ class OwnerController extends Controller
             'owner'       => $owner,
             'hotels'      => $hotels->isNotEmpty() ? $hotels : $owner->hotels,
             'analytics'   => [
-                'total_revenue'          => $totalCustomerPaid,
-                'owner_payable_revenue'  => $ownerPayableRevenue,
-                'platform_fee_collected' => $platformFeeCollected,
+                'total_revenue'          => $totalCustomerPaid,    // ₹118
+                'owner_payable_revenue'  => $ownerPayableRevenue,  // ₹66
+                'owner_gst_amount'       => $ownerGstAmount,       // ₹11.88
+                'platform_fee_collected' => $platformFeeCollected, // ₹34
                 'total_bookings'         => $totalBookings,
                 'confirmed_bookings'     => $confirmedBookings->count(),
                 'cancelled_bookings'     => $totalCancelled,
