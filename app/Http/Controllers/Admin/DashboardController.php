@@ -61,8 +61,8 @@ class DashboardController extends Controller
             ->whereIn('payment_status', ['pending', 'failed'])
             ->count();
 
-        // Total Revenue: Sum of payable amounts for confirmed/completed non-refunded bookings
-        $totalRevenue = Booking::where(function($q) {
+        // Confirmed & Non-Refunded Bookings Query for Revenue Breakdown
+        $confirmedBookingsQuery = Booking::where(function($q) {
             $q->where('payment_status', 'paid')
               ->orWhereIn('status', ['confirmed', 'completed']);
         })
@@ -71,8 +71,16 @@ class DashboardController extends Controller
         ->where(function($q) {
             $q->whereNull('cancellation_reason')
               ->orWhere('cancellation_reason', 'not like', '%refund%');
-        })
-        ->sum(DB::raw('COALESCE(total_payable, total_amount)'));
+        });
+
+        // 1. Gross Customer Revenue (total_payable e.g. ₹118)
+        $totalRevenue = (float) (clone $confirmedBookingsQuery)->sum(DB::raw('COALESCE(total_payable, total_amount)'));
+
+        // 2. Admin Platform Revenue (GST 18% / Platform fee e.g. ₹18)
+        $adminPlatformRevenue = (float) (clone $confirmedBookingsQuery)->sum(DB::raw('COALESCE(gst_amount, 0)'));
+
+        // 3. Hotel Owners Total Net Share (Base room price e.g. ₹100)
+        $hotelOwnersRevenue = (float) (clone $confirmedBookingsQuery)->sum(DB::raw('COALESCE(total_amount, price_per_night)'));
 
         // Current Month Revenue
         $startOfMonth = Carbon::now()->startOfMonth();
@@ -159,22 +167,24 @@ class DashboardController extends Controller
 
         return response()->json([
             'metrics' => [
-                'users_count'        => $totalUsers,
-                'owners_count'       => $totalOwners,
-                'verified_owners'    => $verifiedOwners,
-                'pending_owners'     => $pendingOwners,
-                'total_hotels'       => $totalHotels,
-                'approved_hotels'    => $approvedHotels,
-                'pending_hotels'     => $pendingHotels,
-                'rejected_hotels'    => $rejectedHotels,
-                'total_bookings'     => $confirmedBookingsCount,
-                'all_bookings'       => $allBookingsCount,
-                'confirmed_bookings' => $confirmedBookingsCount,
-                'active_bookings'    => $confirmedBookingsCount,
-                'pending_bookings'   => $pendingBookingsCount,
-                'cancelled_bookings' => $cancelledBookingsCount,
-                'total_revenue'      => (float) $totalRevenue,
-                'conversion_rate'    => $conversionRate,
+                'users_count'            => $totalUsers,
+                'owners_count'           => $totalOwners,
+                'verified_owners'        => $verifiedOwners,
+                'pending_owners'         => $pendingOwners,
+                'total_hotels'           => $totalHotels,
+                'approved_hotels'        => $approvedHotels,
+                'pending_hotels'         => $pendingHotels,
+                'rejected_hotels'        => $rejectedHotels,
+                'total_bookings'         => $confirmedBookingsCount,
+                'all_bookings'           => $allBookingsCount,
+                'confirmed_bookings'     => $confirmedBookingsCount,
+                'active_bookings'        => $confirmedBookingsCount,
+                'pending_bookings'       => $pendingBookingsCount,
+                'cancelled_bookings'     => $cancelledBookingsCount,
+                'total_revenue'          => (float) $totalRevenue,
+                'admin_platform_revenue' => (float) $adminPlatformRevenue,
+                'hotel_owners_revenue'   => (float) $hotelOwnersRevenue,
+                'conversion_rate'        => $conversionRate,
             ],
             'goals' => [
                 'target_goal'           => (float) $targetGoal,

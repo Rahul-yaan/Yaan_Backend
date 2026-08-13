@@ -84,8 +84,16 @@ class OwnerController extends Controller
             return ($b->payment_status === 'paid' || in_array($b->status, ['confirmed', 'completed'])) && $b->payment_status !== 'refunded';
         });
 
-        $totalRevenue = (float) $confirmedBookings->sum(function($b) {
+        $totalCustomerPaid = (float) $confirmedBookings->sum(function($b) {
             return (float) ($b->total_payable ?? $b->total_amount ?? 0);
+        });
+
+        $ownerPayableRevenue = (float) $confirmedBookings->sum(function($b) {
+            return (float) ($b->total_amount ?? $b->price_per_night ?? 0);
+        });
+
+        $platformFeeCollected = (float) $confirmedBookings->sum(function($b) {
+            return (float) ($b->gst_amount ?? 0);
         });
 
         $totalCancelled = $bookings->filter(function($b) {
@@ -96,10 +104,12 @@ class OwnerController extends Controller
             'owner'       => $owner,
             'hotels'      => $hotels->isNotEmpty() ? $hotels : $owner->hotels,
             'analytics'   => [
-                'total_revenue'      => $totalRevenue,
-                'total_bookings'     => $totalBookings,
-                'confirmed_bookings' => $confirmedBookings->count(),
-                'cancelled_bookings' => $totalCancelled,
+                'total_revenue'          => $totalCustomerPaid,
+                'owner_payable_revenue'  => $ownerPayableRevenue,
+                'platform_fee_collected' => $platformFeeCollected,
+                'total_bookings'         => $totalBookings,
+                'confirmed_bookings'     => $confirmedBookings->count(),
+                'cancelled_bookings'     => $totalCancelled,
             ],
             'visiting_customers' => $bookings->take(25),
         ]);

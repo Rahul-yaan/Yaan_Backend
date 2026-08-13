@@ -263,6 +263,12 @@ async function loadDashboardData() {
         }
 
         document.getElementById('stat-revenue').textContent = `₹${(m.total_revenue || 0).toLocaleString('en-IN')}`;
+        if (document.getElementById('stat-admin-fee')) {
+            document.getElementById('stat-admin-fee').textContent = `₹${(m.admin_platform_revenue || 0).toLocaleString('en-IN')}`;
+        }
+        if (document.getElementById('stat-owners-fee')) {
+            document.getElementById('stat-owners-fee').textContent = `₹${(m.hotel_owners_revenue || 0).toLocaleString('en-IN')}`;
+        }
         document.getElementById('stat-bookings').textContent = m.confirmed_bookings ?? m.total_bookings ?? 0;
         if (document.getElementById('stat-goal-percentage')) {
             document.getElementById('stat-goal-percentage').textContent = `${g.goal_percentage || 0}%`;
