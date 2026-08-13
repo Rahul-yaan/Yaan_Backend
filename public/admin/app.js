@@ -2627,6 +2627,24 @@ async function runAiAgentAnalysis() {
             rewardElem.textContent = data.summary ? data.summary.total_reward_estimate : '₹1,50,000';
         }
 
+        // Render Goal Breakdown Card
+        if (data.summary) {
+            const sum = data.summary;
+            const card = document.getElementById('ai-goal-breakdown-card');
+            if (card) {
+                card.style.display = 'block';
+                const goalTargetText = document.getElementById('ai-goal-target-text');
+                const goalShortfallText = document.getElementById('ai-goal-shortfall-text');
+                const goalNightsText = document.getElementById('ai-goal-nights-text');
+                const goalDailyText = document.getElementById('ai-goal-daily-text');
+
+                if (goalTargetText) goalTargetText.textContent = `₹${(sum.target_goal || 500000).toLocaleString('en-IN')}`;
+                if (goalShortfallText) goalShortfallText.textContent = `₹${(sum.remaining_shortfall || 0).toLocaleString('en-IN')}`;
+                if (goalNightsText) goalNightsText.textContent = `${sum.required_room_nights || 0} nights`;
+                if (goalDailyText) goalDailyText.textContent = `${sum.daily_bookings_needed || 0} / day`;
+            }
+        }
+
         // Render Priority Steps
         if (stepsContainer) {
             const steps = data.priority_steps || [];
@@ -2675,10 +2693,66 @@ async function runAiAgentAnalysis() {
 
 function navigateToTabFromAi(tabId) {
     closeAiAgentModal();
+    if (tabId === 'dashboard') {
+        const navLink = document.querySelector(`.drawer-nav [data-tab="dashboard"]`);
+        if (navLink) navLink.click();
+        return;
+    }
     const navLink = document.querySelector(`.drawer-nav [data-tab="${tabId}"]`);
     if (navLink) {
         navLink.click();
     } else if (typeof switchTab === 'function') {
         switchTab(tabId);
+    }
+}
+
+// ----------------------------------------------------
+// 10. TARGET GOAL MANAGEMENT
+// ----------------------------------------------------
+let currentTargetGoal = 500000;
+
+function openSetGoalModal() {
+    const modal = document.getElementById('set-goal-modal');
+    const input = document.getElementById('input-target-goal');
+    if (input) input.value = currentTargetGoal || 500000;
+    if (modal) modal.classList.remove('hidden');
+}
+
+function closeSetGoalModal() {
+    const modal = document.getElementById('set-goal-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+function setGoalPreset(amount) {
+    const input = document.getElementById('input-target-goal');
+    if (input) input.value = amount;
+}
+
+async function saveTargetGoal(event) {
+    if (event) event.preventDefault();
+
+    const input = document.getElementById('input-target-goal');
+    const newGoal = parseFloat(input.value);
+
+    if (!newGoal || newGoal < 10000) {
+        showToast('Please enter a valid target goal amount (minimum ₹10,000)', 'danger');
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API_BASE}/admin/dashboard/target-goal`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ target_goal: newGoal })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Failed to update target goal');
+
+        currentTargetGoal = newGoal;
+        showToast(data.message || 'Target goal updated!', 'success');
+        closeSetGoalModal();
+        loadDashboardData();
+    } catch (err) {
+        showToast(err.message, 'danger');
     }
 }

@@ -207,7 +207,10 @@
                             <div>
                                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                                     <h3 style="margin:0; font-size:16px; color:var(--text-primary); font-weight:700;"><i class="fa-solid fa-trophy" style="color:#f59e0b;"></i> Target Goal</h3>
-                                    <span id="badge-goal-status" class="badge approved" style="font-size:10px;">On Track</span>
+                                    <div style="display:flex; gap:6px; align-items:center;">
+                                        <button class="btn-sm" style="background:var(--bg-dark); border:1px solid var(--border); color:#38bdf8; font-size:11px; font-weight:700;" onclick="openSetGoalModal()"><i class="fa-solid fa-pen-to-square"></i> Set Target Goal</button>
+                                        <span id="badge-goal-status" class="badge approved" style="font-size:10px;">On Track</span>
+                                    </div>
                                 </div>
 
                                 <div style="text-align:center; padding:12px 0;">
@@ -834,6 +837,31 @@
                         </button>
                     </div>
 
+                    <!-- AI Target Goal Mathematical Breakdown Box -->
+                    <div id="ai-goal-breakdown-card" style="background:var(--bg-dark); border:1px solid var(--border); padding:14px; border-radius:10px; margin-bottom:16px; display:none;">
+                        <h4 style="margin:0 0 10px 0; font-size:13px; color:#fff; display:flex; align-items:center; gap:6px;">
+                            <i class="fa-solid fa-bullseye" style="color:#6366f1;"></i> AI Target Goal Mathematical Breakdown
+                        </h4>
+                        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap:8px; text-align:center; font-size:11px;">
+                            <div style="background:rgba(255,255,255,0.03); padding:8px; border-radius:6px; border:1px solid var(--border);">
+                                <span style="color:var(--text-muted); display:block;">Target Goal</span>
+                                <strong id="ai-goal-target-text" style="font-size:14px; color:#fff;">₹0</strong>
+                            </div>
+                            <div style="background:rgba(255,255,255,0.03); padding:8px; border-radius:6px; border:1px solid var(--border);">
+                                <span style="color:var(--text-muted); display:block;">Shortfall Gap</span>
+                                <strong id="ai-goal-shortfall-text" style="font-size:14px; color:#f87171;">₹0</strong>
+                            </div>
+                            <div style="background:rgba(255,255,255,0.03); padding:8px; border-radius:6px; border:1px solid var(--border);">
+                                <span style="color:var(--text-muted); display:block;">Room Nights Needed</span>
+                                <strong id="ai-goal-nights-text" style="font-size:14px; color:#38bdf8;">0</strong>
+                            </div>
+                            <div style="background:rgba(255,255,255,0.03); padding:8px; border-radius:6px; border:1px solid var(--border);">
+                                <span style="color:var(--text-muted); display:block;">Daily Target</span>
+                                <strong id="ai-goal-daily-text" style="font-size:14px; color:#34d399;">0 / day</strong>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Step-by-Step Priority Actions Section -->
                     <div style="margin-bottom:18px;">
                         <h4 style="margin:0 0 10px 0; font-size:14px; color:#fff; display:flex; align-items:center; gap:8px;">
@@ -857,9 +885,42 @@
 
                 <div class="modal-footer" style="padding:12px 18px; border-top:1px solid var(--border); display:flex; justify-content:flex-end;">
                     <button type="button" class="btn-sm" style="background:var(--bg-dark); border:1px solid var(--border); color:#fff;" onclick="closeAiAgentModal()">Close</button>
+        </div>
+
+        <!-- Set Custom Target Goal Modal -->
+        <div id="set-goal-modal" class="modal-backdrop hidden" style="z-index:10005;">
+            <div class="modal-content" style="max-width: 480px;">
+                <div class="modal-header">
+                    <h3><i class="fa-solid fa-bullseye" style="color:var(--primary);"></i> Set Monthly Revenue Target Goal</h3>
+                    <button class="btn-sm" onclick="closeSetGoalModal()"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="modal-body" style="padding: 18px;">
+                    <form onsubmit="saveTargetGoal(event)">
+                        <div style="margin-bottom: 16px;">
+                            <label style="font-size:12px; font-weight:700; display:block; margin-bottom:6px;">Monthly Revenue Target Goal (₹) *</label>
+                            <input type="number" id="input-target-goal" placeholder="e.g. 500000" min="10000" max="100000000" step="5000" required style="width:100%; background:var(--bg-dark); border:1px solid var(--border); color:#fff; padding:10px 14px; border-radius:6px; font-size:16px; font-weight:700;">
+                        </div>
+
+                        <!-- Goal Quick Presets -->
+                        <div style="margin-bottom: 20px;">
+                            <label style="font-size:11px; color:var(--text-muted); display:block; margin-bottom:6px;">Quick Presets:</label>
+                            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                                <button type="button" class="btn-sm" style="background:var(--bg-dark); border:1px solid var(--border); color:#fff;" onclick="setGoalPreset(200000)">₹2 Lakhs</button>
+                                <button type="button" class="btn-sm" style="background:var(--bg-dark); border:1px solid var(--border); color:#fff;" onclick="setGoalPreset(500000)">₹5 Lakhs</button>
+                                <button type="button" class="btn-sm" style="background:var(--bg-dark); border:1px solid var(--border); color:#fff;" onclick="setGoalPreset(1000000)">₹10 Lakhs</button>
+                                <button type="button" class="btn-sm" style="background:var(--bg-dark); border:1px solid var(--border); color:#fff;" onclick="setGoalPreset(2500000)">₹25 Lakhs</button>
+                            </div>
+                        </div>
+
+                        <div style="display:flex; justify-content:flex-end; gap:10px;">
+                            <button type="button" class="btn-sm" style="background:var(--bg-dark); border:1px solid var(--border); color:#fff;" onclick="closeSetGoalModal()">Cancel</button>
+                            <button type="submit" class="btn-sm" style="background:var(--primary); color:#fff; font-weight:700; padding:8px 18px;"><i class="fa-solid fa-floppy-disk"></i> Save Goal</button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
+
     </div>
 
     <!-- Application JS Script -->

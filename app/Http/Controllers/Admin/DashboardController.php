@@ -8,6 +8,7 @@ use App\Models\Hotel;
 use App\Models\Booking;
 use App\Models\OwnerProfile;
 use App\Models\Review;
+use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -73,7 +74,7 @@ class DashboardController extends Controller
         })
         ->sum(DB::raw('COALESCE(total_payable, total_amount)'));
 
-        // Current Month Revenue & Target Goal Calculation
+        // Current Month Revenue
         $startOfMonth = Carbon::now()->startOfMonth();
         $endOfMonth   = Carbon::now()->endOfMonth();
 
@@ -86,8 +87,8 @@ class DashboardController extends Controller
         ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
         ->sum(DB::raw('COALESCE(total_payable, total_amount)'));
 
-        // Dynamic Monthly Target Goal (Default ₹5,00,000 or scaled to active hotels/bookings)
-        $targetGoal = max(500000, ceil($totalRevenue * 1.25)); // Target Goal
+        // Saved Custom Target Goal (Default ₹5,00,000)
+        $targetGoal = (float) Setting::get('monthly_target_goal', 500000);
         $goalPercentage = $targetGoal > 0 ? min(100, round(($currentMonthRevenue / $targetGoal) * 100, 1)) : 0;
         $remainingGoal  = max(0, $targetGoal - $currentMonthRevenue);
 
@@ -197,11 +198,49 @@ class DashboardController extends Controller
     }
 
     /**
-     * AI Strategic Agent Intelligence Analysis
+     * Save Custom Target Goal
+     * POST /api/admin/dashboard/target-goal
+     */
+    public function updateTargetGoal(Request $request)
+    {
+        $request->validate([
+            'target_goal' => 'required|numeric|min:10000|max:100000000',
+        ]);
+
+        $newGoal = (float) $request->input('target_goal');
+        Setting::set('monthly_target_goal', $newGoal);
+
+        return response()->json([
+            'success'     => true,
+            'message'     => 'Monthly target goal updated successfully.',
+            'target_goal' => $newGoal,
+        ]);
+    }
+
+    /**
+     * AI Strategic Agent Intelligence Analysis Engine
      * GET /api/admin/dashboard/ai-analysis
      */
     public function getAiAnalysis()
     {
+        $targetGoal = (float) Setting::get('monthly_target_goal', 500000);
+
+        $startOfMonth = Carbon::now()->startOfMonth();
+        $endOfMonth   = Carbon::now()->endOfMonth();
+        $daysRemainingInMonth = max(1, Carbon::now()->daysInMonth - Carbon::now()->day);
+
+        $currentMonthRevenue = (float) Booking::where(function($q) {
+            $q->where('payment_status', 'paid')
+              ->orWhereIn('status', ['confirmed', 'completed']);
+        })
+        ->whereNotIn('status', ['cancelled'])
+        ->whereNotIn('payment_status', ['refunded', 'refund_initiated'])
+        ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
+        ->sum(DB::raw('COALESCE(total_payable, total_amount)'));
+
+        $remainingShortfall = max(0, $targetGoal - $currentMonthRevenue);
+        $goalPercentage = $targetGoal > 0 ? min(100, round(($currentMonthRevenue / $targetGoal) * 100, 1)) : 0;
+
         $pendingHotels = Hotel::where('status', 'pending')->with('owner:id,name,email')->get();
         $pendingOwners = User::where('role', 'owner')
             ->where(function($q) {
@@ -210,92 +249,121 @@ class DashboardController extends Controller
             })->get();
 
         $activeBannersCount = \App\Models\Banner::whereRaw('("is_active" = true OR "is_active" IS TRUE)')->count();
-        $avgPricePerNight   = (float) Hotel::whereIn('status', ['approved', 'active'])->avg('price_per_night');
-        $approvedCount      = Hotel::whereIn('status', ['approved', 'active'])->count();
+        $avgPricePerNight   = max(1000, (float) Hotel::whereIn('status', ['approved', 'active'])->avg('price_per_night'));
+        if ($avgPricePerNight <= 0) $avgPricePerNight = 2000;
+
+        // Mathematical Breakdown for Goal Achievement
+        $requiredRoomNights = ceil($remainingShortfall / $avgPricePerNight);
+        $dailyRevenueNeeded  = ceil($remainingShortfall / $daysRemainingInMonth);
+        $dailyBookingsNeeded = ceil($dailyRevenueNeeded / $avgPricePerNight);
 
         $prioritySteps = [];
         $stepNumber = 1;
 
-        // Step 1: Pending Hotel Approvals Analysis
-        if ($pendingHotels->isNotEmpty()) {
-            $topPending = $pendingHotels->sortByDesc('total_rooms')->first();
-            $topCity = $topPending ? ($topPending->city ?? 'Primary City') : 'Key Market';
-            $potentialRev = $pendingHotels->sum('total_rooms') * 1500 * 15; // Estimated monthly unlock
-
+        // Goal Status Summary Step
+        if ($remainingShortfall > 0) {
             $prioritySteps[] = [
                 'step'            => $stepNumber++,
-                'title'           => "Approve {$pendingHotels->count()} Pending Hotel Listings First",
-                'category'        => 'Inventory & Capacity',
+                'title'           => "Target Goal Achievement Roadmap (Target: ₹" . number_format($targetGoal, 0) . ")",
+                'category'        => 'Goal Milestone Strategy',
+                'priority'        => 'CRITICAL',
+                'rationale'       => "To achieve your custom target goal of ₹" . number_format($targetGoal, 0) . " this month, you need ₹" . number_format($remainingShortfall, 0) . " more in revenue. At an avg room rate of ₹" . number_format($avgPricePerNight, 0) . "/night, your ecosystem requires approximately {$requiredRoomNights} room night bookings over the remaining {$daysRemainingInMonth} days (~{$dailyBookingsNeeded} bookings/day).",
+                'estimated_value' => "₹" . number_format($remainingShortfall, 0) . " Target Unlock",
+                'action_tab'      => 'dashboard',
+                'action_label'    => 'View Live Goal Roadmap',
+            ];
+        } else {
+            $prioritySteps[] = [
+                'step'            => $stepNumber++,
+                'title'           => "Target Goal Achieved! (₹" . number_format($targetGoal, 0) . ")",
+                'category'        => 'Milestone Accomplished',
                 'priority'        => 'HIGH',
-                'rationale'       => "High priority: Approve {$topPending->name} in {$topCity} ({$topPending->total_rooms} rooms). Approving these pending listings immediately expands active inventory by {$pendingHotels->count()} hotels.",
-                'estimated_value' => "₹" . number_format($potentialRev, 0),
-                'action_tab'      => 'hotels',
-                'action_label'    => 'Review & Approve Hotels Now',
+                'rationale'       => "Congratulations! You have surpassed your monthly revenue target goal of ₹" . number_format($targetGoal, 0) . " by generating ₹" . number_format($currentMonthRevenue, 0) . " this month.",
+                'estimated_value' => "₹" . number_format($currentMonthRevenue, 0) . " Achieved",
+                'action_tab'      => 'dashboard',
+                'action_label'    => 'Set Next Goal Target',
             ];
         }
 
-        // Step 2: Owner KYC Verification Analysis
+        // Step 2: Pending Hotel Approvals & Room Capacity Strategy
+        if ($pendingHotels->isNotEmpty()) {
+            $topPending = $pendingHotels->sortByDesc('total_rooms')->first();
+            $topCity = $topPending ? ($topPending->city ?? 'Primary City') : 'Key Market';
+            $potentialRev = $pendingHotels->sum('total_rooms') * $avgPricePerNight * 10;
+
+            $prioritySteps[] = [
+                'step'            => $stepNumber++,
+                'title'           => "Approve {$pendingHotels->count()} Pending Hotel Listings (Unlocks Inventory)",
+                'category'        => 'Inventory Capacity',
+                'priority'        => 'HIGH',
+                'rationale'       => "Approving {$topPending->name} in {$topCity} ({$topPending->total_rooms} rooms) and {$pendingHotels->count()} total pending hotels will add {$pendingHotels->sum('total_rooms')} new room slots, providing the room supply required to hit your target goal.",
+                'estimated_value' => "₹" . number_format($potentialRev, 0),
+                'action_tab'      => 'hotels',
+                'action_label'    => 'Approve Pending Hotels',
+            ];
+        }
+
+        // Step 3: Owner KYC Verification Strategy
         if ($pendingOwners->isNotEmpty()) {
             $prioritySteps[] = [
                 'step'            => $stepNumber++,
                 'title'           => "Verify {$pendingOwners->count()} Pending Hotel Owner Accounts",
-                'category'        => 'Partner Onboarding',
+                'category'        => 'Partner Supply',
                 'priority'        => 'HIGH',
                 'rationale'       => "Verifying owner accounts enables partners to publish new hotel slots and participate in promotional campaigns.",
                 'estimated_value' => "₹" . number_format($pendingOwners->count() * 35000, 0),
                 'action_tab'      => 'owners',
-                'action_label'    => 'Verify Owner KYCs Now',
+                'action_label'    => 'Verify Owner KYCs',
             ];
         }
 
-        // Step 3: Promotional Offer Banner Campaign Analysis
+        // Step 4: Promotional Offer Banner Campaign Strategy
         if ($activeBannersCount < 2) {
             $prioritySteps[] = [
                 'step'            => $stepNumber++,
-                'title'           => "Launch a Targeted Discount Offer Banner",
-                'category'        => 'Marketing & Conversion',
+                'title'           => "Launch a 15% OFF Banner Offer to Drive ~{$dailyBookingsNeeded} Bookings/Day",
+                'category'        => 'Marketing Velocity',
                 'priority'        => 'MEDIUM',
-                'rationale'       => "Currently you have {$activeBannersCount} active banners. Creating a 15%-20% discount offer banner (e.g. YAANFAMILY5) boosts customer app booking conversions by ~25%.",
-                'estimated_value' => "₹50,000 - ₹1,20,000",
+                'rationale'       => "To achieve your required booking velocity of ~{$dailyBookingsNeeded} bookings per day, launch a 15%-20% promotional offer banner under Banners tab (e.g. YAANGOAL15). Offer banners boost customer app booking conversions by ~25%.",
+                'estimated_value' => "₹" . number_format($remainingShortfall * 0.4, 0),
                 'action_tab'      => 'banners',
-                'action_label'    => 'Create Offer Banner Now',
+                'action_label'    => 'Create Goal Banner Offer',
             ];
         }
 
-        // Step 4: Pricing Tier Optimization
-        $suggestedPriceMin = $avgPricePerNight > 0 ? round($avgPricePerNight * 0.9, 0) : 1200;
-        $suggestedPriceMax = $avgPricePerNight > 0 ? round($avgPricePerNight * 1.2, 0) : 3500;
+        // Step 5: Pricing Strategy & Slot Optimization
+        $suggestedPriceMin = round($avgPricePerNight * 0.9, 0);
+        $suggestedPriceMax = round($avgPricePerNight * 1.25, 0);
         $prioritySteps[] = [
             'step'            => $stepNumber++,
-            'title'           => "Optimize Hotel Room Price Slots (₹{$suggestedPriceMin} - ₹{$suggestedPriceMax})",
-            'category'        => 'Pricing Strategy',
+            'title'           => "Optimize Hotel Room Price Slots (₹{$suggestedPriceMin} - ₹{$suggestedPriceMax}/night)",
+            'category'        => 'Yield Optimization',
             'priority'        => 'MEDIUM',
-            'rationale'       => "Current average approved hotel price is ₹" . number_format($avgPricePerNight, 0) . "/night. Approving price slots in the sweet spot (₹{$suggestedPriceMin} - ₹{$suggestedPriceMax}) captures max customer bookings.",
-            'estimated_value' => "+18% Net Yield",
+            'rationale'       => "Average approved hotel room rate is ₹" . number_format($avgPricePerNight, 0) . "/night. Maintaining price slots in the sweet spot (₹{$suggestedPriceMin} - ₹{$suggestedPriceMax}) optimizes occupancy rates to achieve target goal revenue faster.",
+            'estimated_value' => "+20% Booking Yield",
             'action_tab'      => 'hotels',
             'action_label'    => 'Inspect Hotel Slots',
         ];
 
-        // Overall Estimated Reward Potential
-        $totalRewardEstimate = ($pendingHotels->count() * 45000) + ($pendingOwners->count() * 30000) + 60000;
-
         return response()->json([
             'success' => true,
             'summary' => [
-                'status'                 => 'OPTIMAL_STRATEGY_READY',
-                'total_reward_estimate'  => "₹" . number_format($totalRewardEstimate, 0),
-                'pending_hotels_count'   => $pendingHotels->count(),
-                'pending_owners_count'   => $pendingOwners->count(),
-                'active_banners_count'   => $activeBannersCount,
-                'avg_approved_price'     => round($avgPricePerNight, 2),
+                'status'                 => 'TARGET_GOAL_ROADMAP_READY',
+                'target_goal'            => (float) $targetGoal,
+                'current_month_revenue'  => (float) $currentMonthRevenue,
+                'remaining_shortfall'    => (float) $remainingShortfall,
+                'goal_percentage'        => $goalPercentage,
+                'required_room_nights'   => $requiredRoomNights,
+                'daily_bookings_needed'  => $dailyBookingsNeeded,
+                'days_remaining'         => $daysRemainingInMonth,
+                'total_reward_estimate'  => "₹" . number_format(max($remainingShortfall, $currentMonthRevenue), 0),
             ],
             'priority_steps' => $prioritySteps,
             'market_conditions' => [
-                'season_trend'         => 'High Urban Travel & Weekend Getaway Surge',
-                'demand_surge_cities'  => ['Ahmedabad', 'Surat', 'Vadodara', 'Mumbai'],
-                'digital_adoption'     => 'Razorpay online payments account for the majority of completed bookings.',
-                'pricing_sweet_spot'   => "₹{$suggestedPriceMin} - ₹{$suggestedPriceMax} per night",
-                'strategic_recommendation' => "Approve high-capacity pending hotels first, then launch a 15% user offer banner under Banners tab to maximize target goal achievement.",
+                'season_trend'             => 'High Urban Travel & Weekend Getaway Surge',
+                'demand_surge_cities'      => ['Ahmedabad', 'Surat', 'Vadodara', 'Mumbai'],
+                'pricing_sweet_spot'       => "₹{$suggestedPriceMin} - ₹{$suggestedPriceMax} per night",
+                'strategic_recommendation' => "To hit your target goal of ₹" . number_format($targetGoal, 0) . ", generate ~{$dailyBookingsNeeded} bookings/day by approving pending hotel listings and launching a targeted 15% offer banner.",
             ],
         ]);
     }
