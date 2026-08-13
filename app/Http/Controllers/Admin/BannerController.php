@@ -120,10 +120,11 @@ class BannerController extends Controller
         $banner->is_active = !$banner->is_active;
         $banner->save();
 
+        $fresh = $banner->fresh();
         return response()->json([
             'message'   => 'Banner status updated.',
-            'is_active' => $banner->is_active,
-            'banner'    => $banner,
+            'is_active' => $fresh ? $fresh->is_active : $banner->is_active,
+            'banner'    => $fresh,
         ]);
     }
 

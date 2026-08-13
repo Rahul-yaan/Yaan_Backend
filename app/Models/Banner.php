@@ -29,6 +29,17 @@ class Banner extends Model
         'image_url',
     ];
 
+    public function setIsActiveAttribute($value)
+    {
+        $isTrue = filter_var($value, FILTER_VALIDATE_BOOLEAN);
+        $this->attributes['is_active'] = $isTrue ? \Illuminate\Support\Facades\DB::raw('true') : \Illuminate\Support\Facades\DB::raw('false');
+    }
+
+    public function getIsActiveAttribute($value)
+    {
+        return filter_var($value, FILTER_VALIDATE_BOOLEAN);
+    }
+
     public function getImageUrlAttribute()
     {
         if (empty($this->image_path)) {
