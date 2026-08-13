@@ -15,7 +15,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="styles.css?v=3.0.0">
+    <link rel="stylesheet" href="styles.css?v=3.1.0">
     <!-- Chart.js Library -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
@@ -804,8 +804,10 @@
                     </form>
                 </div>
             </div>
+        </div>
+
         <!-- AI Strategic Agent Modal -->
-        <div id="ai-agent-modal" class="modal-backdrop hidden">
+        <div id="ai-agent-modal" class="modal-backdrop hidden" style="z-index:10000;">
             <div class="modal-content" style="max-width: 720px; border: 1px solid rgba(168, 85, 247, 0.4); box-shadow: 0 0 35px rgba(99, 102, 241, 0.3);">
                 <div class="modal-header" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(168, 85, 247, 0.2) 100%);">
                     <div style="display:flex; align-items:center; gap:10px;">
@@ -858,12 +860,9 @@
                 </div>
             </div>
         </div>
-
-    </div>
-
     </div>
 
     <!-- Application JS Script -->
-    <script src="app.js?v=3.0.0"></script>
+    <script src="app.js?v=3.1.0"></script>
 </body>
 </html>
