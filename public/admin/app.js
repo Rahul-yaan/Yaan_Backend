@@ -2233,6 +2233,10 @@ async function loadBannersData() {
                     ? `<span class="badge pending" style="background:rgba(250,204,21,0.15); color:#facc15; border:1px solid rgba(250,204,21,0.3);"><i class="fa-solid fa-user-tie"></i> Hotel Owners Only</span>`
                     : `<span class="badge approved" style="background:rgba(168,85,247,0.15); color:#c084fc; border:1px solid rgba(168,85,247,0.3);"><i class="fa-solid fa-users"></i> All (Users & Owners)</span>`);
 
+            const capacityBadge = b.max_uses
+                ? `<span class="badge pending" style="background:rgba(234,179,8,0.15); color:#eab308; border:1px solid rgba(234,179,8,0.3);"><i class="fa-solid fa-users"></i> First ${b.max_uses} Customers Only</span>`
+                : `<span class="badge approved" style="background:rgba(34,197,94,0.12); color:#22c55e; border:1px solid rgba(34,197,94,0.3);"><i class="fa-solid fa-users-line"></i> All Customers</span>`;
+
             const statusBadge = b.is_active
                 ? `<span class="badge approved" style="cursor:pointer;" onclick="toggleBannerStatus(${b.id})" title="Click to disable"><i class="fa-solid fa-circle-check"></i> ACTIVE</span>`
                 : `<span class="badge alert" style="cursor:pointer;" onclick="toggleBannerStatus(${b.id})" title="Click to enable"><i class="fa-solid fa-circle-xmark"></i> INACTIVE</span>`;
@@ -2253,7 +2257,10 @@ async function loadBannersData() {
                 ${b.discount_percentage ? `<span style="background:var(--success); color:#fff; font-weight:700; padding:2px 8px; border-radius:4px; font-size:11px; flex-shrink:0;">${b.discount_percentage}% OFF</span>` : ''}
             </div>
 
-            <div style="margin-bottom:8px;">${audienceBadge}</div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;">
+                ${audienceBadge}
+                ${capacityBadge}
+            </div>
 
             <p style="font-size:12px; color:var(--text-secondary); line-height:1.4; margin: 6px 0 10px 0;">
                 ${b.description || 'No detailed description provided.'}
@@ -2291,6 +2298,8 @@ async function loadBannersData() {
 function openCreateBannerModal() {
     document.getElementById('banner-form').reset();
     document.getElementById('banner-id').value = '';
+    const maxUsesElem = document.getElementById('banner-max-uses');
+    if (maxUsesElem) maxUsesElem.value = '';
     document.getElementById('banner-modal-title').innerHTML = `<i class="fa-solid fa-rectangle-ad"></i> Create New Banner / Offer`;
     document.getElementById('banner-modal').classList.remove('hidden');
 }
@@ -2305,6 +2314,8 @@ function openEditBannerModal(id) {
     document.getElementById('banner-target-audience').value = b.target_audience || 'all';
     document.getElementById('banner-discount-code').value = b.discount_code || '';
     document.getElementById('banner-discount-percentage').value = b.discount_percentage || '';
+    const maxUsesElem = document.getElementById('banner-max-uses');
+    if (maxUsesElem) maxUsesElem.value = b.max_uses || '';
     document.getElementById('banner-expires-at').value = b.expires_at ? b.expires_at.split('T')[0] : '';
     document.getElementById('banner-image-url').value = (b.image_path && b.image_path.startsWith('http')) ? b.image_path : '';
     document.getElementById('banner-image-file').value = '';
@@ -2326,6 +2337,8 @@ async function saveBanner(event) {
     const targetAudience = document.getElementById('banner-target-audience').value;
     const discountCode = document.getElementById('banner-discount-code').value.trim();
     const discountPercentage = document.getElementById('banner-discount-percentage').value;
+    const maxUsesElem = document.getElementById('banner-max-uses');
+    const maxUses = maxUsesElem ? maxUsesElem.value : '';
     const expiresAt = document.getElementById('banner-expires-at').value;
     const imageUrl = document.getElementById('banner-image-url').value.trim();
     const imageFile = document.getElementById('banner-image-file').files[0];
@@ -2335,8 +2348,9 @@ async function saveBanner(event) {
     formData.append('description', description);
     formData.append('target_audience', targetAudience);
     if (discountCode) formData.append('discount_code', discountCode);
-    if (discountPercentage) formData.append('discount_percentage', discountPercentage);
-    if (expiresAt) formData.append('expires_at', expiresAt);
+    if (discountPercentage !== '') formData.append('discount_percentage', discountPercentage);
+    if (maxUses !== '') formData.append('max_uses', maxUses);
+    if (expiresAt !== '') formData.append('expires_at', expiresAt);
     if (imageUrl) formData.append('image_url', imageUrl);
     if (imageFile) formData.append('image', imageFile);
 
@@ -2350,11 +2364,21 @@ async function saveBanner(event) {
     try {
         const res = await fetch(url, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${authToken}` },
+            headers: {
+                'Accept': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
             body: formData
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || data.message || 'Failed to save banner');
+        if (!res.ok) {
+            let errorMsg = data.error || data.message || 'Failed to save banner';
+            if (data.errors && typeof data.errors === 'object') {
+                const fieldErrors = Object.values(data.errors).flat().join(' | ');
+                if (fieldErrors) errorMsg = fieldErrors;
+            }
+            throw new Error(errorMsg);
+        }
 
         showToast(data.message || 'Banner saved successfully', 'success');
         closeBannerModal();

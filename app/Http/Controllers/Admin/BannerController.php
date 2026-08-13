@@ -17,12 +17,22 @@ class BannerController extends Controller
 
     public function store(Request $request)
     {
+        // Sanitize empty strings to null for optional inputs
+        $input = $request->all();
+        foreach (['expires_at', 'discount_code', 'discount_percentage', 'max_uses', 'image_url'] as $key) {
+            if (array_key_exists($key, $input) && trim((string)$input[$key]) === '') {
+                $input[$key] = null;
+            }
+        }
+        $request->merge($input);
+
         $request->validate([
             'title'               => 'required|string|max:255',
             'description'         => 'nullable|string',
             'target_audience'     => 'required|in:all,user,owner',
             'discount_code'       => 'nullable|string|max:50',
             'discount_percentage' => 'nullable|numeric|min:0|max:100',
+            'max_uses'            => 'nullable|integer|min:1',
             'expires_at'          => 'nullable|date',
             'image'               => 'nullable|file|mimes:jpeg,png,jpg,gif,webp|max:5120',
             'image_url'           => 'nullable|string',
@@ -42,6 +52,7 @@ class BannerController extends Controller
             'target_audience'     => $request->target_audience ?? 'all',
             'discount_code'       => $request->discount_code,
             'discount_percentage' => $request->discount_percentage,
+            'max_uses'            => $request->max_uses,
             'is_active'           => $request->boolean('is_active', true),
             'expires_at'          => $request->expires_at,
         ]);
@@ -56,12 +67,22 @@ class BannerController extends Controller
     {
         $banner = Banner::findOrFail($id);
 
+        // Sanitize empty strings to null for optional inputs
+        $input = $request->all();
+        foreach (['expires_at', 'discount_code', 'discount_percentage', 'max_uses', 'image_url'] as $key) {
+            if (array_key_exists($key, $input) && trim((string)$input[$key]) === '') {
+                $input[$key] = null;
+            }
+        }
+        $request->merge($input);
+
         $request->validate([
             'title'               => 'sometimes|required|string|max:255',
             'description'         => 'nullable|string',
             'target_audience'     => 'sometimes|required|in:all,user,owner',
             'discount_code'       => 'nullable|string|max:50',
             'discount_percentage' => 'nullable|numeric|min:0|max:100',
+            'max_uses'            => 'nullable|integer|min:1',
             'expires_at'          => 'nullable|date',
             'image'               => 'nullable|file|mimes:jpeg,png,jpg,gif,webp|max:5120',
             'image_url'           => 'nullable|string',
@@ -81,6 +102,7 @@ class BannerController extends Controller
         if ($request->has('target_audience'))     $banner->target_audience = $request->target_audience;
         if ($request->has('discount_code'))       $banner->discount_code = $request->discount_code;
         if ($request->has('discount_percentage')) $banner->discount_percentage = $request->discount_percentage;
+        if ($request->has('max_uses'))            $banner->max_uses = $request->max_uses;
         if ($request->has('expires_at'))          $banner->expires_at = $request->expires_at;
         if ($request->has('is_active'))           $banner->is_active = $request->boolean('is_active');
 

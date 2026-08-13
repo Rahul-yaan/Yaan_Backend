@@ -13,6 +13,7 @@ class Banner extends Model
         'target_audience',
         'discount_code',
         'discount_percentage',
+        'max_uses',
         'is_active',
         'expires_at',
     ];
@@ -20,6 +21,7 @@ class Banner extends Model
     protected $casts = [
         'is_active'           => 'boolean',
         'discount_percentage' => 'float',
+        'max_uses'            => 'integer',
         'expires_at'          => 'datetime',
     ];
 
