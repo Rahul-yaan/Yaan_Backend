@@ -38,9 +38,25 @@ public function store(Request $request)
 
     $price = (float) $hotel->price_per_night;
 
-    // Discount calculation support (e.g. 5% discount or promo offer)
+    // Discount calculation support (e.g. 5% discount or active offer banner)
     $discountPct = (float) $request->input('discount_percentage', 0);
     $discountAmount = (float) $request->input('discount_amount', $request->input('promotion_applied', 0));
+
+    // Automatic fallback: If no explicit discount is passed, check active user banner discounts!
+    if ($discountPct <= 0 && $discountAmount <= 0) {
+        $activeBanner = \App\Models\Banner::whereRaw('("is_active" = true OR "is_active" IS TRUE)')
+            ->whereIn('target_audience', ['user', 'all'])
+            ->where(function($q) {
+                $q->whereNull('expires_at')->orWhere('expires_at', '>=', now());
+            })
+            ->where('discount_percentage', '>', 0)
+            ->latest()
+            ->first();
+
+        if ($activeBanner) {
+            $discountPct = (float) $activeBanner->discount_percentage;
+        }
+    }
 
     if ($discountPct > 0 && $discountAmount <= 0) {
         $discountAmount = round($price * ($discountPct / 100), 2);

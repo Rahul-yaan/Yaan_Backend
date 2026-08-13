@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Hotel;
+use App\Models\Banner;
 
 class HotelController extends Controller
 {
@@ -18,6 +19,41 @@ class HotelController extends Controller
             ->whereHas('owner', function($q) {
                 $q->whereRaw('("is_verified" = true OR "is_verified" IS TRUE)');
             });
+    }
+
+    /**
+     * Attach Active Offer Banner Discount Information to Hotel Object
+     */
+    private function attachActiveDiscountInfo($hotel)
+    {
+        $activeUserBanner = Banner::whereRaw('("is_active" = true OR "is_active" IS TRUE)')
+            ->whereIn('target_audience', ['user', 'all'])
+            ->where(function($q) {
+                $q->whereNull('expires_at')
+                  ->orWhere('expires_at', '>=', now());
+            })
+            ->where('discount_percentage', '>', 0)
+            ->latest()
+            ->first();
+
+        $discountPct = $activeUserBanner ? (float) $activeUserBanner->discount_percentage : 0;
+        $price = (float) $hotel->price_per_night;
+
+        $discountAmount = round($price * ($discountPct / 100), 2);
+        $discountedPrice = max(0, $price - $discountAmount);
+        $gstAmount = round($discountedPrice * 0.18, 2);
+        $totalPayable = round($discountedPrice + $gstAmount, 2);
+
+        $hotel->active_discount_percentage = $discountPct;
+        $hotel->active_promo_code           = $activeUserBanner->promo_code ?? null;
+        $hotel->banner_title                = $activeUserBanner->title ?? null;
+        $hotel->original_price              = $price;
+        $hotel->discount_amount             = $discountAmount;
+        $hotel->discounted_price            = $discountedPrice;
+        $hotel->gst_amount                  = $gstAmount;
+        $hotel->total_payable               = $totalPayable;
+
+        return $hotel;
     }
 
     // GET /api/hotels
@@ -34,6 +70,7 @@ class HotelController extends Controller
         $hotels = $query->get();
         foreach ($hotels as $h) {
             $h->ensurePrimaryImageExists();
+            $this->attachActiveDiscountInfo($h);
         }
 
         return response()->json($hotels);
@@ -46,6 +83,7 @@ class HotelController extends Controller
         $query = $this->applyApprovedScope($query);
         $hotel = $query->findOrFail($id);
         $hotel->ensurePrimaryImageExists();
+        $this->attachActiveDiscountInfo($hotel);
 
         return response()->json($hotel);
     }
@@ -65,11 +103,13 @@ class HotelController extends Controller
         $hotels = $query->get();
         foreach ($hotels as $h) {
             $h->ensurePrimaryImageExists();
+            $this->attachActiveDiscountInfo($h);
         }
         
         return response()->json([
-            'success' => true,
-            'data'    => $hotels
+            'status' => true,
+            'count'  => $hotels->count(),
+            'hotels' => $hotels,
         ]);
     }
 }
