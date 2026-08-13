@@ -245,20 +245,28 @@ async function fetchBadgeCounts() {
     }
 }
 
-// ----------------------------------------------------
-// 1. DASHBOARD DATA
-// ----------------------------------------------------
+// Chart.js Instances
+let chartIncomeGrowthInstance = null;
+let chartPaymentDonutInstance = null;
+
 async function loadDashboardData() {
     try {
         const res = await fetch(`${API_BASE}/admin/dashboard`, { headers: getHeaders() });
         if (!res.ok) await handleApiError(res);
         const data = await res.json();
         const m = data.metrics || {};
+        const g = data.goals || {};
+        const c = data.charts || {};
 
         document.getElementById('stat-revenue').textContent = `₹${(m.total_revenue || 0).toLocaleString('en-IN')}`;
         document.getElementById('stat-bookings').textContent = m.confirmed_bookings ?? m.total_bookings ?? 0;
-        document.getElementById('stat-pending-hotels').textContent = m.pending_hotels || 0;
-        document.getElementById('stat-pending-owners').textContent = m.pending_owners || 0;
+        if (document.getElementById('stat-goal-percentage')) {
+            document.getElementById('stat-goal-percentage').textContent = `${g.goal_percentage || 0}%`;
+        }
+        if (document.getElementById('stat-conversion-rate')) {
+            document.getElementById('stat-conversion-rate').textContent = `${m.conversion_rate || 0}%`;
+        }
+
         document.getElementById('stat-users').textContent = m.users_count || 0;
         document.getElementById('stat-owners').textContent = m.owners_count || 0;
         document.getElementById('stat-approved-hotels').textContent = m.approved_hotels || 0;
@@ -266,21 +274,50 @@ async function loadDashboardData() {
             document.getElementById('stat-cancelled-bookings').textContent = m.cancelled_bookings || 0;
         }
 
+        // Render Target Goal Widget
+        if (document.getElementById('goal-current-revenue')) {
+            document.getElementById('goal-current-revenue').textContent = `₹${(g.current_month_revenue || 0).toLocaleString('en-IN')}`;
+            document.getElementById('goal-target-amount').textContent = `₹${(g.target_goal || 500000).toLocaleString('en-IN')}`;
+            document.getElementById('goal-progress-text').textContent = `${g.goal_percentage || 0}%`;
+            document.getElementById('goal-remaining-amount').textContent = `₹${(g.remaining_goal || 0).toLocaleString('en-IN')}`;
+            const progressBar = document.getElementById('goal-progress-bar');
+            if (progressBar) {
+                progressBar.style.width = `${Math.min(100, g.goal_percentage || 0)}%`;
+            }
+        }
+
+        // Render Booking Funnel Metrics
+        if (document.getElementById('funnel-total')) {
+            document.getElementById('funnel-total').textContent = m.all_bookings || 0;
+            document.getElementById('funnel-confirmed').textContent = m.confirmed_bookings || 0;
+            document.getElementById('funnel-pending').textContent = m.pending_bookings || 0;
+            document.getElementById('funnel-cancelled').textContent = m.cancelled_bookings || 0;
+        }
+
+        // Render Charts & Top Hotels
+        renderIncomeGrowthChart(c);
+        renderPaymentDonutChart(c.payment_sources);
+        renderTopHotels(data.top_hotels);
+
         // Badges in drawer
         const bHotels = document.getElementById('badge-pending-hotels');
         const bOwners = document.getElementById('badge-pending-owners');
-        if (m.pending_hotels > 0) {
-            bHotels.textContent = m.pending_hotels;
-            bHotels.classList.remove('hidden');
-        } else {
-            bHotels.classList.add('hidden');
+        if (bHotels) {
+            if (m.pending_hotels > 0) {
+                bHotels.textContent = m.pending_hotels;
+                bHotels.classList.remove('hidden');
+            } else {
+                bHotels.classList.add('hidden');
+            }
         }
 
-        if (m.pending_owners > 0) {
-            bOwners.textContent = m.pending_owners;
-            bOwners.classList.remove('hidden');
-        } else {
-            bOwners.classList.add('hidden');
+        if (bOwners) {
+            if (m.pending_owners > 0) {
+                bOwners.textContent = m.pending_owners;
+                bOwners.classList.remove('hidden');
+            } else {
+                bOwners.classList.add('hidden');
+            }
         }
 
         renderRecentBookings(data.recent_bookings);
@@ -288,6 +325,140 @@ async function loadDashboardData() {
     } catch (err) {
         console.error('Failed to load dashboard:', err);
     }
+}
+
+function renderIncomeGrowthChart(chartsData) {
+    const canvas = document.getElementById('chart-income-growth');
+    if (!canvas || typeof Chart === 'undefined') return;
+
+    const ctx = canvas.getContext('2d');
+    if (chartIncomeGrowthInstance) {
+        chartIncomeGrowthInstance.destroy();
+    }
+
+    const labels = (chartsData && chartsData.labels) ? chartsData.labels : ['Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug'];
+    const incomeData = (chartsData && chartsData.income_series) ? chartsData.income_series : [0, 0, 0, 0, 0, 0];
+
+    const gradient = ctx.createLinearGradient(0, 0, 0, 240);
+    gradient.addColorStop(0, 'rgba(99, 102, 241, 0.4)');
+    gradient.addColorStop(1, 'rgba(99, 102, 241, 0.0)');
+
+    chartIncomeGrowthInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Monthly Income (₹)',
+                data: incomeData,
+                borderColor: '#6366f1',
+                borderWidth: 3,
+                backgroundColor: gradient,
+                fill: true,
+                tension: 0.4,
+                pointBackgroundColor: '#38bdf8',
+                pointBorderColor: '#fff',
+                pointRadius: 5,
+                pointHoverRadius: 7
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return ' Income: ₹' + Number(context.raw).toLocaleString('en-IN');
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                    ticks: { color: '#94a3b8' }
+                },
+                y: {
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                    ticks: {
+                        color: '#94a3b8',
+                        callback: function(value) {
+                            return '₹' + (value >= 1000 ? (value / 1000).toFixed(0) + 'k' : value);
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderPaymentDonutChart(sources) {
+    const canvas = document.getElementById('chart-payment-donut');
+    if (!canvas || typeof Chart === 'undefined') return;
+
+    const ctx = canvas.getContext('2d');
+    if (chartPaymentDonutInstance) {
+        chartPaymentDonutInstance.destroy();
+    }
+
+    const online = sources ? (sources.online_razorpay || 0) : 0;
+    const offline = sources ? (sources.pay_at_hotel || 0) : 0;
+
+    chartPaymentDonutInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Razorpay Online', 'Pay-at-Hotel'],
+            datasets: [{
+                data: [online, offline],
+                backgroundColor: ['#6366f1', '#38bdf8'],
+                borderWidth: 0,
+                hoverOffset: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { color: '#94a3b8', boxWidth: 12, font: { size: 11 } }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return ' ' + context.label + ': ₹' + Number(context.raw).toLocaleString('en-IN');
+                        }
+                    }
+                }
+            },
+            cutout: '70%'
+        }
+    });
+}
+
+function renderTopHotels(topHotels) {
+    const container = document.getElementById('top-hotels-container');
+    if (!container) return;
+    if (!topHotels || topHotels.length === 0) {
+        container.innerHTML = `<div class="empty-state">No hotel performance data yet</div>`;
+        return;
+    }
+
+    container.innerHTML = topHotels.map((h, index) => `
+        <div style="background:var(--bg-dark); padding:8px 12px; border-radius:6px; border:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; font-size:12px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-weight:800; color:var(--primary); font-size:13px;">#${index + 1}</span>
+                <div>
+                    <strong style="color:var(--text-primary); display:block;">${h.name}</strong>
+                    <span style="font-size:11px; color:var(--text-muted);">${h.city || 'Location'} • <i class="fa-solid fa-star" style="color:#facc15;"></i> ${h.rating || '4.5'}</span>
+                </div>
+            </div>
+            <div style="text-align:right;">
+                <strong style="color:var(--success); font-size:13px;">${h.bookings_count || 0} Bookings</strong>
+            </div>
+        </div>
+    `).join('');
 }
 
 function renderRecentBookings(bookings) {

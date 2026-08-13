@@ -10,6 +10,7 @@ use App\Models\OwnerProfile;
 use App\Models\Review;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
@@ -35,7 +36,7 @@ class DashboardController extends Controller
 
         $allBookingsCount = Booking::count();
 
-        // Confirmed / Active Bookings: Only valid bookings that are paid and confirmed/completed (excluding cancelled & refunded)
+        // Confirmed / Active Bookings
         $confirmedBookingsCount = Booking::where(function($q) {
             $q->where('payment_status', 'paid')
               ->orWhereIn('status', ['confirmed', 'completed']);
@@ -54,7 +55,7 @@ class DashboardController extends Controller
             ->orWhere('cancellation_reason', 'like', '%refund%')
             ->count();
 
-        // Pending Bookings (temporary/incomplete)
+        // Pending Bookings
         $pendingBookingsCount = Booking::where('status', 'pending')
             ->whereIn('payment_status', ['pending', 'failed'])
             ->count();
@@ -71,6 +72,79 @@ class DashboardController extends Controller
               ->orWhere('cancellation_reason', 'not like', '%refund%');
         })
         ->sum(DB::raw('COALESCE(total_payable, total_amount)'));
+
+        // Current Month Revenue & Target Goal Calculation
+        $startOfMonth = Carbon::now()->startOfMonth();
+        $endOfMonth   = Carbon::now()->endOfMonth();
+
+        $currentMonthRevenue = (float) Booking::where(function($q) {
+            $q->where('payment_status', 'paid')
+              ->orWhereIn('status', ['confirmed', 'completed']);
+        })
+        ->whereNotIn('status', ['cancelled'])
+        ->whereNotIn('payment_status', ['refunded', 'refund_initiated'])
+        ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
+        ->sum(DB::raw('COALESCE(total_payable, total_amount)'));
+
+        // Dynamic Monthly Target Goal (Default ₹5,00,000 or scaled to active hotels/bookings)
+        $targetGoal = max(500000, ceil($totalRevenue * 1.25)); // Target Goal
+        $goalPercentage = $targetGoal > 0 ? min(100, round(($currentMonthRevenue / $targetGoal) * 100, 1)) : 0;
+        $remainingGoal  = max(0, $targetGoal - $currentMonthRevenue);
+
+        // Monthly Revenue Trends (Past 6 Months) for Chart.js
+        $monthlyLabels = [];
+        $monthlyIncomeData = [];
+        $monthlyBookingsData = [];
+
+        for ($i = 5; $i >= 0; $i--) {
+            $month = Carbon::now()->subMonths($i);
+            $monthStart = $month->copy()->startOfMonth();
+            $monthEnd   = $month->copy()->endOfMonth();
+
+            $monthlyLabels[] = $month->format('M Y');
+
+            $mRev = (float) Booking::where(function($q) {
+                $q->where('payment_status', 'paid')
+                  ->orWhereIn('status', ['confirmed', 'completed']);
+            })
+            ->whereNotIn('status', ['cancelled'])
+            ->whereNotIn('payment_status', ['refunded', 'refund_initiated'])
+            ->whereBetween('created_at', [$monthStart, $monthEnd])
+            ->sum(DB::raw('COALESCE(total_payable, total_amount)'));
+
+            $mCount = Booking::where(function($q) {
+                $q->where('payment_status', 'paid')
+                  ->orWhereIn('status', ['confirmed', 'completed']);
+            })
+            ->whereNotIn('status', ['cancelled'])
+            ->whereBetween('created_at', [$monthStart, $monthEnd])
+            ->count();
+
+            $monthlyIncomeData[]   = round($mRev, 2);
+            $monthlyBookingsData[] = $mCount;
+        }
+
+        // Payment Source Distribution (Razorpay vs Pay-at-Hotel)
+        $onlineRevenue = (float) Booking::where(function($q) {
+            $q->where('payment_status', 'paid')
+              ->orWhereNotNull('razorpay_payment_id');
+        })
+        ->whereNotIn('status', ['cancelled'])
+        ->sum(DB::raw('COALESCE(total_payable, total_amount)'));
+
+        $offlineRevenue = max(0, (float)$totalRevenue - $onlineRevenue);
+
+        // Conversion Rate
+        $conversionRate = $allBookingsCount > 0 ? round(($confirmedBookingsCount / $allBookingsCount) * 100, 1) : 0;
+
+        // Top 5 Performing Hotels
+        $topHotels = Hotel::withCount(['bookings' => function($q) {
+            $q->whereNotIn('status', ['cancelled']);
+        }])
+        ->orderBy('rating', 'desc')
+        ->orderBy('bookings_count', 'desc')
+        ->take(5)
+        ->get();
 
         $recentBookings = Booking::with(['user:id,name,email,phone', 'hotel:id,name,city'])
             ->latest()
@@ -92,14 +166,31 @@ class DashboardController extends Controller
                 'approved_hotels'    => $approvedHotels,
                 'pending_hotels'     => $pendingHotels,
                 'rejected_hotels'    => $rejectedHotels,
-                'total_bookings'     => $confirmedBookingsCount, // Auto-updates to show valid active/confirmed bookings count
+                'total_bookings'     => $confirmedBookingsCount,
                 'all_bookings'       => $allBookingsCount,
                 'confirmed_bookings' => $confirmedBookingsCount,
                 'active_bookings'    => $confirmedBookingsCount,
                 'pending_bookings'   => $pendingBookingsCount,
                 'cancelled_bookings' => $cancelledBookingsCount,
                 'total_revenue'      => (float) $totalRevenue,
+                'conversion_rate'    => $conversionRate,
             ],
+            'goals' => [
+                'target_goal'           => (float) $targetGoal,
+                'current_month_revenue' => (float) $currentMonthRevenue,
+                'goal_percentage'       => $goalPercentage,
+                'remaining_goal'        => (float) $remainingGoal,
+            ],
+            'charts' => [
+                'labels'           => $monthlyLabels,
+                'income_series'    => $monthlyIncomeData,
+                'bookings_series'  => $monthlyBookingsData,
+                'payment_sources'  => [
+                    'online_razorpay' => round($onlineRevenue, 2),
+                    'pay_at_hotel'    => round($offlineRevenue, 2),
+                ],
+            ],
+            'top_hotels'      => $topHotels,
             'recent_bookings' => $recentBookings,
             'recent_hotels'   => $recentHotels,
         ]);

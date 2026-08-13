@@ -16,6 +16,8 @@
     <meta http-equiv="Expires" content="0">
     <!-- Custom CSS -->
     <link rel="stylesheet" href="styles.css?v=3.0.0">
+    <!-- Chart.js Library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <div id="app" class="app-container">
@@ -133,17 +135,20 @@
             <main class="app-content">
 
                 <!-- -------------------------------------- -->
-                <!-- TAB 1: DASHBOARD -->
+                <!-- TAB 1: DASHBOARD ANALYTICS & GOALS -->
                 <!-- -------------------------------------- -->
                 <section id="tab-dashboard" class="tab-content active">
                     <div class="section-title">
-                        <h2>Overview & Analytics</h2>
-                        <button class="btn-sm" onclick="loadDashboardData()">
-                            <i class="fa-solid fa-rotate-right"></i> Refresh
-                        </button>
+                        <h2>Sales & Revenue Overview</h2>
+                        <div style="display:flex; gap:10px; align-items:center;">
+                            <span style="font-size:12px; color:var(--text-muted);"><i class="fa-solid fa-clock"></i> Live Updates</span>
+                            <button class="btn-sm" onclick="loadDashboardData()">
+                                <i class="fa-solid fa-rotate-right"></i> Refresh
+                            </button>
+                        </div>
                     </div>
 
-                    <!-- Metrics Grid -->
+                    <!-- Metrics Grid Header -->
                     <div class="metrics-grid">
                         <div class="metric-card gradient-purple">
                             <div class="metric-icon"><i class="fa-solid fa-indian-rupee-sign"></i></div>
@@ -154,32 +159,126 @@
                         </div>
 
                         <div class="metric-card gradient-blue">
-                            <div class="metric-icon"><i class="fa-solid fa-bookmark"></i></div>
+                            <div class="metric-icon"><i class="fa-solid fa-calendar-check"></i></div>
                             <div class="metric-info">
-                                <span class="metric-label">Total Bookings</span>
+                                <span class="metric-label">Active Bookings</span>
                                 <h3 id="stat-bookings">0</h3>
                             </div>
                         </div>
 
                         <div class="metric-card gradient-amber">
-                            <div class="metric-icon"><i class="fa-solid fa-hotel"></i></div>
+                            <div class="metric-icon"><i class="fa-solid fa-bullseye"></i></div>
                             <div class="metric-info">
-                                <span class="metric-label">Hotels Pending</span>
-                                <h3 id="stat-pending-hotels">0</h3>
+                                <span class="metric-label">Monthly Goal Achieved</span>
+                                <h3 id="stat-goal-percentage">0%</h3>
                             </div>
                         </div>
 
                         <div class="metric-card gradient-teal">
-                            <div class="metric-icon"><i class="fa-solid fa-user-check"></i></div>
+                            <div class="metric-icon"><i class="fa-solid fa-chart-line"></i></div>
                             <div class="metric-info">
-                                <span class="metric-label">Owners Pending KYC</span>
-                                <h3 id="stat-pending-owners">0</h3>
+                                <span class="metric-label">Conversion Rate</span>
+                                <h3 id="stat-conversion-rate">0%</h3>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Analytics Grid Row 1: Income Growth Chart & Target Goals Widget -->
+                    <div style="display:grid; grid-template-columns: 2fr 1fr; gap:16px; margin-bottom:16px;">
+                        <!-- Card A: Income Growth Line Chart -->
+                        <div style="background:var(--bg-card); padding:16px; border-radius:12px; border:1px solid var(--border); box-shadow:var(--shadow);">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                                <div>
+                                    <h3 style="margin:0; font-size:16px; color:var(--text-primary); font-weight:700;"><i class="fa-solid fa-chart-area" style="color:var(--primary);"></i> Revenue & Income Growth</h3>
+                                    <span style="font-size:12px; color:var(--text-muted);">Monthly income trend (Last 6 Months)</span>
+                                </div>
+                                <span class="badge approved" style="font-size:11px;"><i class="fa-solid fa-arrow-trend-up"></i> Live Performance</span>
+                            </div>
+                            <div style="position:relative; height:240px; width:100%;">
+                                <canvas id="chart-income-growth"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Card B: Monthly Goal & Target Progress -->
+                        <div style="background:var(--bg-card); padding:16px; border-radius:12px; border:1px solid var(--border); box-shadow:var(--shadow); display:flex; flex-direction:column; justify-content:space-between;">
+                            <div>
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                                    <h3 style="margin:0; font-size:16px; color:var(--text-primary); font-weight:700;"><i class="fa-solid fa-trophy" style="color:#f59e0b;"></i> Target Goal</h3>
+                                    <span id="badge-goal-status" class="badge approved" style="font-size:10px;">On Track</span>
+                                </div>
+
+                                <div style="text-align:center; padding:12px 0;">
+                                    <div style="font-size:12px; color:var(--text-secondary); margin-bottom:4px;">Current Month Revenue</div>
+                                    <h2 id="goal-current-revenue" style="font-size:26px; color:var(--success); font-weight:800; margin:0;">₹0</h2>
+                                    <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">Target Goal: <strong id="goal-target-amount" style="color:#fff;">₹5,00,000</strong></div>
+                                </div>
+
+                                <!-- Dynamic Goal Progress Bar -->
+                                <div style="margin:16px 0;">
+                                    <div style="display:flex; justify-content:space-between; font-size:12px; font-weight:700; margin-bottom:6px;">
+                                        <span>Goal Completion</span>
+                                        <span id="goal-progress-text" style="color:var(--primary);">0%</span>
+                                    </div>
+                                    <div style="background:var(--bg-dark); height:10px; border-radius:10px; overflow:hidden; border:1px solid var(--border);">
+                                        <div id="goal-progress-bar" style="background:linear-gradient(90deg, #6366f1, #38bdf8); height:100%; width:0%; transition:width 1s ease;"></div>
+                                    </div>
+                                </div>
+
+                                <div style="font-size:12px; color:var(--text-secondary); line-height:1.4;">
+                                    <i class="fa-solid fa-circle-info" style="color:var(--info);"></i> Remaining to reach milestone: <strong id="goal-remaining-amount" style="color:#fff;">₹0</strong>
+                                </div>
+                            </div>
+
+                            <div style="background:var(--bg-dark); padding:10px; border-radius:8px; border:1px solid var(--border); font-size:11px; color:var(--text-muted); margin-top:12px;">
+                                <i class="fa-solid fa-lightbulb" style="color:#facc15;"></i> <strong>Project Success Tip:</strong> Create targeted offers under Banners tab to boost monthly goal completions!
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Analytics Grid Row 2: Booking Funnel & Payment Sources -->
+                    <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:16px; margin-bottom:16px;">
+                        <!-- Card C: Booking Conversion Funnel -->
+                        <div style="background:var(--bg-card); padding:16px; border-radius:12px; border:1px solid var(--border);">
+                            <h4 style="margin:0 0 12px 0; font-size:14px; color:var(--text-primary);"><i class="fa-solid fa-filter-circle-dollar" style="color:#38bdf8;"></i> Booking Conversion Funnel</h4>
+                            <div style="display:flex; flex-direction:column; gap:8px;">
+                                <div style="background:var(--bg-dark); padding:8px 12px; border-radius:6px; border:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; font-size:12px;">
+                                    <span><i class="fa-solid fa-users" style="color:var(--info);"></i> Total Booking Intent</span>
+                                    <strong id="funnel-total">0</strong>
+                                </div>
+                                <div style="background:var(--bg-dark); padding:8px 12px; border-radius:6px; border:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; font-size:12px;">
+                                    <span><i class="fa-solid fa-circle-check" style="color:var(--success);"></i> Confirmed / Paid</span>
+                                    <strong id="funnel-confirmed" style="color:var(--success);">0</strong>
+                                </div>
+                                <div style="background:var(--bg-dark); padding:8px 12px; border-radius:6px; border:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; font-size:12px;">
+                                    <span><i class="fa-solid fa-hourglass-half" style="color:var(--warning);"></i> Pending Payment</span>
+                                    <strong id="funnel-pending" style="color:var(--warning);">0</strong>
+                                </div>
+                                <div style="background:var(--bg-dark); padding:8px 12px; border-radius:6px; border:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; font-size:12px;">
+                                    <span><i class="fa-solid fa-circle-xmark" style="color:var(--danger);"></i> Cancelled / Refunded</span>
+                                    <strong id="funnel-cancelled" style="color:var(--danger);">0</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card D: Payment Distribution Donut -->
+                        <div style="background:var(--bg-card); padding:16px; border-radius:12px; border:1px solid var(--border);">
+                            <h4 style="margin:0 0 8px 0; font-size:14px; color:var(--text-primary);"><i class="fa-solid fa-chart-pie" style="color:#a855f7;"></i> Payment Sources</h4>
+                            <div style="position:relative; height:180px; width:100%;">
+                                <canvas id="chart-payment-donut"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Card E: Top Revenue Generating Hotels -->
+                        <div style="background:var(--bg-card); padding:16px; border-radius:12px; border:1px solid var(--border);">
+                            <h4 style="margin:0 0 12px 0; font-size:14px; color:var(--text-primary);"><i class="fa-solid fa-award" style="color:#facc15;"></i> Top Earning Hotels</h4>
+                            <div id="top-hotels-container" style="display:flex; flex-direction:column; gap:8px;">
+                                <div style="font-size:12px; color:var(--text-muted);">Loading top hotels...</div>
                             </div>
                         </div>
                     </div>
 
                     <!-- Additional Secondary Metrics -->
-                    <div class="sub-metrics">
+                    <div class="sub-metrics" style="margin-bottom:16px;">
                         <div class="sub-card">
                             <i class="fa-solid fa-users"></i>
                             <div>
