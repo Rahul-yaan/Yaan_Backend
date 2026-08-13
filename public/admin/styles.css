@@ -857,6 +857,46 @@ body {
     }
 }
 
+/* AI Agent Glowing Styles */
+.btn-ai-glow {
+    background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
+    color: #ffffff !important;
+    font-weight: 700;
+    border: none;
+    box-shadow: 0 0 15px rgba(168, 85, 247, 0.4);
+    transition: all 0.3s ease;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 12px;
+}
+
+.btn-ai-glow:hover {
+    box-shadow: 0 0 25px rgba(236, 72, 153, 0.6);
+    transform: translateY(-1px);
+}
+
+.ai-card-glow {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(168, 85, 247, 0.18) 100%);
+    border: 1px solid rgba(168, 85, 247, 0.35);
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 4px 20px rgba(99, 102, 241, 0.15);
+}
+
+.ai-step-badge {
+    background: linear-gradient(135deg, #a855f7, #6366f1);
+    color: #ffffff;
+    font-weight: 800;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+}
+
 
 
 

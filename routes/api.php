@@ -64,7 +64,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Admin routes
     Route::middleware('role:admin')->prefix('admin')->group(function () {
-        Route::get('/dashboard',           [App\Http\Controllers\Admin\DashboardController::class, 'index']);
+        Route::get('/dashboard',             [App\Http\Controllers\Admin\DashboardController::class, 'index']);
+        Route::get('/dashboard/ai-analysis', [App\Http\Controllers\Admin\DashboardController::class, 'getAiAnalysis']);
         
         // Hotels
         Route::get('/hotels/locations',              [App\Http\Controllers\Admin\HotelController::class, 'getLocations']);

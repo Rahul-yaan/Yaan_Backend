@@ -2592,3 +2592,93 @@ async function deleteBanner(id) {
         showToast(err.message, 'danger');
     }
 }
+
+// ----------------------------------------------------
+// 9. AI STRATEGIC AGENT INSIGHTS
+// ----------------------------------------------------
+function openAiAgentModal() {
+    const modal = document.getElementById('ai-agent-modal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        runAiAgentAnalysis();
+    }
+}
+
+function closeAiAgentModal() {
+    const modal = document.getElementById('ai-agent-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+async function runAiAgentAnalysis() {
+    const stepsContainer = document.getElementById('ai-priority-steps-container');
+    const rewardElem = document.getElementById('ai-reward-estimate');
+    const marketContainer = document.getElementById('ai-market-conditions-content');
+
+    if (stepsContainer) {
+        stepsContainer.innerHTML = `<div style="font-size:12px; color:var(--text-muted); padding:16px; text-align:center;"><i class="fa-solid fa-wand-magic-sparkles fa-spin" style="color:#a855f7;"></i> AI Strategic Agent is analyzing listings & market conditions...</div>`;
+    }
+
+    try {
+        const res = await fetch(`${API_BASE}/admin/dashboard/ai-analysis`, { headers: getHeaders() });
+        if (!res.ok) await handleApiError(res);
+        const data = await res.json();
+
+        if (rewardElem) {
+            rewardElem.textContent = data.summary ? data.summary.total_reward_estimate : '₹1,50,000';
+        }
+
+        // Render Priority Steps
+        if (stepsContainer) {
+            const steps = data.priority_steps || [];
+            if (steps.length === 0) {
+                stepsContainer.innerHTML = `<div class="empty-state">All priority tasks completed! Your ecosystem is operating at peak performance.</div>`;
+            } else {
+                stepsContainer.innerHTML = steps.map(s => `
+                    <div style="background:var(--bg-dark); border:1px solid var(--border); padding:12px 14px; border-radius:8px; display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
+                        <div style="flex:1;">
+                            <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+                                <span class="ai-step-badge">STEP ${s.step} • ${s.priority}</span>
+                                <span style="font-size:11px; color:#c084fc; font-weight:700;">${s.category}</span>
+                            </div>
+                            <h5 style="margin:2px 0 4px 0; font-size:14px; color:#fff; font-weight:700;">${s.title}</h5>
+                            <p style="margin:0 0 8px 0; font-size:12px; color:var(--text-secondary); line-height:1.4;">${s.rationale}</p>
+                            <div style="font-size:11px; color:var(--success); font-weight:700;">
+                                <i class="fa-solid fa-coins"></i> Estimated Unlock: ${s.estimated_value}
+                            </div>
+                        </div>
+                        <button class="btn-sm" style="background:linear-gradient(135deg, #6366f1, #38bdf8); color:#fff; font-weight:700; flex-shrink:0; margin-top:4px;" onclick="navigateToTabFromAi('${s.action_tab}')">
+                            ${s.action_label} <i class="fa-solid fa-arrow-right"></i>
+                        </button>
+                    </div>
+                `).join('');
+            }
+        }
+
+        // Render Market Conditions
+        if (marketContainer && data.market_conditions) {
+            const m = data.market_conditions;
+            marketContainer.innerHTML = `
+                <div style="margin-bottom:6px;"><strong>Season Trend:</strong> ${m.season_trend}</div>
+                <div style="margin-bottom:6px;"><strong>High Demand Cities:</strong> ${(m.demand_surge_cities || []).join(', ')}</div>
+                <div style="margin-bottom:6px;"><strong>Optimal Price Range:</strong> ${m.pricing_sweet_spot}</div>
+                <div style="margin-top:8px; padding:8px 10px; background:rgba(99,102,241,0.1); border-left:3px solid #6366f1; border-radius:4px; color:#e2e8f0;">
+                    <i class="fa-solid fa-robot" style="color:#6366f1;"></i> <strong>AI Recommendation:</strong> ${m.strategic_recommendation}
+                </div>
+            `;
+        }
+    } catch (err) {
+        if (stepsContainer) {
+            stepsContainer.innerHTML = `<div class="empty-state text-danger"><i class="fa-solid fa-triangle-exclamation"></i> Error loading AI insights: ${err.message}</div>`;
+        }
+    }
+}
+
+function navigateToTabFromAi(tabId) {
+    closeAiAgentModal();
+    const navLink = document.querySelector(`.drawer-nav [data-tab="${tabId}"]`);
+    if (navLink) {
+        navLink.click();
+    } else if (typeof switchTab === 'function') {
+        switchTab(tabId);
+    }
+}
