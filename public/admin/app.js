@@ -1253,11 +1253,10 @@ async function deleteAdminHotelPhoto(hotelId, imageId) {
             <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; background:var(--bg-dark); padding:14px; border-radius:8px; border:1px solid var(--border); margin-bottom:16px;">
                 <div style="text-align:center;">
                     <span style="font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Owner Payable Revenue</span>
-                    <h3 style="margin:4px 0 2px 0; color:var(--success); font-size:18px;">₹${(analytics.owner_payable_revenue || 0).toLocaleString('en-IN')}</h3>
-                    <div style="font-size:10px; color:#38bdf8;">Platform Fee: ₹${(analytics.platform_fee_collected || 0).toLocaleString('en-IN')}</div>
+                    <h3 style="margin:4px 0 0 0; color:var(--success); font-size:18px;">₹${(analytics.owner_payable_revenue || 0).toLocaleString('en-IN')}</h3>
                 </div>
                 <div style="text-align:center;">
-                    <span style="font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Gross User Volume</span>
+                    <span style="font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Total Customer Payments</span>
                     <h3 style="margin:4px 0 0 0; color:#fcd34d; font-size:18px;">₹${(analytics.total_revenue || 0).toLocaleString('en-IN')}</h3>
                 </div>
                 <div style="text-align:center;">
