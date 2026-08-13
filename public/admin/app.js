@@ -1958,6 +1958,7 @@ async function deleteAdminHotelPhoto(hotelId, imageId) {
                 const t = data.transaction || {};
                 const r = data.razorpay || {};
                 const isConfirmed = t.is_confirmed || t.payment_status === 'paid' || t.status === 'confirmed' || t.status === 'completed';
+                const isRefunded = t.payment_status === 'refunded' || t.payment_status === 'refund_initiated' || (t.cancellation_reason && t.cancellation_reason.toLowerCase().includes('refund'));
                 const displayTxnId = t.display_transaction_id || t.transaction_id || t.temp_transaction_id || `TMP-${t.razorpay_order_id || t.id}`;
                 const regionTime = t.region_time_formatted || (t.created_at ? new Date(t.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' IST' : 'N/A');
                 const userObj = t.user || {};
