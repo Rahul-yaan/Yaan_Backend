@@ -180,6 +180,7 @@ function switchTab(tabId, event) {
     if (tabId === 'transactions') loadTransactionsData();
     if (tabId === 'users') loadUsersData();
     if (tabId === 'reviews') loadReviewsData();
+    if (tabId === 'banners') loadBannersData();
 }
 
 function toggleDrawer() {
@@ -2202,4 +2203,197 @@ function showToast(message, type = 'info') {
     setTimeout(() => {
         toast.remove();
     }, 3500);
+}
+
+// ----------------------------------------------------
+// 8. BANNERS & OFFERS BRAND MANAGEMENT
+// ----------------------------------------------------
+let currentBanners = [];
+
+async function loadBannersData() {
+    const container = document.getElementById('banners-container');
+    if (!container) return;
+    container.innerHTML = `<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Loading banners & offers...</div>`;
+
+    try {
+        const res = await fetch(`${API_BASE}/admin/banners`, { headers: getHeaders() });
+        if (!res.ok) await handleApiError(res);
+        const data = await res.json();
+        currentBanners = data.data || [];
+
+        if (currentBanners.length === 0) {
+            container.innerHTML = `<div class="empty-state">No promotional banners created yet. Click "Create New Banner" to add one.</div>`;
+            return;
+        }
+
+        container.innerHTML = currentBanners.map(b => {
+            const audienceBadge = b.target_audience === 'user'
+                ? `<span class="badge pending" style="background:rgba(56,189,248,0.15); color:#38bdf8; border:1px solid rgba(56,189,248,0.3);"><i class="fa-solid fa-user"></i> Customers Only</span>`
+                : (b.target_audience === 'owner'
+                    ? `<span class="badge pending" style="background:rgba(250,204,21,0.15); color:#facc15; border:1px solid rgba(250,204,21,0.3);"><i class="fa-solid fa-user-tie"></i> Hotel Owners Only</span>`
+                    : `<span class="badge approved" style="background:rgba(168,85,247,0.15); color:#c084fc; border:1px solid rgba(168,85,247,0.3);"><i class="fa-solid fa-users"></i> All (Users & Owners)</span>`);
+
+            const statusBadge = b.is_active
+                ? `<span class="badge approved" style="cursor:pointer;" onclick="toggleBannerStatus(${b.id})" title="Click to disable"><i class="fa-solid fa-circle-check"></i> ACTIVE</span>`
+                : `<span class="badge alert" style="cursor:pointer;" onclick="toggleBannerStatus(${b.id})" title="Click to enable"><i class="fa-solid fa-circle-xmark"></i> INACTIVE</span>`;
+
+            const fallbackImage = 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=800&q=80';
+            const imgUrl = b.image_url || fallbackImage;
+
+            return `
+    <div class="data-card" style="display:flex; flex-direction:column; justify-content:space-between; overflow:hidden;">
+        <div style="height: 140px; width: 100%; background:#0f172a; border-radius:8px; overflow:hidden; position:relative; margin-bottom:12px;">
+            <img src="${imgUrl}" alt="${b.title}" style="width:100%; height:100%; object-fit:cover;" onerror="this.src='${fallbackImage}'">
+            <div style="position:absolute; top:8px; right:8px;">${statusBadge}</div>
+        </div>
+
+        <div style="flex:1;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px; gap:8px;">
+                <h4 style="margin:0; font-size:15px; color:var(--text-primary); font-weight:700;">${b.title}</h4>
+                ${b.discount_percentage ? `<span style="background:var(--success); color:#fff; font-weight:700; padding:2px 8px; border-radius:4px; font-size:11px; flex-shrink:0;">${b.discount_percentage}% OFF</span>` : ''}
+            </div>
+
+            <div style="margin-bottom:8px;">${audienceBadge}</div>
+
+            <p style="font-size:12px; color:var(--text-secondary); line-height:1.4; margin: 6px 0 10px 0;">
+                ${b.description || 'No detailed description provided.'}
+            </p>
+
+            ${b.discount_code ? `
+                <div style="background:var(--bg-dark); border:1px dashed var(--primary); padding:6px 10px; border-radius:6px; font-size:12px; font-weight:700; color:var(--primary); display:inline-block; margin-bottom:10px;">
+                    <i class="fa-solid fa-ticket"></i> CODE: ${b.discount_code}
+                </div>
+            ` : ''}
+
+            ${b.expires_at ? `
+                <div style="font-size:11px; color:var(--text-muted); margin-bottom:10px;">
+                    <i class="fa-solid fa-hourglass-half"></i> Expires: <strong>${formatDateClean(b.expires_at)}</strong>
+                </div>
+            ` : ''}
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; pt-2; border-top:1px solid var(--border); margin-top:10px;">
+            <button class="btn-sm" style="background:var(--bg-dark); border:1px solid var(--border); color:#fff;" onclick="openEditBannerModal(${b.id})">
+                <i class="fa-solid fa-pen-to-square"></i> Edit
+            </button>
+            <button class="btn-sm btn-danger" onclick="deleteBanner(${b.id})">
+                <i class="fa-solid fa-trash"></i> Delete
+            </button>
+        </div>
+    </div>
+    `;
+        }).join('');
+    } catch (err) {
+        container.innerHTML = `<div class="empty-state text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading banners'}</div>`;
+    }
+}
+
+function openCreateBannerModal() {
+    document.getElementById('banner-form').reset();
+    document.getElementById('banner-id').value = '';
+    document.getElementById('banner-modal-title').innerHTML = `<i class="fa-solid fa-rectangle-ad"></i> Create New Banner / Offer`;
+    document.getElementById('banner-modal').classList.remove('hidden');
+}
+
+function openEditBannerModal(id) {
+    const b = currentBanners.find(x => x.id === id);
+    if (!b) return;
+
+    document.getElementById('banner-id').value = b.id;
+    document.getElementById('banner-title').value = b.title || '';
+    document.getElementById('banner-description').value = b.description || '';
+    document.getElementById('banner-target-audience').value = b.target_audience || 'all';
+    document.getElementById('banner-discount-code').value = b.discount_code || '';
+    document.getElementById('banner-discount-percentage').value = b.discount_percentage || '';
+    document.getElementById('banner-expires-at').value = b.expires_at ? b.expires_at.split('T')[0] : '';
+    document.getElementById('banner-image-url').value = (b.image_path && b.image_path.startsWith('http')) ? b.image_path : '';
+    document.getElementById('banner-image-file').value = '';
+
+    document.getElementById('banner-modal-title').innerHTML = `<i class="fa-solid fa-pen-to-square"></i> Edit Banner / Offer`;
+    document.getElementById('banner-modal').classList.remove('hidden');
+}
+
+function closeBannerModal() {
+    document.getElementById('banner-modal').classList.add('hidden');
+}
+
+async function saveBanner(event) {
+    if (event) event.preventDefault();
+
+    const id = document.getElementById('banner-id').value;
+    const title = document.getElementById('banner-title').value.trim();
+    const description = document.getElementById('banner-description').value.trim();
+    const targetAudience = document.getElementById('banner-target-audience').value;
+    const discountCode = document.getElementById('banner-discount-code').value.trim();
+    const discountPercentage = document.getElementById('banner-discount-percentage').value;
+    const expiresAt = document.getElementById('banner-expires-at').value;
+    const imageUrl = document.getElementById('banner-image-url').value.trim();
+    const imageFile = document.getElementById('banner-image-file').files[0];
+
+    const formData = new FormData();
+    formData.append('title', title);
+    formData.append('description', description);
+    formData.append('target_audience', targetAudience);
+    if (discountCode) formData.append('discount_code', discountCode);
+    if (discountPercentage) formData.append('discount_percentage', discountPercentage);
+    if (expiresAt) formData.append('expires_at', expiresAt);
+    if (imageUrl) formData.append('image_url', imageUrl);
+    if (imageFile) formData.append('image', imageFile);
+
+    const isEdit = !!id;
+    const url = isEdit ? `${API_BASE}/admin/banners/${id}` : `${API_BASE}/admin/banners`;
+
+    if (isEdit) {
+        formData.append('_method', 'PUT');
+    }
+
+    try {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${authToken}` },
+            body: formData
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || data.message || 'Failed to save banner');
+
+        showToast(data.message || 'Banner saved successfully', 'success');
+        closeBannerModal();
+        loadBannersData();
+    } catch (err) {
+        showToast(err.message, 'danger');
+    }
+}
+
+async function toggleBannerStatus(id) {
+    try {
+        const res = await fetch(`${API_BASE}/admin/banners/${id}/status`, {
+            method: 'PUT',
+            headers: getHeaders()
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || data.message || 'Failed to update status');
+
+        showToast(data.message || 'Status updated', 'success');
+        loadBannersData();
+    } catch (err) {
+        showToast(err.message, 'danger');
+    }
+}
+
+async function deleteBanner(id) {
+    if (!confirm('Are you sure you want to delete this banner?')) return;
+
+    try {
+        const res = await fetch(`${API_BASE}/admin/banners/${id}`, {
+            method: 'DELETE',
+            headers: getHeaders()
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || data.message || 'Failed to delete banner');
+
+        showToast(data.message || 'Banner deleted successfully', 'success');
+        loadBannersData();
+    } catch (err) {
+        showToast(err.message, 'danger');
+    }
 }

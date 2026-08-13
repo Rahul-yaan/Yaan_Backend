@@ -20,6 +20,9 @@ Route::middleware('throttle:60,1')->group(function () {
 // Razorpay Webhook — Verified by HMAC signature in controller
 Route::post('/webhooks/razorpay', [App\Http\Controllers\RazorpayWebhookController::class, 'handleWebhook']);
 
+// Public Banners & Offers API for Mobile Apps (User App / Hotel Owner App)
+Route::get('/banners', [App\Http\Controllers\BannerController::class, 'index']);
+
 // ============================================================
 // PROTECTED ROUTES — token required in Authorization header
 // ============================================================
@@ -98,6 +101,13 @@ Route::middleware('auth:sanctum')->group(function () {
         // Reviews
         Route::get('/reviews',             [App\Http\Controllers\Admin\ReviewController::class, 'index']);
         Route::delete('/reviews/{id}',      [App\Http\Controllers\Admin\ReviewController::class, 'destroy']);
+
+        // Banners & Offers
+        Route::get('/banners',             [App\Http\Controllers\Admin\BannerController::class, 'index']);
+        Route::post('/banners',            [App\Http\Controllers\Admin\BannerController::class, 'store']);
+        Route::put('/banners/{id}',        [App\Http\Controllers\Admin\BannerController::class, 'update']);
+        Route::put('/banners/{id}/status', [App\Http\Controllers\Admin\BannerController::class, 'toggleStatus']);
+        Route::delete('/banners/{id}',     [App\Http\Controllers\Admin\BannerController::class, 'destroy']);
     });
 
 });

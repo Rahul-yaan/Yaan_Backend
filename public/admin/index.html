@@ -122,6 +122,9 @@
                     <a href="#" class="nav-item" data-tab="reviews" onclick="switchTab('reviews', event)">
                         <i class="fa-solid fa-star"></i> <span>Reviews</span>
                     </a>
+                    <a href="#" class="nav-item" data-tab="banners" onclick="switchTab('banners', event)">
+                        <i class="fa-solid fa-rectangle-ad"></i> <span>Banners & Offers</span>
+                    </a>
                 </nav>
             </aside>
             <div id="drawer-overlay" class="drawer-overlay" onclick="toggleDrawer()"></div>
@@ -412,6 +415,22 @@
                 </section>
 
                 <!-- -------------------------------------- -->
+                <!-- TAB 8: BANNERS & OFFERS BRAND MANAGEMENT -->
+                <!-- -------------------------------------- -->
+                <section id="tab-banners" class="tab-content">
+                    <div class="section-title">
+                        <h2>Banners & Discount Offers</h2>
+                        <button class="btn-sm" style="background:var(--primary); color:#fff; font-weight:700; padding:8px 14px; border-radius:6px;" onclick="openCreateBannerModal()">
+                            <i class="fa-solid fa-plus"></i> Create New Banner
+                        </button>
+                    </div>
+
+                    <div id="banners-container" class="data-cards-grid">
+                        <div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Loading banners & offers...</div>
+                    </div>
+                </section>
+
+                <!-- -------------------------------------- -->
                 <!-- TAB 7: TRANSACTIONS & RAZORPAY LEDGER -->
                 <!-- -------------------------------------- -->
                 <section id="tab-transactions" class="tab-content">
@@ -607,6 +626,62 @@
                 </div>
                 <div id="hotel-modal-body" class="modal-body">
                     <!-- Populated dynamically by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Banner Create / Edit Modal -->
+        <div id="banner-modal" class="modal-backdrop hidden">
+            <div class="modal-content" style="max-width: 580px;">
+                <div class="modal-header">
+                    <h3 id="banner-modal-title"><i class="fa-solid fa-rectangle-ad"></i> Create Banner / Offer</h3>
+                    <button class="btn-sm" onclick="closeBannerModal()"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="modal-body" style="padding: 16px;">
+                    <form id="banner-form" onsubmit="saveBanner(event)">
+                        <input type="hidden" id="banner-id">
+                        <div style="margin-bottom: 12px;">
+                            <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">Offer Title *</label>
+                            <input type="text" id="banner-title" placeholder="e.g. Summer Special 20% OFF" required style="width:100%; background:var(--bg-dark); border:1px solid var(--border); color:#fff; padding:8px 12px; border-radius:6px;">
+                        </div>
+                        <div style="margin-bottom: 12px;">
+                            <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">Description / Terms</label>
+                            <textarea id="banner-description" rows="3" placeholder="e.g. Flat 20% discount on first booking. Use promo code YAAN20." style="width:100%; background:var(--bg-dark); border:1px solid var(--border); color:#fff; padding:8px 12px; border-radius:6px; font-family:inherit;"></textarea>
+                        </div>
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom: 12px;">
+                            <div>
+                                <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">Target Audience *</label>
+                                <select id="banner-target-audience" required style="width:100%; background:var(--bg-dark); border:1px solid var(--border); color:#fff; padding:8px 12px; border-radius:6px;">
+                                    <option value="all">All (Users & Hotel Owners)</option>
+                                    <option value="user">Users Only (Customer App)</option>
+                                    <option value="owner">Hotel Owners Only (Owner App)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">Discount Code (Optional)</label>
+                                <input type="text" id="banner-discount-code" placeholder="e.g. YAAN20" style="width:100%; background:var(--bg-dark); border:1px solid var(--border); color:#fff; padding:8px 12px; border-radius:6px;">
+                            </div>
+                        </div>
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom: 12px;">
+                            <div>
+                                <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">Discount % (Optional)</label>
+                                <input type="number" id="banner-discount-percentage" placeholder="e.g. 20" min="0" max="100" step="0.5" style="width:100%; background:var(--bg-dark); border:1px solid var(--border); color:#fff; padding:8px 12px; border-radius:6px;">
+                            </div>
+                            <div>
+                                <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">Expiration Date (Optional)</label>
+                                <input type="date" id="banner-expires-at" style="width:100%; background:var(--bg-dark); border:1px solid var(--border); color:#fff; padding:8px 12px; border-radius:6px;">
+                            </div>
+                        </div>
+                        <div style="margin-bottom: 16px;">
+                            <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">Banner Image File OR URL</label>
+                            <input type="file" id="banner-image-file" accept="image/*" style="width:100%; margin-bottom:6px; font-size:12px;">
+                            <input type="url" id="banner-image-url" placeholder="OR paste image URL (https://...)" style="width:100%; background:var(--bg-dark); border:1px solid var(--border); color:#fff; padding:8px 12px; border-radius:6px; font-size:12px;">
+                        </div>
+                        <div style="display:flex; justify-content:flex-end; gap:10px;">
+                            <button type="button" class="btn-sm" style="background:var(--bg-dark); border:1px solid var(--border); color:#fff;" onclick="closeBannerModal()">Cancel</button>
+                            <button type="submit" class="btn-sm" style="background:var(--primary); color:#fff; font-weight:700; padding:8px 16px;"><i class="fa-solid fa-floppy-disk"></i> Save Banner</button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
