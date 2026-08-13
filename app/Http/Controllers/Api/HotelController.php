@@ -42,7 +42,7 @@ class HotelController extends Controller
     // GET /api/hotels/{id}
     public function show($id)
     {
-        $query = Hotel::with(['images', 'primaryImage', 'reviews', 'amenities', 'owner.ownerProfile']);
+        $query = Hotel::with(['images', 'primaryImage', 'reviews.user:id,name,email', 'amenities', 'owner.ownerProfile']);
         $query = $this->applyApprovedScope($query);
         $hotel = $query->findOrFail($id);
         $hotel->ensurePrimaryImageExists();

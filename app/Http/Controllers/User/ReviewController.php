@@ -24,42 +24,63 @@ class ReviewController extends Controller
             'comment'    => 'nullable|string|max:500',
         ]);
 
-        if ($request->booking_id) {
+        $bookingId = $request->booking_id;
+
+        if ($bookingId) {
             // Check booking belongs to user
-            $booking = Booking::where('id', $request->booking_id)
+            $booking = Booking::where('id', $bookingId)
                 ->where('user_id', $request->user()->id)
                 ->where('hotel_id', $request->hotel_id)
-                ->where('status', 'completed')
+                ->where(function($q) {
+                    $q->whereIn('status', ['completed', 'confirmed'])
+                      ->orWhere('payment_status', 'paid');
+                })
                 ->first();
 
             if (!$booking) {
                 return response()->json([
-                    'error' => 'You can only review hotels you have completed a stay at.',
+                    'error' => 'You can only review hotels you have a confirmed or completed stay at.',
                 ], 403);
+            }
+        } else {
+            // Auto-link latest valid booking if user has one
+            $userBooking = Booking::where('user_id', $request->user()->id)
+                ->where('hotel_id', $request->hotel_id)
+                ->where(function($q) {
+                    $q->whereIn('status', ['completed', 'confirmed'])
+                      ->orWhere('payment_status', 'paid');
+                })
+                ->latest()
+                ->first();
+
+            if ($userBooking) {
+                $bookingId = $userBooking->id;
             }
         }
 
         $review = Review::create([
             'user_id'    => $request->user()->id,
             'hotel_id'   => $request->hotel_id,
-            'booking_id' => $request->booking_id,
+            'booking_id' => $bookingId,
             'rating'     => $request->rating,
             'comment'    => $request->comment,
         ]);
 
-        // Update hotel rating
+        // Update hotel rating & review count
         $hotel = Hotel::find($request->hotel_id);
-        $avgRating = Review::where('hotel_id', $request->hotel_id)->avg('rating');
-        $reviewCount = Review::where('hotel_id', $request->hotel_id)->count();
+        if ($hotel) {
+            $avgRating = Review::where('hotel_id', $request->hotel_id)->avg('rating') ?? 0;
+            $reviewCount = Review::where('hotel_id', $request->hotel_id)->count();
 
-        $hotel->update([
-            'rating'       => round($avgRating, 2),
-            'review_count' => $reviewCount,
-        ]);
+            $hotel->update([
+                'rating'       => round((float)$avgRating, 2),
+                'review_count' => $reviewCount,
+            ]);
+        }
 
         return response()->json([
             'message' => 'Review posted successfully.',
-            'review'  => $review->load('user'),
+            'review'  => $review->load('user:id,name,email'),
         ], 201);
     }
 
@@ -71,7 +92,7 @@ class ReviewController extends Controller
     public function index($hotelId)
     {
         $reviews = Review::where('hotel_id', $hotelId)
-            ->with('user:id,name')
+            ->with('user:id,name,email')
             ->orderBy('created_at', 'desc')
             ->get();
 

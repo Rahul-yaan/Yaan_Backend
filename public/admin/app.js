@@ -7,6 +7,28 @@ let currentOwners = [];
 let currentTxnTypeFilter = '';
 let currentTransactions = [];
 
+function formatDateClean(dateStr) {
+    if (!dateStr) return 'N/A';
+    try {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    } catch (e) {
+        return dateStr;
+    }
+}
+
+function formatDateTimeClean(dateStr) {
+    if (!dateStr) return 'N/A';
+    try {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        return d.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
+    } catch (e) {
+        return dateStr;
+    }
+}
+
 // Initialize Application
 document.addEventListener('DOMContentLoaded', () => {
     if (authToken && currentUser) {
@@ -764,13 +786,42 @@ async function openHotelDetailsModal(id) {
 
             <!-- Amenities -->
             ${(h.amenities || []).length > 0 ? `
-                <div style="background:var(--bg-dark); padding:12px; border-radius:8px; border:1px solid var(--border); font-size:12px;">
+                <div style="background:var(--bg-dark); padding:12px; border-radius:8px; border:1px solid var(--border); font-size:12px; margin-bottom:14px;">
                     <h5 style="margin:0 0 8px 0; font-size:13px; color:#a855f7;"><i class="fa-solid fa-wifi"></i> Hotel Amenities</h5>
                     <div style="display:flex; gap:8px; flex-wrap:wrap;">
                         ${h.amenities.map(a => `<span style="background:rgba(168,85,247,0.15); color:#c084fc; padding:4px 8px; border-radius:4px; border:1px solid rgba(168,85,247,0.3); font-weight:600;"><i class="fa-solid fa-check"></i> ${a.name}</span>`).join('')}
                     </div>
                 </div>
             ` : ''}
+
+            <!-- Customer Reviews for this Hotel -->
+            <div style="background:var(--bg-dark); padding:12px; border-radius:8px; border:1px solid var(--border); font-size:12px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <h5 style="margin:0; font-size:13px; color:#f59e0b;"><i class="fa-solid fa-star"></i> Customer Reviews (${(h.reviews || []).length})</h5>
+                    <span style="color:#f59e0b; font-weight:700;"><i class="fa-solid fa-star"></i> ${h.rating || '0.0'} / 5.0 (${h.review_count || (h.reviews || []).length} reviews)</span>
+                </div>
+                ${(!h.reviews || h.reviews.length === 0) ? `
+                    <div style="font-size:12px; color:var(--text-muted);">No reviews posted for this hotel yet.</div>
+                ` : `
+                    <div style="max-height:220px; overflow-y:auto; display:flex; flex-direction:column; gap:8px;">
+                        ${h.reviews.map(r => `
+                            <div style="background:var(--bg-card); padding:10px 12px; border-radius:6px; border:1px solid var(--border);">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                    <strong><i class="fa-solid fa-user" style="color:var(--primary);"></i> ${r.user ? r.user.name : (r.user_name || 'Customer')}</strong>
+                                    <span class="badge approved" style="font-size:11px;"><i class="fa-solid fa-star"></i> ${r.rating} / 5</span>
+                                </div>
+                                <p style="margin:4px 0; color:var(--text-secondary); font-size:12px; line-height:1.4;">"${r.comment || 'No text comment provided.'}"</p>
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; font-size:11px; color:var(--text-muted);">
+                                    <span>${formatDateTimeClean(r.created_at)}</span>
+                                    <button class="btn-sm btn-danger" style="padding:2px 8px; font-size:10px;" onclick="deleteReview(${r.id}); openHotelDetailsModal(${h.id});">
+                                        <i class="fa-solid fa-trash"></i> Delete
+                                    </button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `}
+            </div>
         `;
     } catch (err) {
         body.innerHTML = `<div style="padding:20px; text-align:center; color:var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Failed to load hotel details'}</div>`;
@@ -1466,6 +1517,7 @@ async function deleteAdminHotelPhoto(hotelId, imageId) {
         // ----------------------------------------------------
         async function loadReviewsData() {
             const container = document.getElementById('reviews-container');
+            if (!container) return;
             container.innerHTML = `<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Loading reviews...</div>`;
 
             try {
@@ -1483,15 +1535,16 @@ async function deleteAdminHotelPhoto(hotelId, imageId) {
             <div class="data-card">
                 <div class="data-card-header">
                     <div class="data-card-title">
-                        <h4>${r.hotel ? r.hotel.name : 'Hotel'}</h4>
-                        <div class="data-card-sub">by ${r.user ? r.user.name : 'Anonymous'}</div>
+                        <h4><i class="fa-solid fa-hotel" style="color:var(--primary);"></i> ${r.hotel ? r.hotel.name : 'Hotel'} ${r.hotel && r.hotel.city ? `<small style="font-weight:normal; color:var(--text-muted);">(${r.hotel.city})</small>` : ''}</h4>
+                        <div class="data-card-sub"><i class="fa-solid fa-user" style="color:var(--info);"></i> by ${r.user ? r.user.name : (r.user_name || 'Anonymous')} ${r.user && r.user.email ? `(${r.user.email})` : ''}</div>
                     </div>
-                    <span class="badge approved"><i class="fa-solid fa-star"></i> ${r.rating || 5}</span>
+                    <span class="badge approved"><i class="fa-solid fa-star"></i> ${r.rating || 5} / 5</span>
                 </div>
-                <p style="font-size:13px; color: var(--text-secondary); line-height: 1.4; margin: 8px 0;">
+                <p style="font-size:13px; color: var(--text-secondary); line-height: 1.4; margin: 10px 0;">
                     "${r.comment || r.review || 'No text comment provided.'}"
                 </p>
-                <div style="margin-top: auto;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top: auto; pt-2;">
+                    <span style="font-size:11px; color:var(--text-muted);"><i class="fa-solid fa-clock"></i> ${formatDateTimeClean(r.created_at)}</span>
                     <button class="btn-sm btn-danger" onclick="deleteReview(${r.id})">
                         <i class="fa-solid fa-trash"></i> Moderate & Delete
                     </button>
@@ -1516,6 +1569,7 @@ async function deleteAdminHotelPhoto(hotelId, imageId) {
 
                 showToast(data.message || 'Review deleted successfully', 'success');
                 loadReviewsData();
+                loadHotelsData();
             } catch (err) {
                 showToast(err.message, 'danger');
             }

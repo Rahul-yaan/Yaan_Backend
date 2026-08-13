@@ -121,7 +121,7 @@ class HotelController extends Controller
     {
         $hotel = Hotel::where('id', $id)
             ->whereIn('status', ['active', 'approved'])
-            ->with(['images', 'primaryImage', 'amenities', 'reviews', 'owner.ownerProfile'])
+            ->with(['images', 'primaryImage', 'amenities', 'reviews.user:id,name,email', 'owner.ownerProfile'])
             ->firstOrFail();
 
         $hotel->ensurePrimaryImageExists();
