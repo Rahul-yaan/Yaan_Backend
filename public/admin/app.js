@@ -262,9 +262,9 @@ async function loadDashboardData() {
             currentTargetGoal = g.target_goal;
         }
 
-        document.getElementById('stat-revenue').textContent = `₹${(m.total_revenue || 0).toLocaleString('en-IN')}`;
-        if (document.getElementById('stat-admin-fee')) {
-            document.getElementById('stat-admin-fee').textContent = `₹${(m.admin_platform_revenue || 0).toLocaleString('en-IN')}`;
+        document.getElementById('stat-revenue').textContent = `₹${(m.admin_platform_revenue || 0).toLocaleString('en-IN')}`;
+        if (document.getElementById('stat-gross-volume')) {
+            document.getElementById('stat-gross-volume').textContent = `₹${(m.total_revenue || 0).toLocaleString('en-IN')}`;
         }
         if (document.getElementById('stat-owners-fee')) {
             document.getElementById('stat-owners-fee').textContent = `₹${(m.hotel_owners_revenue || 0).toLocaleString('en-IN')}`;

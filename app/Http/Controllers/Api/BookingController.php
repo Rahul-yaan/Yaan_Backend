@@ -36,9 +36,19 @@ public function store(Request $request)
         ], 422);
     }
 
-    $price = $hotel->price_per_night;
-    $gstAmount = $price * 0.18;
-    $totalPayable = $price + $gstAmount;
+    $price = (float) $hotel->price_per_night;
+
+    // Discount calculation support (e.g. 5% discount or promo offer)
+    $discountPct = (float) $request->input('discount_percentage', 0);
+    $discountAmount = (float) $request->input('discount_amount', $request->input('promotion_applied', 0));
+
+    if ($discountPct > 0 && $discountAmount <= 0) {
+        $discountAmount = round($price * ($discountPct / 100), 2);
+    }
+
+    $discountedBasePrice = max(0, $price - $discountAmount);
+    $gstAmount = round($discountedBasePrice * 0.18, 2);
+    $totalPayable = round($discountedBasePrice + $gstAmount, 2);
 
     $booking = Booking::create([
         'user_id'          => $request->user() ? $request->user()->id : 1, // Fallback if used without auth
@@ -51,8 +61,8 @@ public function store(Request $request)
         'payment_method'   => $request->payment_method,
         
         'price_per_night'  => $price,
-        'total_amount'     => $price,
-        'promotion_applied'=> 0.00,
+        'total_amount'     => $discountedBasePrice,
+        'promotion_applied'=> $discountAmount,
         'gst_amount'       => $gstAmount,
         'total_payable'    => $totalPayable,
         

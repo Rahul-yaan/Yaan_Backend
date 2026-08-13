@@ -48,9 +48,19 @@ class BookingController extends Controller
             ], 422);
         }
 
-        $price = $hotel->price_per_night;
-        $gstAmount = $price * 0.18;
-        $totalPayable = $price + $gstAmount;
+        $price = (float) $hotel->price_per_night;
+
+        // Discount calculation support (e.g. 5% discount or promo offer)
+        $discountPct = (float) $request->input('discount_percentage', 0);
+        $discountAmount = (float) $request->input('discount_amount', $request->input('promotion_applied', 0));
+
+        if ($discountPct > 0 && $discountAmount <= 0) {
+            $discountAmount = round($price * ($discountPct / 100), 2);
+        }
+
+        $discountedBasePrice = max(0, $price - $discountAmount);
+        $gstAmount = round($discountedBasePrice * 0.18, 2);
+        $totalPayable = round($discountedBasePrice + $gstAmount, 2);
 
         $rawPayment = strtolower(trim($request->payment_method ?? 'online'));
         $isOfflinePayment = in_array($rawPayment, ['cash', 'pay_at_hotel', 'pay at hotel', 'offline']);
@@ -62,9 +72,9 @@ class BookingController extends Controller
             'user_id'             => $request->user()->id,
             'hotel_id'            => $request->hotel_id,
             'booking_date'        => $request->booking_date,
-            'check_in'            => $request->booking_date, // Defaulting check_in to avoid DB constraint error
-            'check_out'           => \Carbon\Carbon::parse($request->booking_date)->addDay()->toDateString(), // Default 1 day
-            'total_nights'        => 1, // Default 1 night
+            'check_in'            => $request->booking_date,
+            'check_out'           => \Carbon\Carbon::parse($request->booking_date)->addDay()->toDateString(),
+            'total_nights'        => 1,
             'truck_type'          => $request->truck_type,
             'truck_no'            => $request->truck_no,
             'logistics_name'      => $request->logistics_name,
@@ -73,8 +83,8 @@ class BookingController extends Controller
             'temp_transaction_id' => $tempTxnId,
             
             'price_per_night'  => $price,
-            'total_amount'     => $price,
-            'promotion_applied'=> 0.00,
+            'total_amount'     => $discountedBasePrice,
+            'promotion_applied'=> $discountAmount,
             'gst_amount'       => $gstAmount,
             'total_payable'    => $totalPayable,
             
