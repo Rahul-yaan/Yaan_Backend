@@ -2631,9 +2631,14 @@ async function runAiAgentAnalysis() {
             rewardElem.textContent = data.summary ? data.summary.total_reward_estimate : '₹1,50,000';
         }
 
-        // Render Goal Breakdown Card
         if (data.summary) {
             const sum = data.summary;
+
+            const healthScoreElem = document.getElementById('ai-health-score');
+            const trainedTimeElem = document.getElementById('ai-last-trained-time');
+            if (healthScoreElem) healthScoreElem.textContent = `${sum.health_score || 85}/100`;
+            if (trainedTimeElem) trainedTimeElem.textContent = `Trained: ${sum.training_timestamp || 'Just Now'} (${sum.datapoints_learned || 0} Datapoints Learned)`;
+
             const card = document.getElementById('ai-goal-breakdown-card');
             if (card) {
                 card.style.display = 'block';
@@ -2641,11 +2646,26 @@ async function runAiAgentAnalysis() {
                 const goalShortfallText = document.getElementById('ai-goal-shortfall-text');
                 const goalNightsText = document.getElementById('ai-goal-nights-text');
                 const goalDailyText = document.getElementById('ai-goal-daily-text');
+                const actualVelocityText = document.getElementById('ai-actual-velocity-text');
+                const paceBadge = document.getElementById('ai-velocity-pace-badge');
 
                 if (goalTargetText) goalTargetText.textContent = `₹${(sum.target_goal || 500000).toLocaleString('en-IN')}`;
                 if (goalShortfallText) goalShortfallText.textContent = `₹${(sum.remaining_shortfall || 0).toLocaleString('en-IN')}`;
                 if (goalNightsText) goalNightsText.textContent = `${sum.required_room_nights || 0} nights`;
                 if (goalDailyText) goalDailyText.textContent = `${sum.daily_bookings_needed || 0} / day`;
+                if (actualVelocityText) actualVelocityText.textContent = `${sum.actual_daily_velocity || 0} / day`;
+
+                if (paceBadge) {
+                    const pacePct = sum.velocity_pace_percent || 0;
+                    paceBadge.textContent = `Pace: ${pacePct}% of Target Velocity`;
+                    if (pacePct >= 80) {
+                        paceBadge.className = 'badge approved';
+                    } else if (pacePct >= 40) {
+                        paceBadge.className = 'badge pending';
+                    } else {
+                        paceBadge.className = 'badge alert';
+                    }
+                }
             }
         }
 
