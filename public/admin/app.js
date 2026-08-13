@@ -2214,7 +2214,77 @@ async function deleteAdminHotelPhoto(hotelId, imageId) {
         }
 
         function printInvoice() {
-            window.print();
+            const modalBody = document.getElementById('invoice-modal-body');
+            if (!modalBody) return;
+
+            const printWindow = window.open('', '_blank', 'width=850,height=1100');
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Official Payment Invoice - Yaan</title>
+                    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+                    <style>
+                        body {
+                            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                            color: #0f172a;
+                            background: #ffffff;
+                            margin: 0;
+                            padding: 24px;
+                            -webkit-print-color-adjust: exact !important;
+                            print-color-adjust: exact !important;
+                        }
+                        * {
+                            color: #0f172a !important;
+                            background: transparent !important;
+                            border-color: #cbd5e1 !important;
+                            box-shadow: none !important;
+                        }
+                        .badge {
+                            border: 1px solid #0f172a;
+                            padding: 4px 8px;
+                            border-radius: 4px;
+                            font-weight: bold;
+                        }
+                        table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            margin: 16px 0;
+                        }
+                        th, td {
+                            padding: 10px 12px;
+                            border: 1px solid #cbd5e1;
+                            text-align: left;
+                        }
+                        th {
+                            background: #f8fafc !important;
+                            font-weight: 700;
+                        }
+                        hr {
+                            border: 0;
+                            border-top: 1px solid #cbd5e1;
+                            margin: 16px 0;
+                        }
+                        @media print {
+                            body { padding: 0; }
+                            @page { margin: 1.5cm; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div style="max-width:800px; margin:0 auto;">
+                        ${modalBody.innerHTML}
+                    </div>
+                    <script>
+                        setTimeout(() => {
+                            window.print();
+                            window.close();
+                        }, 350);
+                    </script>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
         }
 
         async function verifyRazorpayStatus(txnId) {
