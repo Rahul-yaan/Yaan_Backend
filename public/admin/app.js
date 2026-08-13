@@ -258,6 +258,10 @@ async function loadDashboardData() {
         const g = data.goals || {};
         const c = data.charts || {};
 
+        if (g.target_goal) {
+            currentTargetGoal = g.target_goal;
+        }
+
         document.getElementById('stat-revenue').textContent = `₹${(m.total_revenue || 0).toLocaleString('en-IN')}`;
         document.getElementById('stat-bookings').textContent = m.confirmed_bookings ?? m.total_bookings ?? 0;
         if (document.getElementById('stat-goal-percentage')) {
