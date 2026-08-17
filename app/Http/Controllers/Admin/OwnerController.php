@@ -85,7 +85,7 @@ class OwnerController extends Controller
 
         $totalBookings     = $bookings->count();
         $confirmedBookings = $bookings->filter(function($b) {
-            return ($b->payment_status === 'paid' || in_array($b->status, ['confirmed', 'completed'])) && $b->payment_status !== 'refunded';
+            return (in_array($b->payment_status, ['paid', 'pay_at_hotel', 'cash', 'completed']) || in_array($b->status, ['confirmed', 'completed'])) && $b->payment_status !== 'refunded';
         });
 
         $baseRevenueSum = (float) $confirmedBookings->sum(function($b) {

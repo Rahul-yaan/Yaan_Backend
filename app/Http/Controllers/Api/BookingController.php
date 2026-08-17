@@ -66,6 +66,9 @@ public function store(Request $request)
     $gstAmount = round($discountedBasePrice * 0.18, 2);
     $totalPayable = round($discountedBasePrice + $gstAmount, 2);
 
+    $rawPayment = strtolower(trim($request->payment_method ?? 'online'));
+    $isOfflinePayment = in_array($rawPayment, ['cash', 'pay_at_hotel', 'pay at hotel', 'offline']);
+
     $booking = Booking::create([
         'user_id'          => $request->user() ? $request->user()->id : 1, // Fallback if used without auth
         'hotel_id'         => $request->hotel_id,
@@ -82,8 +85,8 @@ public function store(Request $request)
         'gst_amount'       => $gstAmount,
         'total_payable'    => $totalPayable,
         
-        'status'           => 'pending',
-        'payment_status'   => 'pending',
+        'status'           => $isOfflinePayment ? 'confirmed' : 'pending',
+        'payment_status'   => $isOfflinePayment ? 'pay_at_hotel' : 'pending',
     ]);
 
     $hotel->decrement('available_rooms');

@@ -67,7 +67,7 @@ class DashboardController extends Controller
 
         // Confirmed & Non-Refunded Bookings Query for Revenue Breakdown
         $confirmedBookingsQuery = Booking::where(function($q) {
-            $q->where('payment_status', 'paid')
+            $q->whereIn('payment_status', ['paid', 'pay_at_hotel', 'cash', 'completed'])
               ->orWhereIn('status', ['confirmed', 'completed']);
         })
         ->whereNotIn('status', ['cancelled'])

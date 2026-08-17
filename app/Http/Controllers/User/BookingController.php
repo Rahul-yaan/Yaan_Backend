@@ -104,8 +104,8 @@ class BookingController extends Controller
             'gst_amount'       => $gstAmount,
             'total_payable'    => $totalPayable,
             
-            'status'           => 'pending',
-            'payment_status'   => 'pending',
+            'status'           => $isOfflinePayment ? 'confirmed' : 'pending',
+            'payment_status'   => $isOfflinePayment ? 'pay_at_hotel' : 'pending',
         ]);
 
         // Decrease available rooms
