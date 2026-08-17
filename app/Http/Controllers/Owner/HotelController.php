@@ -326,12 +326,34 @@ class HotelController extends Controller
             }
         }
 
-        if (empty($files)) {
-            return [];
-        }
-
         $hasPrimary = $hotel->images()->whereRaw('is_primary IS TRUE')->exists();
         $uploaded = [];
+
+        // Support base64 or URL strings sent in images array payload
+        $rawImages = $request->input('images') ?? $request->input('image_urls') ?? $request->input('photos');
+        if (!empty($rawImages) && is_array($rawImages)) {
+            foreach ($rawImages as $imgStr) {
+                if (is_string($imgStr) && !empty(trim($imgStr))) {
+                    $isPrimary = !$hasPrimary;
+                    if ($isPrimary) {
+                        HotelImage::where('hotel_id', $hotel->id)->update([
+                            'is_primary' => \Illuminate\Support\Facades\DB::raw('false')
+                        ]);
+                        $hasPrimary = true;
+                    }
+                    $image = HotelImage::create([
+                        'hotel_id'   => $hotel->id,
+                        'image_path' => trim($imgStr),
+                        'is_primary' => $isPrimary,
+                    ]);
+                    $uploaded[] = $image;
+                }
+            }
+        }
+
+        if (empty($files)) {
+            return $uploaded;
+        }
 
         foreach ($files as $index => $file) {
             if (!$file->isValid()) continue;

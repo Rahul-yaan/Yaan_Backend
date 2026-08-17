@@ -22,7 +22,7 @@ class HotelImage extends Model
     public function setIsPrimaryAttribute($value)
     {
         $isTrue = filter_var($value, FILTER_VALIDATE_BOOLEAN);
-        $this->attributes['is_primary'] = (bool) $isTrue;
+        $this->attributes['is_primary'] = $isTrue ? DB::raw('true') : DB::raw('false');
     }
 
     public function getUrlAttribute()

@@ -50,6 +50,8 @@ class ProfileController extends Controller
         $request->validate([
             'hotel_name'     => 'nullable|string|max:200',
             'owner_name'     => 'nullable|string|max:200',
+            'name'           => 'nullable|string|max:200',
+            'phone'          => 'nullable|string|max:30',
             'address'        => 'nullable|string',
             'state'          => 'nullable|string',
             'city'           => 'nullable|string',
@@ -59,15 +61,25 @@ class ProfileController extends Controller
             'bank_name'      => 'nullable|string',
             'account_number' => 'nullable|string',
             'ifsc_code'      => 'nullable|string',
-            'business_proof' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:5120',
-            'aadhaar_front'  => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:5120',
-            'aadhaar_back'   => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:5120',
-            'pan_card'       => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:5120',
-            'fssai_license'  => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:5120',
-            'gst_image'      => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:5120',
+            'business_proof' => 'nullable',
+            'aadhaar_front'  => 'nullable',
+            'aadhaar_back'   => 'nullable',
+            'pan_card'       => 'nullable',
+            'fssai_license'  => 'nullable',
+            'gst_image'      => 'nullable',
         ]);
 
         $user = $request->user();
+
+        // Update User name & phone if provided
+        $newName = $request->input('owner_name') ?? $request->input('name');
+        if (!empty($newName)) {
+            $user->name = trim($newName);
+        }
+        if ($request->filled('phone')) {
+            $user->phone = trim($request->input('phone'));
+        }
+        $user->save();
 
         $profile = OwnerProfile::firstOrCreate(
             ['user_id' => $user->id]
@@ -79,7 +91,11 @@ class ProfileController extends Controller
             'bank_name', 'account_number', 'ifsc_code',
         ]);
 
-        // Handle file uploads
+        if (empty($data['owner_name']) && !empty($user->name)) {
+            $data['owner_name'] = $user->name;
+        }
+
+        // Handle file uploads (supporting both multipart UploadedFile and Base64/URL strings)
         $fileFields = [
             'business_proof', 'aadhaar_front', 'aadhaar_back',
             'pan_card', 'fssai_license', 'gst_image',
@@ -92,10 +108,12 @@ class ProfileController extends Controller
                 $contents = file_get_contents($file->getRealPath());
                 $base64 = 'data:' . $mime . ';base64,' . base64_encode($contents);
                 $data[$field] = $base64;
+            } elseif ($request->filled($field) && is_string($request->input($field))) {
+                $data[$field] = trim($request->input($field));
             }
         }
 
-        // Update profile text and file fields (excluding boolean flags to avoid PostgreSQL 42804 type mismatch)
+        // Update profile text and file fields
         unset($data['is_profile_complete']);
         $profile->update($data);
 
