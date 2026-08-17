@@ -41,19 +41,15 @@ class OwnerController extends Controller
         if ($request->has('verified') && $request->verified !== '' && $request->verified !== null && $request->verified !== 'all') {
             $isVerified = filter_var($request->verified, FILTER_VALIDATE_BOOLEAN);
             if ($isVerified) {
-                $query->where(function($q) {
-                    $q->where('is_verified', true)->orWhere('is_verified', 1);
-                })
+                $query->whereRaw('is_verified IS TRUE')
                 ->whereHas('ownerProfile', function($q) {
-                    $q->where('is_profile_complete', true)->orWhere('is_profile_complete', 1);
+                    $q->whereRaw('is_profile_complete IS TRUE');
                 });
             } else {
                 $query->where(function($q) {
-                    $q->where(function($sq) {
-                        $sq->where('is_verified', false)->orWhere('is_verified', 0)->orWhereNull('is_verified');
-                    })
+                    $q->whereRaw('(is_verified IS FALSE OR is_verified IS NULL)')
                     ->orWhereHas('ownerProfile', function($sq) {
-                        $sq->where('is_profile_complete', false)->orWhere('is_profile_complete', 0)->orWhereNull('is_profile_complete');
+                        $sq->whereRaw('(is_profile_complete IS FALSE OR is_profile_complete IS NULL)');
                     })
                     ->orDoesntHave('ownerProfile');
                 });
@@ -108,10 +104,16 @@ class OwnerController extends Controller
             'owner'       => $owner,
             'hotels'      => $hotels->isNotEmpty() ? $hotels : $owner->hotels,
             'analytics'   => [
-                'total_revenue'          => $totalCustomerPaid,    // ₹118
-                'owner_payable_revenue'  => $ownerPayableRevenue,  // ₹66
-                'owner_gst_amount'       => $ownerGstAmount,       // ₹11.88
-                'platform_fee_collected' => $platformFeeCollected, // ₹34
+                'total_revenue'          => $totalCustomerPaid,    // ₹112.10 Gross
+                'total_customer_paid'    => $totalCustomerPaid,
+                'gross_revenue'          => $totalCustomerPaid,
+                'owner_payable_revenue'  => $ownerPayableRevenue,  // ₹62.70 Owner Net
+                'payable_amount'         => $ownerPayableRevenue,
+                'total_earnings'         => $ownerPayableRevenue,
+                'owner_gst_amount'       => $ownerGstAmount,       // ₹11.29 Owner GST
+                'gst_amount'             => $ownerGstAmount,
+                'platform_fee_collected' => $platformFeeCollected, // ₹32.30 Platform Fee
+                'platform_fee'           => $platformFeeCollected,
                 'total_bookings'         => $totalBookings,
                 'confirmed_bookings'     => $confirmedBookings->count(),
                 'cancelled_bookings'     => $totalCancelled,
