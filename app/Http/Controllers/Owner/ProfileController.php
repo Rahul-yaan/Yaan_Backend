@@ -120,7 +120,12 @@ class ProfileController extends Controller
         \Illuminate\Support\Facades\DB::statement("UPDATE owner_profiles SET is_profile_complete = true, updated_at = NOW() WHERE id = ?", [$profile->id]);
         \Illuminate\Support\Facades\DB::statement("UPDATE users SET is_verified = false, updated_at = NOW() WHERE id = ?", [$user->id]);
 
-        // Sync hotel name, address, and city with core hotels table and reset status to pending for Admin verification
+        // Sync hotel name, address, city, latitude, longitude, pricing with core hotels table
+        $lat   = $request->input('latitude') ?? $request->input('lat') ?? $request->input('origin_lat') ?? 22.3072;
+        $lng   = $request->input('longitude') ?? $request->input('lng') ?? $request->input('lon') ?? $request->input('origin_lng') ?? 73.1812;
+        $price = $request->input('price_per_night') ?? $request->input('price') ?? 1500;
+        $rooms = $request->input('total_rooms') ?? $request->input('rooms') ?? 10;
+
         $targetHotel = \App\Models\Hotel::where('owner_id', $user->id)->first();
         if (!$targetHotel) {
             $targetHotel = \App\Models\Hotel::create([
@@ -128,20 +133,36 @@ class ProfileController extends Controller
                 'name'            => !empty($data['hotel_name']) ? $data['hotel_name'] : $user->name,
                 'address'         => $data['address'] ?? 'N/A',
                 'city'            => $data['city'] ?? 'N/A',
-                'price_per_night' => 1500,
-                'total_rooms'     => 10,
-                'available_rooms' => 10,
+                'latitude'        => (float) $lat,
+                'longitude'       => (float) $lng,
+                'price_per_night' => (float) $price,
+                'total_rooms'     => (int) $rooms,
+                'available_rooms' => (int) $rooms,
                 'rating'          => 4.5,
                 'review_count'    => 0,
                 'status'          => 'pending',
             ]);
         } else {
-            $targetHotel->update([
+            $hotelUpdate = [
                 'name'    => !empty($data['hotel_name']) ? $data['hotel_name'] : $targetHotel->name,
                 'address' => !empty($data['address']) ? $data['address'] : $targetHotel->address,
                 'city'    => !empty($data['city']) ? $data['city'] : $targetHotel->city,
                 'status'  => 'pending',
-            ]);
+            ];
+            if ($request->filled('latitude') || $request->filled('lat') || $request->filled('origin_lat')) {
+                $hotelUpdate['latitude'] = (float) $lat;
+            }
+            if ($request->filled('longitude') || $request->filled('lng') || $request->filled('lon') || $request->filled('origin_lng')) {
+                $hotelUpdate['longitude'] = (float) $lng;
+            }
+            if ($request->filled('price_per_night') || $request->filled('price')) {
+                $hotelUpdate['price_per_night'] = (float) $price;
+            }
+            if ($request->filled('total_rooms') || $request->filled('rooms')) {
+                $hotelUpdate['total_rooms'] = (int) $rooms;
+                $hotelUpdate['available_rooms'] = (int) $rooms;
+            }
+            $targetHotel->update($hotelUpdate);
         }
 
         // Automatically attach registration/profile photo as hotel image
