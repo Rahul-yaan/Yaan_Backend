@@ -20,6 +20,7 @@ class Hotel extends Model
         'rating',
         'review_count',
         'status',
+        'rejection_reason',
     ];
 
     protected $casts = [

@@ -27,6 +27,8 @@ class OwnerProfile extends Model
         'account_number',
         'ifsc_code',
         'is_profile_complete',
+        'status',
+        'rejection_reason',
     ];
 
     protected $casts = [
@@ -46,14 +48,13 @@ class OwnerProfile extends Model
     {
         if (empty($path)) return null;
         if (str_starts_with($path, 'data:') || str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
-            return preg_replace('/^http:/i', 'https:', $path);
+            return $path;
         }
         $clean = ltrim($path, '/');
         if (str_starts_with($clean, 'storage/')) {
             $clean = substr($clean, 8);
         }
-        $url = asset('storage/' . $clean);
-        return preg_replace('/^http:/i', 'https:', $url);
+        return asset('storage/' . $clean);
     }
 
     public function getAadhaarFrontAttribute($value)
@@ -118,7 +119,15 @@ class OwnerProfile extends Model
 
     public function setIsProfileCompleteAttribute($value)
     {
-        $this->attributes['is_profile_complete'] = filter_var($value, FILTER_VALIDATE_BOOLEAN);
+        $isTrue = filter_var($value, FILTER_VALIDATE_BOOLEAN);
+        try {
+            if (DB::getDriverName() === 'pgsql') {
+                $this->attributes['is_profile_complete'] = $isTrue ? DB::raw('true') : DB::raw('false');
+                return;
+            }
+        } catch (\Throwable $e) {}
+
+        $this->attributes['is_profile_complete'] = $isTrue ? 1 : 0;
     }
 
     public function user()

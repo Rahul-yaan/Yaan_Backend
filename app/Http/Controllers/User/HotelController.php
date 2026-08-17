@@ -8,6 +8,21 @@ use Illuminate\Http\Request;
 
 class HotelController extends Controller
 {
+    private function applyApprovedScope($query)
+    {
+        return $query->whereIn('status', ['active', 'approved'])
+            ->whereHas('owner', function($oq) {
+                $oq->whereRaw('is_verified IS TRUE')
+                   ->whereHas('ownerProfile', function($pq) {
+                       $pq->where(function($spq) {
+                           $spq->where('status', 'approved')
+                               ->orWhereNull('status')
+                               ->orWhere('status', '!=', 'rejected');
+                       });
+                   });
+            });
+    }
+
     public function search(Request $request)
     {
         // 1. Normalize Amenities input (can be array, comma-separated string, or JSON string)
@@ -53,7 +68,7 @@ class HotelController extends Controller
                 + sin(radians(?)) * sin(radians(latitude))))
             ))";
 
-            $query = Hotel::whereIn('status', ['active', 'approved'])->whereHas('owner', function($oq) { $oq->whereRaw('is_verified IS TRUE'); })
+            $query = $this->applyApprovedScope(Hotel::query())
                 ->selectRaw("*, {$distanceSql} AS distance", [$midLat, $midLng, $midLat])
                 ->whereRaw("{$distanceSql} <= ?", [$midLat, $midLng, $midLat, $radius])
                 ->with(['images', 'primaryImage', 'amenities', 'owner.ownerProfile']);
@@ -68,7 +83,7 @@ class HotelController extends Controller
 
             $hotels = $query->orderBy('distance')->get();
         } else {
-            $query = Hotel::whereIn('status', ['active', 'approved'])->whereHas('owner', function($oq) { $oq->whereRaw('is_verified IS TRUE'); })
+            $query = $this->applyApprovedScope(Hotel::query())
                 ->with(['images', 'primaryImage', 'amenities', 'owner.ownerProfile']);
 
             $fromCity = $request->input('from_city') ?? $request->input('from');
@@ -140,10 +155,11 @@ class HotelController extends Controller
 
     public function show($id)
     {
-        $hotel = Hotel::where('id', $id)
-            ->whereIn('status', ['active', 'approved'])
-            ->with(['images', 'primaryImage', 'amenities', 'reviews.user:id,name,email', 'owner.ownerProfile'])
-            ->firstOrFail();
+        $query = $this->applyApprovedScope(Hotel::query())
+            ->where('id', $id)
+            ->with(['images', 'primaryImage', 'amenities', 'reviews.user:id,name,email', 'owner.ownerProfile']);
+
+        $hotel = $query->firstOrFail();
 
         $hotel->ensurePrimaryImageExists();
         $this->attachActiveDiscountInfo($hotel);

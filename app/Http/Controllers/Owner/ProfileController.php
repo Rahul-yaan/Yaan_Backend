@@ -19,26 +19,34 @@ class ProfileController extends Controller
         $hotel = \App\Models\Hotel::where('owner_id', $user->id)->first();
 
         $isVerified = (bool) $user->is_verified;
-        $isComplete = $profile ? (bool) $profile->is_profile_complete : false;
-
-        $kycStatus = 'action_required';
-        $kycMessage = 'Admin has requested fresh KYC submission. Please fill in your hotel details and upload document images.';
+        $isProfileRejected = $profile && $profile->status === 'rejected';
+        $isHotelRejected = $hotel && $hotel->status === 'rejected';
 
         if ($isVerified && ($hotel && in_array($hotel->status, ['approved', 'active']))) {
             $kycStatus = 'approved';
+            $rejectionReason = null;
             $kycMessage = 'Your Owner KYC and hotel profile are fully verified and active.';
+        } elseif ($isProfileRejected || $isHotelRejected) {
+            $kycStatus = 'rejected';
+            $rejectionReason = ($profile && !empty($profile->rejection_reason))
+                ? $profile->rejection_reason
+                : (($hotel && !empty($hotel->rejection_reason)) ? $hotel->rejection_reason : 'Admin rejected your application.');
+            $kycMessage = "Admin rejected your application for this reason: {$rejectionReason}";
         } else {
             $kycStatus = 'pending_approval';
-            $kycMessage = 'Registration submitted successfully! Your hotel and profile are pending Admin verification. Please wait for Admin approval before your hotel goes live for users.';
+            $rejectionReason = null;
+            $kycMessage = 'Please wait for approval by the admin.';
         }
 
         return response()->json([
-            'profile'      => $profile,
-            'user'         => $user,
-            'hotel'        => $hotel,
-            'kyc_status'   => $kycStatus,
-            'kyc_message'  => $kycMessage,
-            'hotel_status' => $hotel ? $hotel->status : 'pending',
+            'profile'          => $profile,
+            'user'             => $user,
+            'hotel'            => $hotel,
+            'kyc_status'       => $kycStatus,
+            'rejection_reason' => $rejectionReason,
+            'kyc_message'      => $kycMessage,
+            'message'          => $kycMessage,
+            'hotel_status'     => $hotel ? $hotel->status : 'pending',
         ]);
     }
 
@@ -104,20 +112,26 @@ class ProfileController extends Controller
         foreach ($fileFields as $field) {
             if ($request->hasFile($field)) {
                 $file = $request->file($field);
-                $mime = $file->getClientMimeType() ?: 'image/jpeg';
-                $contents = file_get_contents($file->getRealPath());
-                $base64 = 'data:' . $mime . ';base64,' . base64_encode($contents);
-                $data[$field] = $base64;
+                $path = $file->store('kyc_docs', 'public');
+                $data[$field] = $path;
             } elseif ($request->filled($field) && is_string($request->input($field))) {
-                $data[$field] = trim($request->input($field));
+                $val = trim($request->input($field));
+                if (str_starts_with($val, 'data:image/') || str_starts_with($val, 'data:application/')) {
+                    $savedPath = $this->saveBase64Document($val, $field, $user->id);
+                    $data[$field] = $savedPath ?? $val;
+                } else {
+                    $data[$field] = $val;
+                }
             }
         }
 
         // Update profile text and file fields
         unset($data['is_profile_complete']);
+        $data['status'] = 'pending';
+        $data['rejection_reason'] = null;
         $profile->update($data);
 
-        \Illuminate\Support\Facades\DB::statement("UPDATE owner_profiles SET is_profile_complete = true, updated_at = NOW() WHERE id = ?", [$profile->id]);
+        \Illuminate\Support\Facades\DB::statement("UPDATE owner_profiles SET is_profile_complete = true, status = 'pending', rejection_reason = NULL, updated_at = NOW() WHERE id = ?", [$profile->id]);
         \Illuminate\Support\Facades\DB::statement("UPDATE users SET is_verified = false, updated_at = NOW() WHERE id = ?", [$user->id]);
 
         // Sync hotel name, address, city, latitude, longitude, pricing with core hotels table
@@ -141,13 +155,15 @@ class ProfileController extends Controller
                 'rating'          => 4.5,
                 'review_count'    => 0,
                 'status'          => 'pending',
+                'rejection_reason'=> null,
             ]);
         } else {
             $hotelUpdate = [
-                'name'    => !empty($data['hotel_name']) ? $data['hotel_name'] : $targetHotel->name,
-                'address' => !empty($data['address']) ? $data['address'] : $targetHotel->address,
-                'city'    => !empty($data['city']) ? $data['city'] : $targetHotel->city,
-                'status'  => 'pending',
+                'name'             => !empty($data['hotel_name']) ? $data['hotel_name'] : $targetHotel->name,
+                'address'          => !empty($data['address']) ? $data['address'] : $targetHotel->address,
+                'city'             => !empty($data['city']) ? $data['city'] : $targetHotel->city,
+                'status'           => 'pending',
+                'rejection_reason' => null,
             ];
             if ($request->filled('latitude') || $request->filled('lat') || $request->filled('origin_lat')) {
                 $hotelUpdate['latitude'] = (float) $lat;
@@ -180,9 +196,29 @@ class ProfileController extends Controller
         }
 
         return response()->json([
-            'message'    => 'KYC & Profile details updated successfully. Status is now Pending Admin Verification.',
+            'message'    => 'Please wait for approval by the admin.',
             'profile'    => $profile->fresh(),
             'kyc_status' => 'pending_approval',
         ]);
+    }
+
+    private function saveBase64Document($base64String, $fieldName, $userId)
+    {
+        try {
+            if (preg_match('/^data:(image\/(\w+)|application\/pdf);base64,/', $base64String, $matches)) {
+                $ext = isset($matches[2]) && !empty($matches[2]) ? $matches[2] : 'jpg';
+                if ($ext === 'jpeg') $ext = 'jpg';
+                $rawBase64 = substr($base64String, strpos($base64String, ',') + 1);
+                $decoded = base64_decode($rawBase64);
+                if ($decoded === false) return null;
+
+                $fileName = "{$fieldName}_{$userId}_" . time() . '.' . $ext;
+                $relPath = "kyc_docs/{$fileName}";
+                Storage::disk('public')->put($relPath, $decoded);
+                return $relPath;
+            }
+        } catch (\Throwable $e) {}
+
+        return null;
     }
 }

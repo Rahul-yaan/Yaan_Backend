@@ -103,8 +103,9 @@ class HotelController extends Controller
     public function updateStatus(Request $request, $id)
     {
         $request->validate([
-            'status' => 'required|in:approved,pending,rejected,suspended,active,inactive',
-            'reason' => 'nullable|string|max:255',
+            'status'           => 'required|in:approved,pending,rejected,suspended,active,inactive',
+            'reason'           => 'nullable|string|max:1000',
+            'rejection_reason' => 'nullable|string|max:1000',
         ]);
 
         try {
@@ -115,20 +116,43 @@ class HotelController extends Controller
         } catch (\Throwable $e) {}
 
         $hotel = Hotel::findOrFail($id);
-        $hotel->status = $request->input('status', $request->status);
-        $hotel->save();
+        $newStatus = strtolower($request->input('status', $request->status));
+        $reason = $request->input('rejection_reason') ?? $request->input('reason');
 
-        if (in_array(strtolower($request->status), ['approved', 'active'])) {
+        $hotel->status = $newStatus;
+
+        if ($newStatus === 'rejected') {
+            $hotel->rejection_reason = !empty($reason) ? trim($reason) : 'Admin rejected this hotel listing.';
+            if ($hotel->owner_id) {
+                \App\Models\OwnerProfile::where('user_id', $hotel->owner_id)->update([
+                    'status'           => 'rejected',
+                    'rejection_reason' => $hotel->rejection_reason,
+                ]);
+                \App\Models\User::where('id', $hotel->owner_id)->update([
+                    'is_verified' => false,
+                ]);
+            }
+        } elseif (in_array($newStatus, ['approved', 'active'])) {
+            $hotel->rejection_reason = null;
             $hotel->ensurePrimaryImageExists();
             if ($hotel->owner_id) {
-                \Illuminate\Support\Facades\DB::statement("UPDATE users SET is_verified = true, updated_at = NOW() WHERE id = ?", [$hotel->owner_id]);
-                \Illuminate\Support\Facades\DB::statement("UPDATE owner_profiles SET is_profile_complete = true, updated_at = NOW() WHERE user_id = ?", [$hotel->owner_id]);
+                \App\Models\User::where('id', $hotel->owner_id)->update([
+                    'is_verified' => true,
+                ]);
+                \App\Models\OwnerProfile::where('user_id', $hotel->owner_id)->update([
+                    'status'              => 'approved',
+                    'is_profile_complete' => true,
+                    'rejection_reason'   => null,
+                ]);
             }
         }
 
+        $hotel->save();
+
         return response()->json([
-            'message' => "Hotel status successfully updated to {$request->status}.",
-            'hotel'   => $hotel->load(['images', 'primaryImage', 'amenities']),
+            'message'          => "Hotel status successfully updated to {$newStatus}.",
+            'hotel'            => $hotel->load(['images', 'primaryImage', 'amenities']),
+            'rejection_reason' => $hotel->rejection_reason,
         ]);
     }
 

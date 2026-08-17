@@ -237,14 +237,41 @@ class AuthController extends Controller
         $token = $user->createToken('auth_token')->plainTextToken;
 
         $targetHotel = \App\Models\Hotel::where('owner_id', $user->id)->first();
-        $kycStatus = $user->is_verified ? 'verified' : 'pending_approval';
+        $ownerProfile = \App\Models\OwnerProfile::where('user_id', $user->id)->first();
+
+        $kycStatus = 'pending_approval';
+        $rejectionReason = null;
+        $message = 'Please wait for approval by the admin.';
+
+        if ($user->role === 'owner') {
+            if ($user->is_verified && (!$targetHotel || in_array($targetHotel->status, ['approved', 'active']))) {
+                $kycStatus = 'approved';
+                $message = 'Login successful.';
+            } elseif (($ownerProfile && $ownerProfile->status === 'rejected') || ($targetHotel && $targetHotel->status === 'rejected')) {
+                $kycStatus = 'rejected';
+                $rejectionReason = ($ownerProfile && !empty($ownerProfile->rejection_reason))
+                    ? $ownerProfile->rejection_reason
+                    : (($targetHotel && !empty($targetHotel->rejection_reason)) ? $targetHotel->rejection_reason : 'Admin rejected your application.');
+                $message = "Admin rejected your application for this reason: {$rejectionReason}";
+            } else {
+                $kycStatus = 'pending_approval';
+                $message = 'Please wait for approval by the admin.';
+            }
+        } elseif ($user->role === 'admin') {
+            $kycStatus = 'approved';
+            $message = 'Login successful.';
+        } else {
+            $kycStatus = 'approved';
+            $message = 'Login successful.';
+        }
 
         return response()->json([
-            'message'      => $user->is_verified ? 'Login successful.' : 'Login successful. Your profile update is currently pending Admin approval.',
-            'token'        => $token,
-            'user'         => $user,
-            'kyc_status'   => $kycStatus,
-            'hotel_status' => $targetHotel ? $targetHotel->status : 'pending',
+            'message'          => $message,
+            'token'            => $token,
+            'user'             => $user->load('ownerProfile'),
+            'kyc_status'       => $kycStatus,
+            'rejection_reason' => $rejectionReason,
+            'hotel_status'     => $targetHotel ? $targetHotel->status : 'pending',
         ]);
     }
 
@@ -264,13 +291,40 @@ class AuthController extends Controller
         }
 
         $targetHotel = \App\Models\Hotel::where('owner_id', $user->id)->first();
-        $kycStatus = $user->is_verified ? 'verified' : 'pending_approval';
+        $ownerProfile = \App\Models\OwnerProfile::where('user_id', $user->id)->first();
+
+        $kycStatus = 'pending_approval';
+        $rejectionReason = null;
+        $message = 'Please wait for approval by the admin.';
+
+        if ($user->role === 'owner') {
+            if ($user->is_verified && (!$targetHotel || in_array($targetHotel->status, ['approved', 'active']))) {
+                $kycStatus = 'approved';
+                $message = 'Account verified.';
+            } elseif (($ownerProfile && $ownerProfile->status === 'rejected') || ($targetHotel && $targetHotel->status === 'rejected')) {
+                $kycStatus = 'rejected';
+                $rejectionReason = ($ownerProfile && !empty($ownerProfile->rejection_reason))
+                    ? $ownerProfile->rejection_reason
+                    : (($targetHotel && !empty($targetHotel->rejection_reason)) ? $targetHotel->rejection_reason : 'Admin rejected your application.');
+                $message = "Admin rejected your application for this reason: {$rejectionReason}";
+            } else {
+                $kycStatus = 'pending_approval';
+                $message = 'Please wait for approval by the admin.';
+            }
+        } elseif ($user->role === 'admin') {
+            $kycStatus = 'approved';
+            $message = 'Account verified.';
+        } else {
+            $kycStatus = 'approved';
+            $message = 'Account verified.';
+        }
 
         return response()->json([
-            'user'         => $user,
-            'kyc_status'   => $kycStatus,
-            'hotel_status' => $targetHotel ? $targetHotel->status : 'pending',
-            'message'      => $user->is_verified ? 'Account verified.' : 'Your profile update is currently pending Admin approval.',
+            'user'             => $user->load('ownerProfile'),
+            'kyc_status'       => $kycStatus,
+            'rejection_reason' => $rejectionReason,
+            'hotel_status'     => $targetHotel ? $targetHotel->status : 'pending',
+            'message'          => $message,
         ]);
     }
 

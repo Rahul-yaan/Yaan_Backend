@@ -125,30 +125,74 @@ class OwnerController extends Controller
     public function verifyOwner(Request $request, $id)
     {
         $request->validate([
-            'is_verified' => 'required|boolean',
-            'notes'       => 'nullable|string|max:255',
+            'is_verified'      => 'nullable|boolean',
+            'status'           => 'nullable|string|in:approved,rejected,pending',
+            'notes'            => 'nullable|string|max:1000',
+            'reason'           => 'nullable|string|max:1000',
+            'rejection_reason' => 'nullable|string|max:1000',
         ]);
-
-        $isVerified = filter_var($request->is_verified, FILTER_VALIDATE_BOOLEAN);
 
         $owner = User::where('role', 'owner')->findOrFail($id);
         $profile = OwnerProfile::firstOrCreate(['user_id' => $owner->id]);
 
-        $boolStr = $isVerified ? 'true' : 'false';
-        \Illuminate\Support\Facades\DB::statement("UPDATE owner_profiles SET is_profile_complete = {$boolStr}, updated_at = NOW() WHERE user_id = ?", [$owner->id]);
-        \Illuminate\Support\Facades\DB::statement("UPDATE users SET is_verified = {$boolStr}, updated_at = NOW() WHERE id = ?", [$owner->id]);
+        $statusInput = strtolower($request->input('status', ''));
+        $isVerifiedInput = $request->has('is_verified') ? filter_var($request->is_verified, FILTER_VALIDATE_BOOLEAN) : null;
 
-        if ($isVerified) {
-            \Illuminate\Support\Facades\DB::statement("UPDATE hotels SET status = 'approved', updated_at = NOW() WHERE owner_id = ?", [$owner->id]);
+        $isApproved = ($statusInput === 'approved') || ($isVerifiedInput === true);
+        $isRejected = ($statusInput === 'rejected') || ($isVerifiedInput === false && $statusInput !== 'approved');
+
+        $reason = $request->input('rejection_reason') ?? $request->input('reason') ?? $request->input('notes');
+
+        if ($isApproved) {
+            $owner->is_verified = true;
+            $owner->save();
+
+            $profile->status = 'approved';
+            $profile->is_profile_complete = true;
+            $profile->rejection_reason = null;
+            $profile->save();
+
+            Hotel::where('owner_id', $owner->id)->update([
+                'status'           => 'approved',
+                'rejection_reason' => null,
+            ]);
+
+            $statusText = 'Approved';
+            $message = 'Owner profile and hotel listing have been approved successfully.';
+        } elseif ($isRejected) {
+            $rejectionMessage = !empty($reason) ? trim($reason) : 'Admin rejected your profile verification request.';
+
+            $owner->is_verified = false;
+            $owner->save();
+
+            $profile->status = 'rejected';
+            $profile->is_profile_complete = false;
+            $profile->rejection_reason = $rejectionMessage;
+            $profile->save();
+
+            Hotel::where('owner_id', $owner->id)->update([
+                'status'           => 'rejected',
+                'rejection_reason' => $rejectionMessage,
+            ]);
+
+            $statusText = 'Rejected';
+            $message = "Owner verification has been rejected. Reason: {$rejectionMessage}";
         } else {
-            $owner->tokens()->delete();
+            $owner->is_verified = false;
+            $owner->save();
+
+            $profile->status = 'pending';
+            $profile->save();
+
+            $statusText = 'Pending';
+            $message = 'Owner verification status updated to Pending.';
         }
 
-        $statusText = $isVerified ? 'Verified' : 'Unverified';
-
         return response()->json([
-            'message' => "Owner verification updated to {$statusText}.",
-            'owner'   => $owner->fresh('ownerProfile'),
+            'message'          => $message,
+            'status'           => $statusText,
+            'rejection_reason' => $profile->rejection_reason,
+            'owner'            => $owner->fresh('ownerProfile'),
         ]);
     }
 
