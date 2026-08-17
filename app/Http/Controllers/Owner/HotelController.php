@@ -336,9 +336,7 @@ class HotelController extends Controller
                 if (is_string($imgStr) && !empty(trim($imgStr))) {
                     $isPrimary = !$hasPrimary;
                     if ($isPrimary) {
-                        HotelImage::where('hotel_id', $hotel->id)->update([
-                            'is_primary' => \Illuminate\Support\Facades\DB::raw('false')
-                        ]);
+                        \Illuminate\Support\Facades\DB::statement("UPDATE hotel_images SET is_primary = false WHERE hotel_id = ?", [$hotel->id]);
                         $hasPrimary = true;
                     }
                     $image = HotelImage::create([
@@ -362,9 +360,7 @@ class HotelController extends Controller
             $isPrimary = !$hasPrimary || ($index === 0);
 
             if ($isPrimary) {
-                HotelImage::where('hotel_id', $hotel->id)->update([
-                    'is_primary' => false
-                ]);
+                \Illuminate\Support\Facades\DB::statement("UPDATE hotel_images SET is_primary = false WHERE hotel_id = ?", [$hotel->id]);
             }
 
             $image = HotelImage::create([
