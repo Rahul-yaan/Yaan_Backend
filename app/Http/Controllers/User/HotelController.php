@@ -105,6 +105,7 @@ class HotelController extends Controller
             }
 
             $h->amenity_names = $h->amenities->pluck('name')->toArray();
+            $this->attachActiveDiscountInfo($h);
         }
 
         return response()->json([
@@ -125,6 +126,7 @@ class HotelController extends Controller
             ->firstOrFail();
 
         $hotel->ensurePrimaryImageExists();
+        $this->attachActiveDiscountInfo($hotel);
 
         $today = \Carbon\Carbon::today()->toDateString();
         $todayBooked = \App\Models\Booking::where('hotel_id', $hotel->id)
@@ -148,6 +150,42 @@ class HotelController extends Controller
         $hotel->amenity_names = $hotel->amenities->pluck('name')->toArray();
 
         return response()->json(['hotel' => $hotel]);
+    }
+
+    /**
+     * Attach Active Offer Banner Discount Information to Hotel Object
+     */
+    private function attachActiveDiscountInfo($hotel)
+    {
+        $activeUserBanner = \App\Models\Banner::whereRaw('is_active IS TRUE')
+            ->whereIn('target_audience', ['user', 'all'])
+            ->where(function($q) {
+                $q->whereNull('expires_at')
+                  ->orWhere('expires_at', '>=', now());
+            })
+            ->where('discount_percentage', '>', 0)
+            ->latest()
+            ->first();
+
+        $discountPct = $activeUserBanner ? (float) $activeUserBanner->discount_percentage : 0;
+        $price = (float) $hotel->price_per_night;
+
+        $discountAmount = round($price * ($discountPct / 100), 2);
+        $discountedPrice = max(0, $price - $discountAmount);
+        $gstAmount = round($discountedPrice * 0.18, 2);
+        $totalPayable = round($discountedPrice + $gstAmount, 2);
+
+        $hotel->active_discount_percentage = $discountPct;
+        $hotel->active_promo_code           = $activeUserBanner ? ($activeUserBanner->discount_code ?? $activeUserBanner->promo_code ?? null) : null;
+        $hotel->banner_title                = $activeUserBanner->title ?? null;
+        $hotel->banner_image                = $activeUserBanner->image_url ?? null;
+        $hotel->original_price              = $price;
+        $hotel->discount_amount             = $discountAmount;
+        $hotel->discounted_price            = $discountedPrice;
+        $hotel->gst_amount                  = $gstAmount;
+        $hotel->total_payable               = $totalPayable;
+
+        return $hotel;
     }
 
     private function haversine($lat1, $lng1, $lat2, $lng2)

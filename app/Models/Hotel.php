@@ -48,7 +48,9 @@ class Hotel extends Model
 
     public function primaryImage()
     {
-        return $this->hasOne(HotelImage::class)->whereRaw('("is_primary" = true OR "is_primary" IS TRUE)');
+        return $this->hasOne(HotelImage::class)->where(function($q) {
+            $q->where('is_primary', true)->orWhere('is_primary', 1);
+        });
     }
 
     public function getPrimaryImageAttribute()
@@ -64,7 +66,9 @@ class Hotel extends Model
             return $img;
         }
 
-        $img = $this->images()->whereRaw('("is_primary" = true OR "is_primary" IS TRUE)')->first()
+        $img = $this->images()->where(function($q) {
+            $q->where('is_primary', true)->orWhere('is_primary', 1);
+        })->first()
             ?? $this->images()->first();
 
         if ($img) {

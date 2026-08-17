@@ -19,14 +19,18 @@ class DashboardController extends Controller
     {
         $totalUsers     = User::where('role', 'user')->count();
         $totalOwners    = User::where('role', 'owner')->count();
-        $verifiedOwners = OwnerProfile::whereRaw('("is_profile_complete" = true OR "is_profile_complete" IS TRUE)')->count();
+        $verifiedOwners = OwnerProfile::where(function($q) {
+            $q->where('is_profile_complete', true)->orWhere('is_profile_complete', 1);
+        })->count();
         $pendingOwners  = User::where('role', 'owner')
             ->where(function($q) {
-                $q->whereRaw('("is_verified" = false OR "is_verified" IS FALSE OR "is_verified" IS NULL)')
-                  ->orWhereHas('ownerProfile', function($sq) {
-                      $sq->whereRaw('("is_profile_complete" = false OR "is_profile_complete" IS FALSE OR "is_profile_complete" IS NULL)');
-                  })
-                  ->orDoesntHave('ownerProfile');
+                $q->where(function($sq) {
+                    $sq->where('is_verified', false)->orWhere('is_verified', 0)->orWhereNull('is_verified');
+                })
+                ->orWhereHas('ownerProfile', function($sq) {
+                    $sq->where('is_profile_complete', false)->orWhere('is_profile_complete', 0)->orWhereNull('is_profile_complete');
+                })
+                ->orDoesntHave('ownerProfile');
             })
             ->count();
 
@@ -283,11 +287,13 @@ class DashboardController extends Controller
         $pendingHotels = Hotel::where('status', 'pending')->with('owner:id,name,email')->get();
         $pendingOwners = User::where('role', 'owner')
             ->where(function($q) {
-                $q->whereRaw('("is_verified" = false OR "is_verified" IS FALSE OR "is_verified" IS NULL)')
-                  ->orWhereDoesntHave('ownerProfile');
+                $q->where(function($sq) {
+                    $sq->where('is_verified', false)->orWhere('is_verified', 0)->orWhereNull('is_verified');
+                })
+                ->orWhereDoesntHave('ownerProfile');
             })->get();
 
-        $activeBannersCount = \App\Models\Banner::whereRaw('("is_active" = true OR "is_active" IS TRUE)')->count();
+        $activeBannersCount = \App\Models\Banner::whereRaw('is_active IS TRUE')->count();
         $avgPricePerNight   = max(1000, (float) Hotel::whereIn('status', ['approved', 'active'])->avg('price_per_night'));
         if ($avgPricePerNight <= 0) $avgPricePerNight = 2000;
 

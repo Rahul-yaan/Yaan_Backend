@@ -141,7 +141,9 @@ class HotelController extends Controller
             return response()->json(['error' => 'No image provided.'], 422);
         }
 
-        $hasPrimary = $hotel->images()->whereRaw('("is_primary" = true OR "is_primary" IS TRUE)')->exists();
+        $hasPrimary = $hotel->images()->where(function($q) {
+            $q->where('is_primary', true)->orWhere('is_primary', 1);
+        })->exists();
 
         $image = \App\Models\HotelImage::create([
             'hotel_id'   => $hotel->id,

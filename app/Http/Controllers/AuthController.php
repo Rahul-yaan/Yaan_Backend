@@ -38,14 +38,18 @@ class AuthController extends Controller
                   ->orWhere('phone', $rawDigits)
                   ->orWhere('phone', '+' . $rawDigits)
                   ->orWhere('phone', 'LIKE', '%' . $last10);
-            })->whereRaw('("is_verified" = false OR "is_verified" IS FALSE)')->delete();
+            })->where(function($q) {
+                $q->where('is_verified', false)->orWhere('is_verified', 0)->orWhereNull('is_verified');
+            })->delete();
         }
 
         if ($request->email) {
             $email = trim(strtolower($request->email));
             $request->merge(['email' => $email]);
             User::where('email', $email)
-                ->whereRaw('("is_verified" = false OR "is_verified" IS FALSE)')
+                ->where(function($q) {
+                    $q->where('is_verified', false)->orWhere('is_verified', 0)->orWhereNull('is_verified');
+                })
                 ->delete();
         }
 

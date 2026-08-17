@@ -17,7 +17,9 @@ class HotelController extends Controller
     {
         return $query->where('status', 'approved')
             ->whereHas('owner', function($q) {
-                $q->whereRaw('("is_verified" = true OR "is_verified" IS TRUE)');
+                $q->where(function($sq) {
+                    $sq->where('is_verified', true)->orWhere('is_verified', 1);
+                });
             });
     }
 
@@ -26,7 +28,7 @@ class HotelController extends Controller
      */
     private function attachActiveDiscountInfo($hotel)
     {
-        $activeUserBanner = Banner::whereRaw('("is_active" = true OR "is_active" IS TRUE)')
+        $activeUserBanner = Banner::whereRaw('is_active IS TRUE')
             ->whereIn('target_audience', ['user', 'all'])
             ->where(function($q) {
                 $q->whereNull('expires_at')

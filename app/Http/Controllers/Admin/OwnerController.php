@@ -41,17 +41,21 @@ class OwnerController extends Controller
         if ($request->has('verified') && $request->verified !== '' && $request->verified !== null && $request->verified !== 'all') {
             $isVerified = filter_var($request->verified, FILTER_VALIDATE_BOOLEAN);
             if ($isVerified) {
-                $query->whereRaw('("is_verified" = true OR "is_verified" IS TRUE)')
-                      ->whereHas('ownerProfile', function($q) {
-                          $q->whereRaw('("is_profile_complete" = true OR "is_profile_complete" IS TRUE)');
-                      });
+                $query->where(function($q) {
+                    $q->where('is_verified', true)->orWhere('is_verified', 1);
+                })
+                ->whereHas('ownerProfile', function($q) {
+                    $q->where('is_profile_complete', true)->orWhere('is_profile_complete', 1);
+                });
             } else {
                 $query->where(function($q) {
-                    $q->whereRaw('("is_verified" = false OR "is_verified" IS FALSE OR "is_verified" IS NULL)')
-                      ->orWhereHas('ownerProfile', function($sq) {
-                          $sq->whereRaw('("is_profile_complete" = false OR "is_profile_complete" IS FALSE OR "is_profile_complete" IS NULL)');
-                      })
-                      ->orDoesntHave('ownerProfile');
+                    $q->where(function($sq) {
+                        $sq->where('is_verified', false)->orWhere('is_verified', 0)->orWhereNull('is_verified');
+                    })
+                    ->orWhereHas('ownerProfile', function($sq) {
+                        $sq->where('is_profile_complete', false)->orWhere('is_profile_complete', 0)->orWhereNull('is_profile_complete');
+                    })
+                    ->orDoesntHave('ownerProfile');
                 });
             }
         }

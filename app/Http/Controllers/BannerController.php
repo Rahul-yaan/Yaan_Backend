@@ -17,7 +17,7 @@ class BannerController extends Controller
     {
         $target = strtolower($request->query('target') ?? $request->query('audience') ?? '');
 
-        $query = Banner::whereRaw('("is_active" = true OR "is_active" IS TRUE)')
+        $query = Banner::whereRaw('is_active IS TRUE')
             ->where(function($q) {
                 $q->whereNull('expires_at')
                   ->orWhere('expires_at', '>=', now());

@@ -44,7 +44,7 @@ public function store(Request $request)
 
     // Automatic fallback: If no explicit discount is passed, check active user banner discounts!
     if ($discountPct <= 0 && $discountAmount <= 0) {
-        $activeBanner = \App\Models\Banner::whereRaw('("is_active" = true OR "is_active" IS TRUE)')
+        $activeBanner = \App\Models\Banner::whereRaw('is_active IS TRUE')
             ->whereIn('target_audience', ['user', 'all'])
             ->where(function($q) {
                 $q->whereNull('expires_at')->orWhere('expires_at', '>=', now());
