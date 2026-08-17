@@ -25,11 +25,11 @@ class ProfileController extends Controller
         $kycMessage = 'Admin has requested fresh KYC submission. Please fill in your hotel details and upload document images.';
 
         if ($isVerified && ($hotel && in_array($hotel->status, ['approved', 'active']))) {
-            $kycStatus = 'verified';
+            $kycStatus = 'approved';
             $kycMessage = 'Your Owner KYC and hotel profile are fully verified and active.';
-        } elseif ($isComplete || ($hotel && $hotel->status === 'pending') || !$isVerified) {
+        } else {
             $kycStatus = 'pending_approval';
-            $kycMessage = 'Your profile/KYC update has been submitted successfully and is currently pending Admin verification.';
+            $kycMessage = 'Registration submitted successfully! Your hotel and profile are pending Admin verification. Please wait for Admin approval before your hotel goes live for users.';
         }
 
         return response()->json([

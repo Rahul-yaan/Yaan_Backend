@@ -56,34 +56,64 @@ class OwnerProfile extends Model
         return preg_replace('/^http:/i', 'https:', $url);
     }
 
+    public function getAadhaarFrontAttribute($value)
+    {
+        return $this->getStorageUrl($value) ?? $value;
+    }
+
+    public function getAadhaarBackAttribute($value)
+    {
+        return $this->getStorageUrl($value) ?? $value;
+    }
+
+    public function getPanCardAttribute($value)
+    {
+        return $this->getStorageUrl($value) ?? $value;
+    }
+
+    public function getFssaiLicenseAttribute($value)
+    {
+        return $this->getStorageUrl($value) ?? $value;
+    }
+
+    public function getGstImageAttribute($value)
+    {
+        return $this->getStorageUrl($value) ?? $value;
+    }
+
+    public function getBusinessProofAttribute($value)
+    {
+        return $this->getStorageUrl($value) ?? $value;
+    }
+
     public function getAadhaarFrontUrlAttribute()
     {
-        return $this->getStorageUrl($this->aadhaar_front);
+        return $this->getStorageUrl($this->attributes['aadhaar_front'] ?? null);
     }
 
     public function getAadhaarBackUrlAttribute()
     {
-        return $this->getStorageUrl($this->aadhaar_back);
+        return $this->getStorageUrl($this->attributes['aadhaar_back'] ?? null);
     }
 
     public function getPanCardUrlAttribute()
     {
-        return $this->getStorageUrl($this->pan_card);
+        return $this->getStorageUrl($this->attributes['pan_card'] ?? null);
     }
 
     public function getFssaiLicenseUrlAttribute()
     {
-        return $this->getStorageUrl($this->fssai_license);
+        return $this->getStorageUrl($this->attributes['fssai_license'] ?? null);
     }
 
     public function getGstImageUrlAttribute()
     {
-        return $this->getStorageUrl($this->gst_image);
+        return $this->getStorageUrl($this->attributes['gst_image'] ?? null);
     }
 
     public function getBusinessProofUrlAttribute()
     {
-        return $this->getStorageUrl($this->business_proof);
+        return $this->getStorageUrl($this->attributes['business_proof'] ?? null);
     }
 
     public function setIsProfileCompleteAttribute($value)

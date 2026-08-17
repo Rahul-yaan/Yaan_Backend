@@ -53,7 +53,7 @@ class HotelController extends Controller
                 + sin(radians(?)) * sin(radians(latitude))))
             ))";
 
-            $query = Hotel::whereIn('status', ['active', 'approved'])
+            $query = Hotel::whereIn('status', ['active', 'approved'])->whereHas('owner', function($oq) { $oq->whereRaw('is_verified IS TRUE'); })
                 ->selectRaw("*, {$distanceSql} AS distance", [$midLat, $midLng, $midLat])
                 ->whereRaw("{$distanceSql} <= ?", [$midLat, $midLng, $midLat, $radius])
                 ->with(['images', 'primaryImage', 'amenities', 'owner.ownerProfile']);
@@ -68,7 +68,7 @@ class HotelController extends Controller
 
             $hotels = $query->orderBy('distance')->get();
         } else {
-            $query = Hotel::whereIn('status', ['active', 'approved'])
+            $query = Hotel::whereIn('status', ['active', 'approved'])->whereHas('owner', function($oq) { $oq->whereRaw('is_verified IS TRUE'); })
                 ->with(['images', 'primaryImage', 'amenities', 'owner.ownerProfile']);
 
             $fromCity = $request->input('from_city') ?? $request->input('from');

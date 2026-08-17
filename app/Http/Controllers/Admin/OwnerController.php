@@ -138,7 +138,9 @@ class OwnerController extends Controller
         \Illuminate\Support\Facades\DB::statement("UPDATE owner_profiles SET is_profile_complete = {$boolStr}, updated_at = NOW() WHERE user_id = ?", [$owner->id]);
         \Illuminate\Support\Facades\DB::statement("UPDATE users SET is_verified = {$boolStr}, updated_at = NOW() WHERE id = ?", [$owner->id]);
 
-        if (!$isVerified) {
+        if ($isVerified) {
+            \Illuminate\Support\Facades\DB::statement("UPDATE hotels SET status = 'approved', updated_at = NOW() WHERE owner_id = ?", [$owner->id]);
+        } else {
             $owner->tokens()->delete();
         }
 
