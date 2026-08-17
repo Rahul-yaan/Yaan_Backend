@@ -177,7 +177,7 @@ class HotelController extends Controller
      */
     private function attachActiveDiscountInfo($hotel)
     {
-        $activeUserBanner = \App\Models\Banner::where('is_active', true)
+        $activeUserBanner = \App\Models\Banner::whereRaw('is_active IS TRUE')
             ->whereIn('target_audience', ['user', 'all'])
             ->where(function($q) {
                 $q->whereNull('expires_at')
