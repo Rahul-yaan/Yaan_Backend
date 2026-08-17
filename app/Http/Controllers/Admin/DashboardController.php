@@ -19,16 +19,14 @@ class DashboardController extends Controller
     {
         $totalUsers     = User::where('role', 'user')->count();
         $totalOwners    = User::where('role', 'owner')->count();
-        $verifiedOwners = OwnerProfile::where(function($q) {
-            $q->where('is_profile_complete', true)->orWhere('is_profile_complete', 1);
-        })->count();
+        $verifiedOwners = OwnerProfile::whereRaw('is_profile_complete IS TRUE')->count();
         $pendingOwners  = User::where('role', 'owner')
             ->where(function($q) {
                 $q->where(function($sq) {
-                    $sq->where('is_verified', false)->orWhere('is_verified', 0)->orWhereNull('is_verified');
+                    $sq->whereRaw('(is_verified IS FALSE OR is_verified IS NULL)');
                 })
                 ->orWhereHas('ownerProfile', function($sq) {
-                    $sq->where('is_profile_complete', false)->orWhere('is_profile_complete', 0)->orWhereNull('is_profile_complete');
+                    $sq->whereRaw('(is_profile_complete IS FALSE OR is_profile_complete IS NULL)');
                 })
                 ->orDoesntHave('ownerProfile');
             })
@@ -174,27 +172,37 @@ class DashboardController extends Controller
             ->take(5)
             ->get();
 
+        $metrics = [
+            'users_count'            => $totalUsers,
+            'owners_count'           => $totalOwners,
+            'verified_owners'        => $verifiedOwners,
+            'pending_owners'         => $pendingOwners,
+            'total_hotels'           => $totalHotels,
+            'approved_hotels'        => $approvedHotels,
+            'pending_hotels'         => $pendingHotels,
+            'rejected_hotels'        => $rejectedHotels,
+            'total_bookings'         => $confirmedBookingsCount,
+            'all_bookings'           => $allBookingsCount,
+            'confirmed_bookings'     => $confirmedBookingsCount,
+            'active_bookings'        => $confirmedBookingsCount,
+            'pending_bookings'       => $pendingBookingsCount,
+            'cancelled_bookings'     => $cancelledBookingsCount,
+
+            // Revenue Fields (Gross Customer Revenue & Admin 34% Platform Share)
+            'total_revenue'          => (float) $totalRevenue,         // Gross Customer Payments (e.g. ₹112.10)
+            'gross_revenue'          => (float) $totalRevenue,
+            'total_customer_paid'    => (float) $totalRevenue,
+            'platform_revenue'       => (float) $totalRevenue,         // Primary platform gross revenue alias
+            'total_platform_revenue' => (float) $totalRevenue,
+            'admin_platform_revenue' => (float) $adminPlatformRevenue, // 34% Admin Share (e.g. ₹32.30)
+            'platform_fee'           => (float) $adminPlatformRevenue,
+            'platform_fee_collected' => (float) $adminPlatformRevenue,
+            'hotel_owners_revenue'   => (float) $hotelOwnersRevenue,   // 66% Owner Share (e.g. ₹62.70)
+            'conversion_rate'        => $conversionRate,
+        ];
+
         return response()->json([
-            'metrics' => [
-                'users_count'            => $totalUsers,
-                'owners_count'           => $totalOwners,
-                'verified_owners'        => $verifiedOwners,
-                'pending_owners'         => $pendingOwners,
-                'total_hotels'           => $totalHotels,
-                'approved_hotels'        => $approvedHotels,
-                'pending_hotels'         => $pendingHotels,
-                'rejected_hotels'        => $rejectedHotels,
-                'total_bookings'         => $confirmedBookingsCount,
-                'all_bookings'           => $allBookingsCount,
-                'confirmed_bookings'     => $confirmedBookingsCount,
-                'active_bookings'        => $confirmedBookingsCount,
-                'pending_bookings'       => $pendingBookingsCount,
-                'cancelled_bookings'     => $cancelledBookingsCount,
-                'total_revenue'          => (float) $totalRevenue,
-                'admin_platform_revenue' => (float) $adminPlatformRevenue,
-                'hotel_owners_revenue'   => (float) $hotelOwnersRevenue,
-                'conversion_rate'        => $conversionRate,
-            ],
+            'metrics' => $metrics,
             'goals' => [
                 'target_goal'           => (float) $targetGoal,
                 'current_month_revenue' => (float) $currentMonthRevenue,
@@ -210,9 +218,16 @@ class DashboardController extends Controller
                     'pay_at_hotel'    => round($offlineRevenue, 2),
                 ],
             ],
-            'top_hotels'      => $topHotels,
-            'recent_bookings' => $recentBookings,
-            'recent_hotels'   => $recentHotels,
+            // Top level aliases
+            'total_revenue'          => (float) $totalRevenue,
+            'platform_revenue'       => (float) $totalRevenue,
+            'total_platform_revenue' => (float) $totalRevenue,
+            'admin_platform_revenue' => (float) $adminPlatformRevenue,
+            'active_bookings'        => $confirmedBookingsCount,
+            'conversion_rate'        => $conversionRate,
+            'top_hotels'             => $topHotels,
+            'recent_bookings'        => $recentBookings,
+            'recent_hotels'          => $recentHotels,
         ]);
     }
 
@@ -288,7 +303,7 @@ class DashboardController extends Controller
         $pendingOwners = User::where('role', 'owner')
             ->where(function($q) {
                 $q->where(function($sq) {
-                    $sq->where('is_verified', false)->orWhere('is_verified', 0)->orWhereNull('is_verified');
+                    $sq->whereRaw('(is_verified IS FALSE OR is_verified IS NULL)');
                 })
                 ->orWhereDoesntHave('ownerProfile');
             })->get();
