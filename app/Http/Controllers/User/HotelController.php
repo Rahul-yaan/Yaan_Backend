@@ -10,22 +10,35 @@ class HotelController extends Controller
 {
     public function search(Request $request)
     {
-        $hasCoords = $request->has(['from_lat', 'from_lng', 'to_lat', 'to_lng']);
+        // 1. Normalize Amenities input (can be array, comma-separated string, or JSON string)
+        $rawAmenities = $request->input('amenities');
+        $amenities = [];
+        if (!empty($rawAmenities)) {
+            if (is_array($rawAmenities)) {
+                $amenities = $rawAmenities;
+            } elseif (is_string($rawAmenities)) {
+                $decoded = json_decode($rawAmenities, true);
+                if (is_array($decoded)) {
+                    $amenities = $decoded;
+                } else {
+                    $amenities = array_filter(array_map('trim', explode(',', $rawAmenities)));
+                }
+            }
+        }
+
+        // 2. Extract Latitude & Longitude parameters flexibly (snake_case, camelCase, origin/dest)
+        $fromLat = $request->input('from_lat') ?? $request->input('fromLat') ?? $request->input('origin_lat') ?? $request->input('pickup_lat');
+        $fromLng = $request->input('from_lng') ?? $request->input('fromLng') ?? $request->input('origin_lng') ?? $request->input('pickup_lng');
+        $toLat   = $request->input('to_lat')   ?? $request->input('toLat')   ?? $request->input('dest_lat')   ?? $request->input('drop_lat');
+        $toLng   = $request->input('to_lng')   ?? $request->input('toLng')   ?? $request->input('dest_lng')   ?? $request->input('drop_lng');
+
+        $hasCoords = is_numeric($fromLat) && is_numeric($fromLng) && is_numeric($toLat) && is_numeric($toLng);
 
         if ($hasCoords) {
-            $request->validate([
-                'from_lat'  => 'required|numeric',
-                'from_lng'  => 'required|numeric',
-                'to_lat'    => 'required|numeric',
-                'to_lng'    => 'required|numeric',
-                'amenities' => 'nullable|array',
-                'amenities.*' => 'string',
-            ]);
-
-            $fromLat = $request->from_lat;
-            $fromLng = $request->from_lng;
-            $toLat   = $request->to_lat;
-            $toLng   = $request->to_lng;
+            $fromLat = (float) $fromLat;
+            $fromLng = (float) $fromLng;
+            $toLat   = (float) $toLat;
+            $toLng   = (float) $toLng;
 
             $midLat = ($fromLat + $toLat) / 2;
             $midLng = ($fromLng + $toLng) / 2;
@@ -33,10 +46,11 @@ class HotelController extends Controller
             $routeDistance = $this->haversine($fromLat, $fromLng, $toLat, $toLng);
             $radius = ($routeDistance / 2) + 50;
 
+            // Clamped acos formula: GREATEST(-1.0, LEAST(1.0, ...)) to prevent out-of-range SQL math errors
             $distanceSql = "(6371 * acos(
-                LEAST(1.0, cos(radians(?)) * cos(radians(latitude))
+                GREATEST(-1.0, LEAST(1.0, cos(radians(?)) * cos(radians(latitude))
                 * cos(radians(longitude) - radians(?))
-                + sin(radians(?)) * sin(radians(latitude)))
+                + sin(radians(?)) * sin(radians(latitude))))
             ))";
 
             $query = Hotel::whereIn('status', ['active', 'approved'])
@@ -44,9 +58,8 @@ class HotelController extends Controller
                 ->whereRaw("{$distanceSql} <= ?", [$midLat, $midLng, $midLat, $radius])
                 ->with(['images', 'primaryImage', 'amenities', 'owner.ownerProfile']);
 
-            if ($request->filled('amenities')) {
-                $requestedAmenities = $request->input('amenities');
-                foreach ($requestedAmenities as $amenityName) {
+            if (!empty($amenities)) {
+                foreach ($amenities as $amenityName) {
                     $query->whereHas('amenities', function ($q) use ($amenityName) {
                         $q->where('name', $amenityName);
                     });
@@ -58,18 +71,25 @@ class HotelController extends Controller
             $query = Hotel::whereIn('status', ['active', 'approved'])
                 ->with(['images', 'primaryImage', 'amenities', 'owner.ownerProfile']);
 
-            $searchTerm = $request->query('destination') ?? $request->query('city') ?? $request->query('location') ?? $request->query('search');
-            if (!empty($searchTerm)) {
-                $query->where(function($q) use ($searchTerm) {
-                    $q->where('city', 'LIKE', '%' . $searchTerm . '%')
-                      ->orWhere('name', 'LIKE', '%' . $searchTerm . '%')
-                      ->orWhere('address', 'LIKE', '%' . $searchTerm . '%');
+            $fromCity = $request->query('from_city') ?? $request->query('from');
+            $toCity   = $request->query('to_city')   ?? $request->query('to') ?? $request->query('destination') ?? $request->query('city') ?? $request->query('location') ?? $request->query('search');
+
+            if (!empty($fromCity) || !empty($toCity)) {
+                $query->where(function($q) use ($fromCity, $toCity) {
+                    if (!empty($fromCity)) {
+                        $q->orWhere('city', 'LIKE', '%' . $fromCity . '%')
+                          ->orWhere('address', 'LIKE', '%' . $fromCity . '%');
+                    }
+                    if (!empty($toCity)) {
+                        $q->orWhere('city', 'LIKE', '%' . $toCity . '%')
+                          ->orWhere('name', 'LIKE', '%' . $toCity . '%')
+                          ->orWhere('address', 'LIKE', '%' . $toCity . '%');
+                    }
                 });
             }
 
-            if ($request->filled('amenities')) {
-                $requestedAmenities = (array) $request->input('amenities');
-                foreach ($requestedAmenities as $amenityName) {
+            if (!empty($amenities)) {
+                foreach ($amenities as $amenityName) {
                     $query->whereHas('amenities', function ($q) use ($amenityName) {
                         $q->where('name', $amenityName);
                     });
@@ -157,7 +177,7 @@ class HotelController extends Controller
      */
     private function attachActiveDiscountInfo($hotel)
     {
-        $activeUserBanner = \App\Models\Banner::whereRaw('is_active IS TRUE')
+        $activeUserBanner = \App\Models\Banner::where('is_active', true)
             ->whereIn('target_audience', ['user', 'all'])
             ->where(function($q) {
                 $q->whereNull('expires_at')
