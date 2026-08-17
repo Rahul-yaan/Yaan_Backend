@@ -115,11 +115,15 @@ class HotelController extends Controller
         } catch (\Throwable $e) {}
 
         $hotel = Hotel::findOrFail($id);
-        $hotel->status = $request->status;
+        $hotel->status = $request->input('status', $request->status);
         $hotel->save();
 
         if (in_array(strtolower($request->status), ['approved', 'active'])) {
             $hotel->ensurePrimaryImageExists();
+            if ($hotel->owner_id) {
+                \Illuminate\Support\Facades\DB::statement("UPDATE users SET is_verified = true, updated_at = NOW() WHERE id = ?", [$hotel->owner_id]);
+                \Illuminate\Support\Facades\DB::statement("UPDATE owner_profiles SET is_profile_complete = true, updated_at = NOW() WHERE user_id = ?", [$hotel->owner_id]);
+            }
         }
 
         return response()->json([

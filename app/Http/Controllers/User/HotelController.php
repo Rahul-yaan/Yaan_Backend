@@ -53,7 +53,7 @@ class HotelController extends Controller
                 + sin(radians(?)) * sin(radians(latitude))))
             ))";
 
-            $query = Hotel::whereIn('status', ['active', 'approved', 'pending'])
+            $query = Hotel::whereIn('status', ['active', 'approved'])
                 ->selectRaw("*, {$distanceSql} AS distance", [$midLat, $midLng, $midLat])
                 ->whereRaw("{$distanceSql} <= ?", [$midLat, $midLng, $midLat, $radius])
                 ->with(['images', 'primaryImage', 'amenities', 'owner.ownerProfile']);
@@ -68,22 +68,22 @@ class HotelController extends Controller
 
             $hotels = $query->orderBy('distance')->get();
         } else {
-            $query = Hotel::whereIn('status', ['active', 'approved', 'pending'])
+            $query = Hotel::whereIn('status', ['active', 'approved'])
                 ->with(['images', 'primaryImage', 'amenities', 'owner.ownerProfile']);
 
-            $fromCity = $request->query('from_city') ?? $request->query('from');
-            $toCity   = $request->query('to_city')   ?? $request->query('to') ?? $request->query('destination') ?? $request->query('city') ?? $request->query('location') ?? $request->query('search');
+            $fromCity = $request->input('from_city') ?? $request->input('from');
+            $toCity   = $request->input('to_city')   ?? $request->input('to') ?? $request->input('destination') ?? $request->input('city') ?? $request->input('location') ?? $request->input('search');
 
             if (!empty($fromCity) || !empty($toCity)) {
                 $query->where(function($q) use ($fromCity, $toCity) {
                     if (!empty($fromCity)) {
-                        $q->orWhere('city', 'LIKE', '%' . $fromCity . '%')
-                          ->orWhere('address', 'LIKE', '%' . $fromCity . '%');
+                        $q->orWhere('city', 'ILIKE', '%' . $fromCity . '%')
+                          ->orWhere('address', 'ILIKE', '%' . $fromCity . '%');
                     }
                     if (!empty($toCity)) {
-                        $q->orWhere('city', 'LIKE', '%' . $toCity . '%')
-                          ->orWhere('name', 'LIKE', '%' . $toCity . '%')
-                          ->orWhere('address', 'LIKE', '%' . $toCity . '%');
+                        $q->orWhere('city', 'ILIKE', '%' . $toCity . '%')
+                          ->orWhere('name', 'ILIKE', '%' . $toCity . '%')
+                          ->orWhere('address', 'ILIKE', '%' . $toCity . '%');
                     }
                 });
             }
