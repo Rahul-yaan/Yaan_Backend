@@ -6,6 +6,7 @@ PORT="${PORT:-80}"
 
 echo "Configuring Apache to listen on port ${PORT}..."
 sed -i "s/80/${PORT}/g" /etc/apache2/ports.conf /etc/apache2/sites-available/000-default.conf
+echo "UseCanonicalName Off" >> /etc/apache2/apache2.conf
 
 echo "Preparing Laravel application..."
 

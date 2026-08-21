@@ -15,6 +15,21 @@ Route::middleware('throttle:60,1')->group(function () {
     Route::post('/login',           [AuthController::class, 'login']);
     Route::post('/forgot-password', [ForgotPasswordController::class, 'sendResetLink']);
     Route::post('/reset-password',  [ForgotPasswordController::class, 'resetPassword']);
+    
+    // Legal & Policy APIs for Mobile App
+    // Customer App
+    Route::get('/terms-and-conditions', [\App\Http\Controllers\LegalController::class, 'termsJson']);
+    Route::get('/terms',                [\App\Http\Controllers\LegalController::class, 'termsJson']);
+    Route::get('/privacy-policy',       [\App\Http\Controllers\LegalController::class, 'privacyJson']);
+    Route::get('/privacy',              [\App\Http\Controllers\LegalController::class, 'privacyJson']);
+
+    // Vendor / Hotel Owner App
+    Route::get('/vendor/terms-and-conditions', [\App\Http\Controllers\LegalController::class, 'vendorTermsJson']);
+    Route::get('/vendor/terms',                [\App\Http\Controllers\LegalController::class, 'vendorTermsJson']);
+    Route::get('/vendor/privacy-policy',       [\App\Http\Controllers\LegalController::class, 'vendorPrivacyJson']);
+    Route::get('/vendor/privacy',              [\App\Http\Controllers\LegalController::class, 'vendorPrivacyJson']);
+    Route::get('/owner/terms-and-conditions',  [\App\Http\Controllers\LegalController::class, 'vendorTermsJson']);
+    Route::get('/owner/privacy-policy',        [\App\Http\Controllers\LegalController::class, 'vendorPrivacyJson']);
 });
 
 // Razorpay Webhook — Verified by HMAC signature in controller

@@ -14,6 +14,21 @@ Route::get('/reset-password', function () {
     return view('reset_password');
 });
 
+// Terms & Conditions and Privacy Policy Public Web Pages
+// Customer App
+Route::get('/terms-and-conditions', [\App\Http\Controllers\LegalController::class, 'termsView']);
+Route::get('/terms',                [\App\Http\Controllers\LegalController::class, 'termsView']);
+Route::get('/privacy-policy',       [\App\Http\Controllers\LegalController::class, 'privacyView']);
+Route::get('/privacy',              [\App\Http\Controllers\LegalController::class, 'privacyView']);
+
+// Vendor / Hotel Owner App
+Route::get('/vendor/terms-and-conditions', [\App\Http\Controllers\LegalController::class, 'vendorTermsView']);
+Route::get('/vendor/terms',                [\App\Http\Controllers\LegalController::class, 'vendorTermsView']);
+Route::get('/vendor/privacy-policy',       [\App\Http\Controllers\LegalController::class, 'vendorPrivacyView']);
+Route::get('/vendor/privacy',              [\App\Http\Controllers\LegalController::class, 'vendorPrivacyView']);
+Route::get('/owner/terms-and-conditions',  [\App\Http\Controllers\LegalController::class, 'vendorTermsView']);
+Route::get('/owner/privacy-policy',        [\App\Http\Controllers\LegalController::class, 'vendorPrivacyView']);
+
 // Explicitly serve Admin Portal with Cache-Control headers to ensure latest JS is always fetched
 Route::get('/admin/{any?}', function () {
     $indexPath = public_path('admin/index.html');
