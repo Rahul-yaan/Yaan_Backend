@@ -8,6 +8,61 @@ use Illuminate\Http\JsonResponse;
 class LegalController extends Controller
 {
     /**
+     * Build plain text from structured data.
+     */
+    private function buildPlainText(array $data): string
+    {
+        $text = $data['title'] . "\n";
+        $text .= "Effective Date: " . ($data['effective_date'] ?? 'August 21, 2026') . "\n\n";
+
+        if (!empty($data['sections']) && is_array($data['sections'])) {
+            foreach ($data['sections'] as $sec) {
+                $text .= ($sec['title'] ?? '') . "\n";
+                $text .= ($sec['content'] ?? '') . "\n";
+                if (!empty($sec['items']) && is_array($sec['items'])) {
+                    foreach ($sec['items'] as $item) {
+                        $text .= " • " . $item . "\n";
+                    }
+                }
+                if (!empty($sec['footer'])) {
+                    $text .= $sec['footer'] . "\n";
+                }
+                $text .= "\n";
+            }
+        }
+        return trim($text);
+    }
+
+    /**
+     * Build HTML string from structured data.
+     */
+    private function buildHtmlText(array $data): string
+    {
+        $html = "<div style='font-family: sans-serif; line-height: 1.6;'>";
+        $html .= "<h1>" . e($data['title'] ?? '') . "</h1>";
+        $html .= "<p><strong>Effective Date:</strong> " . e($data['effective_date'] ?? 'August 21, 2026') . "</p><hr>";
+
+        if (!empty($data['sections']) && is_array($data['sections'])) {
+            foreach ($data['sections'] as $sec) {
+                $html .= "<h2 style='color: #0f172a; margin-top: 20px;'>" . e($sec['title'] ?? '') . "</h2>";
+                $html .= "<p style='color: #334155;'>" . e($sec['content'] ?? '') . "</p>";
+                if (!empty($sec['items']) && is_array($sec['items'])) {
+                    $html .= "<ul>";
+                    foreach ($sec['items'] as $item) {
+                        $html .= "<li style='margin-bottom: 6px;'>" . e($item) . "</li>";
+                    }
+                    $html .= "</ul>";
+                }
+                if (!empty($sec['footer'])) {
+                    $html .= "<p style='color: #334155;'>" . e($sec['footer']) . "</p>";
+                }
+            }
+        }
+        $html .= "</div>";
+        return $html;
+    }
+
+    /**
      * Get Customer Terms and Conditions data.
      */
     private function getTermsData(): array
@@ -455,38 +510,116 @@ class LegalController extends Controller
     }
 
     // ============================================================
-    // JSON API RESPONSES
+    // UNIVERSAL JSON API RESPONSES
+    // Supports all mobile app Flutter JSON parsers:
+    // - content (String)
+    // - html_content (HTML String)
+    // - terms / privacy (String)
+    // - sections (List<Map>)
+    // - data (Object / List)
     // ============================================================
 
     public function termsJson(): JsonResponse
     {
+        $raw   = $this->getTermsData();
+        $plain = $this->buildPlainText($raw);
+        $html  = $this->buildHtmlText($raw);
+
+        $payload = array_merge($raw, [
+            'content'      => $plain,
+            'html_content' => $html,
+            'terms'        => $plain,
+            'url'          => url('/terms-and-conditions'),
+        ]);
+
         return response()->json([
-            'success' => true,
-            'data' => $this->getTermsData()
+            'success'      => true,
+            'status'       => true,
+            'title'        => $raw['title'],
+            'content'      => $plain,
+            'html_content' => $html,
+            'terms'        => $plain,
+            'url'          => url('/terms-and-conditions'),
+            'sections'     => $raw['sections'],
+            'data'         => $payload,
         ]);
     }
 
     public function privacyJson(): JsonResponse
     {
+        $raw   = $this->getPrivacyData();
+        $plain = $this->buildPlainText($raw);
+        $html  = $this->buildHtmlText($raw);
+
+        $payload = array_merge($raw, [
+            'content'      => $plain,
+            'html_content' => $html,
+            'privacy'      => $plain,
+            'url'          => url('/privacy-policy'),
+        ]);
+
         return response()->json([
-            'success' => true,
-            'data' => $this->getPrivacyData()
+            'success'      => true,
+            'status'       => true,
+            'title'        => $raw['title'],
+            'content'      => $plain,
+            'html_content' => $html,
+            'privacy'      => $plain,
+            'url'          => url('/privacy-policy'),
+            'sections'     => $raw['sections'],
+            'data'         => $payload,
         ]);
     }
 
     public function vendorTermsJson(): JsonResponse
     {
+        $raw   = $this->getVendorTermsData();
+        $plain = $this->buildPlainText($raw);
+        $html  = $this->buildHtmlText($raw);
+
+        $payload = array_merge($raw, [
+            'content'      => $plain,
+            'html_content' => $html,
+            'terms'        => $plain,
+            'url'          => url('/vendor/terms-and-conditions'),
+        ]);
+
         return response()->json([
-            'success' => true,
-            'data' => $this->getVendorTermsData()
+            'success'      => true,
+            'status'       => true,
+            'title'        => $raw['title'],
+            'content'      => $plain,
+            'html_content' => $html,
+            'terms'        => $plain,
+            'url'          => url('/vendor/terms-and-conditions'),
+            'sections'     => $raw['sections'],
+            'data'         => $payload,
         ]);
     }
 
     public function vendorPrivacyJson(): JsonResponse
     {
+        $raw   = $this->getVendorPrivacyData();
+        $plain = $this->buildPlainText($raw);
+        $html  = $this->buildHtmlText($raw);
+
+        $payload = array_merge($raw, [
+            'content'      => $plain,
+            'html_content' => $html,
+            'privacy'      => $plain,
+            'url'          => url('/vendor/privacy-policy'),
+        ]);
+
         return response()->json([
-            'success' => true,
-            'data' => $this->getVendorPrivacyData()
+            'success'      => true,
+            'status'       => true,
+            'title'        => $raw['title'],
+            'content'      => $plain,
+            'html_content' => $html,
+            'privacy'      => $plain,
+            'url'          => url('/vendor/privacy-policy'),
+            'sections'     => $raw['sections'],
+            'data'         => $payload,
         ]);
     }
 }
