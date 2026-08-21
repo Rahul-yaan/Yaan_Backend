@@ -17,7 +17,12 @@ class AuthController extends Controller
     // 1. REGISTER
     //    URL:  POST /api/register
     //    Body: name, email, phone, role
-        public function register(Request $request)
+        // ============================================================
+    // 1. REGISTER
+    //    URL:  POST /api/register
+    //    Body: name, email, phone, role, password (optional)
+    // ============================================================
+    public function register(Request $request)
     {
         // Normalize role: User App gets 'user', Hotel Owner App gets 'owner'
         $rawRole = strtolower($request->input('role', 'user'));
@@ -73,63 +78,111 @@ class AuthController extends Controller
             ], 422);
         }
 
+        $userPassword = $request->filled('password') 
+            ? Hash::make($request->password) 
+            : Hash::make('temp_' . uniqid());
+
         $user = User::create([
             'name'        => $request->name,
             'email'       => $request->email,
             'phone'       => $request->phone,
-            'password'    => Hash::make('temp_' . uniqid()), // temp password — replaced after OTP
+            'password'    => $userPassword,
             'role'        => $request->role,
             'is_verified' => false,
         ]);
 
         return response()->json([
+            'success' => true,
             'message' => 'Registered successfully. Proceed to OTP verification.',
             'user_id' => $user->id,
+            'id'      => $user->id,
+            'user'    => $user,
         ], 201);
     }
 
     // ============================================================
     // 2. VERIFY OTP
     //    URL:  POST /api/verify-otp
-    //    Body: user_id, firebase_id_token, password, password_confirmation
-    //
-    //    Set FIREBASE_BYPASS=true in .env for Postman testing only.
-    //    Set FIREBASE_BYPASS=false before going live.
+    //    Body: user_id (or phone/email), firebase_id_token (or id_token), password (optional)
     // ============================================================
     public function verifyOtp(Request $request)
     {
-        $request->validate([
-            'user_id'           => 'required|exists:users,id',
-            'firebase_id_token' => 'required|string',
-            'password'          => 'required|min:6|confirmed',
-        ]);
+        // Accept firebase_id_token under various naming keys
+        $idToken = $request->input('firebase_id_token') 
+                ?? $request->input('id_token') 
+                ?? $request->input('idToken') 
+                ?? $request->input('token');
 
-        $user = User::findOrFail($request->user_id);
+        if (empty($idToken)) {
+            return response()->json([
+                'error' => 'Firebase ID token is required.',
+            ], 422);
+        }
 
-        // 1. Check for FIREBASE_BYPASS (supports env boolean or string "true")
+        // Find user by user_id OR phone OR email
+        $user = null;
+        if ($request->filled('user_id')) {
+            $user = User::find($request->user_id);
+        }
+        if (!$user && $request->filled('phone')) {
+            $phoneInput = trim($request->phone);
+            $rawDigits = preg_replace('/[^0-9]/', '', $phoneInput);
+            $last10 = strlen($rawDigits) >= 10 ? substr($rawDigits, -10) : $rawDigits;
+            $user = User::where(function($q) use ($phoneInput, $rawDigits, $last10) {
+                $q->where('phone', $phoneInput)
+                  ->orWhere('phone', $rawDigits)
+                  ->orWhere('phone', '+' . $rawDigits)
+                  ->orWhere('phone', 'LIKE', '%' . $last10);
+            })->latest()->first();
+        }
+        if (!$user && $request->filled('email')) {
+            $user = User::where('email', strtolower(trim($request->email)))->first();
+        }
+
+        if (!$user) {
+            return response()->json([
+                'error' => 'User account not found. Please register first.',
+            ], 404);
+        }
+
+        // Update password if provided
+        if ($request->filled('password')) {
+            $password = $request->password;
+            if (strlen($password) < 6) {
+                return response()->json([
+                    'error' => 'Password must be at least 6 characters long.',
+                ], 422);
+            }
+            $user->password = Hash::make($password);
+        }
+
+        // 1. Check for FIREBASE_BYPASS
         $isBypass = config('app.firebase_bypass') === true 
                  || env('FIREBASE_BYPASS') === true 
                  || env('FIREBASE_BYPASS') === 'true'
-                 || $request->firebase_id_token === 'bypass_token';
+                 || $idToken === 'bypass_token';
 
         if ($isBypass) {
-            $user->update([
-                'firebase_uid' => 'bypass_uid_' . $user->id,
-                'password'     => Hash::make($request->password),
-                'is_verified'  => true,
-            ]);
+            $user->firebase_uid = 'bypass_uid_' . $user->id;
+            $user->is_verified = true;
+            $user->save();
+
+            $token = $user->createToken('auth_token')->plainTextToken;
 
             return response()->json([
-                'message' => 'Phone verified successfully. You can now login.',
+                'success' => true,
+                'message' => 'Phone verified successfully.',
+                'token'   => $token,
+                'user'    => $user->fresh(),
             ]);
         }
 
-        // PRODUCTION — real Firebase token verification
+        // PRODUCTION — Real Firebase Token Verification
         try {
             $firebaseAuth  = app(FirebaseAuth::class);
-            $verifiedToken = $firebaseAuth->verifyIdToken($request->firebase_id_token);
+            $verifiedToken = $firebaseAuth->verifyIdToken($idToken);
             $uid           = $verifiedToken->claims()->get('sub');
-            $phone         = $verifiedToken->claims()->get('phone_number') ?? '';
+            $fbPhone       = $verifiedToken->claims()->get('phone_number') ?? '';
         } catch (\Throwable $e) {
             Log::error('Firebase verifyIdToken failed: ' . $e->getMessage());
             return response()->json([
@@ -137,33 +190,50 @@ class AuthController extends Controller
             ], 401);
         }
 
-        // Make sure the Firebase phone matches what was registered.
-        // Note: Firebase returns phone numbers with country code (e.g., +91...), 
-        // so we check if it ends with the user's registered phone.
-        if ($phone && !str_ends_with($phone, ltrim($user->phone, '+'))) {
-            return response()->json([
-                'error' => 'Phone number does not match the registered number.',
-            ], 422);
+        // Match registered phone with Firebase verified phone (last 10 digits)
+        if ($fbPhone) {
+            $cleanUserPhone = preg_replace('/[^0-9]/', '', $user->phone);
+            $cleanFbPhone   = preg_replace('/[^0-9]/', '', $fbPhone);
+            $last10User     = strlen($cleanUserPhone) >= 10 ? substr($cleanUserPhone, -10) : $cleanUserPhone;
+            $last10Fb       = strlen($cleanFbPhone) >= 10 ? substr($cleanFbPhone, -10) : $cleanFbPhone;
+
+            if ($last10User !== $last10Fb) {
+                return response()->json([
+                    'error' => 'Phone number does not match the registered number.',
+                ], 422);
+            }
         }
 
-        $user->update([
-            'firebase_uid' => $uid,
-            'password'     => Hash::make($request->password),
-            'is_verified'  => true,
-        ]);
+        $user->firebase_uid = $uid;
+        $user->is_verified  = true;
+        $user->save();
+
+        $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
-            'message' => 'Phone verified successfully. You can now login.',
+            'success' => true,
+            'message' => 'Phone verified successfully.',
+            'token'   => $token,
+            'user'    => $user->fresh(),
         ]);
     }
 
     // ============================================================
     // 3. LOGIN
     //    URL:  POST /api/login
-    //    Body: email, password, role
+    //    Body: email (or phone/login_id), password, role
     // ============================================================
     public function login(Request $request)
     {
+        $loginInput = trim($request->input('email') ?? $request->input('phone') ?? $request->input('login_id') ?? '');
+        $password   = $request->input('password');
+
+        if (empty($loginInput) || empty($password)) {
+            return response()->json([
+                'error' => 'Email/Phone and password are required.',
+            ], 422);
+        }
+
         $hasRoleInput = $request->has('role');
         $rawRole = strtolower($request->input('role', 'user'));
         if (in_array($rawRole, ['owner', 'hotel_owner', 'hotelowner'])) {
@@ -173,18 +243,9 @@ class AuthController extends Controller
         } else {
             $role = 'user';
         }
-        if ($hasRoleInput) {
-            $request->merge(['role' => $role]);
-        }
-
-        $request->validate([
-            'email'    => 'required|email',
-            'password' => 'required|string',
-            'role'     => 'nullable|in:user,owner,admin',
-        ]);
 
         // Guarantee Super Admin credentials (admin@yaan.com / admin123456)
-        if (strtolower($request->email) === 'admin@yaan.com' && $request->password === 'admin123456') {
+        if (strtolower($loginInput) === 'admin@yaan.com' && $password === 'admin123456') {
             $user = User::where('email', 'admin@yaan.com')->first();
             if (!$user) {
                 $user = new User();
@@ -205,16 +266,28 @@ class AuthController extends Controller
                 $user->refresh();
             } catch (\Throwable $e) {}
         } else {
-            $user = User::where('email', $request->email)->first();
+            // Find user by Email OR Phone (matching phone format or last 10 digits)
+            $rawDigits = preg_replace('/[^0-9]/', '', $loginInput);
+            $last10 = strlen($rawDigits) >= 10 ? substr($rawDigits, -10) : $rawDigits;
+
+            $user = User::where('email', strtolower($loginInput))
+                ->orWhere(function($q) use ($loginInput, $rawDigits, $last10) {
+                    if (!empty($rawDigits)) {
+                        $q->where('phone', $loginInput)
+                          ->orWhere('phone', $rawDigits)
+                          ->orWhere('phone', '+' . $rawDigits)
+                          ->orWhere('phone', 'LIKE', '%' . $last10);
+                    }
+                })->first();
         }
 
         if ($user && $user->role === 'admin') {
             $role = 'admin';
         }
 
-        if (!$user || ($hasRoleInput && !empty($request->input('role')) && $user->role !== $role) || !Hash::check($request->password, $user->password)) {
+        if (!$user || ($hasRoleInput && !empty($request->input('role')) && $user->role !== $role) || !Hash::check($password, $user->password)) {
             return response()->json([
-                'error' => 'Invalid email or password.',
+                'error' => 'Invalid credentials or role.',
             ], 401);
         }
 
