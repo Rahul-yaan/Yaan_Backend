@@ -168,7 +168,7 @@ class AuthController extends Controller
         $isBypass = config('app.firebase_bypass') === true 
                  || env('FIREBASE_BYPASS') === true 
                  || env('FIREBASE_BYPASS') === 'true'
-                 || in_array($idToken, ['bypass_token', '123456', '000000', 'test_otp', '123456789']);
+                 || $idToken === 'bypass_token';
 
         if ($isBypass) {
             $user->firebase_uid = 'bypass_uid_' . $user->id;
