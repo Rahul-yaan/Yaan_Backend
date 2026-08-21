@@ -57,19 +57,18 @@ class DashboardController extends Controller
             ->whereNotIn('payment_status', ['refunded', 'refund_initiated']);
 
         // Financial Calculation Model (34% Admin Platform Fee & 66% Owner Net Revenue):
-        // Example: Base Price = ₹100 | 5% Discount = -₹5 | Discounted Room Price = ₹95 | GST (18%) = ₹17.10 | Customer Pays = ₹112.10
-        // Base Room Revenue = ₹95 (or ₹100 base)
-        // Admin Platform Fee (34%) = ₹32.30 (or ₹34 on ₹100 base)
-        // Owner Net Revenue (66%) = ₹62.70 (or ₹66 on ₹100 base)
-        // Owner GST (18% on Net Share) = ₹11.29 (or ₹11.88 on ₹66 net)
-        $baseRevenueSum       = (float) (clone $ownerBookingsQuery)->sum(DB::raw('COALESCE(total_amount, price_per_night)'));
+        // Total actual amount paid by customer (including offer discount & GST)
         $totalCustomerPaid    = (float) (clone $ownerBookingsQuery)->sum(DB::raw('COALESCE(total_payable, total_amount)'));
+        $baseRevenueSum       = (float) (clone $ownerBookingsQuery)->sum(DB::raw('COALESCE(total_amount, price_per_night)'));
         $totalDiscountApplied = (float) (clone $ownerBookingsQuery)->sum(DB::raw('COALESCE(promotion_applied, 0)'));
         $customerGstTotal     = (float) (clone $ownerBookingsQuery)->sum(DB::raw('COALESCE(gst_amount, 0)'));
 
-        $platformFeeCollected = round($baseRevenueSum * 0.34, 2);       // 34% Admin Platform Fee
-        $ownerPayableEarnings = round($baseRevenueSum * 0.66, 2);       // 66% Owner Net Share
-        $ownerGstAmount       = round($ownerPayableEarnings * 0.18, 2);  // 18% GST on Net Share
+        // Actual Order Total Amount displayed on Owner Dashboard (e.g., ₹47.49 after offer discount)
+        $displayTotalAmount   = $totalCustomerPaid > 0 ? $totalCustomerPaid : $baseRevenueSum;
+
+        $platformFeeCollected = round($displayTotalAmount * 0.34, 2);       // 34% Platform Fee (e.g. ₹16.15)
+        $ownerPayableEarnings = round($displayTotalAmount * 0.66, 2);       // 66% Owner Net Share (e.g. ₹31.35)
+        $ownerGstAmount       = round($ownerPayableEarnings * 0.18, 2);  // 18% GST on Net Share (e.g. ₹5.64)
 
         $pendingBookings = (clone $bookingsQuery)
             ->where('status', 'pending')
@@ -94,24 +93,24 @@ class DashboardController extends Controller
             'today_orders'           => $todayBookings,
             'today_order'            => $todayBookings,
 
-            // Financial Summary Keys (supporting all client card naming variations)
-            'total_amount'           => $baseRevenueSum,          // Room Base Amount (₹95.00 / ₹100.00)
+            // Financial Summary Keys (strictly synced with customer paid amount)
+            'total_amount'           => $displayTotalAmount,      // Actual Order Amount (₹47.49)
             'base_amount'            => $baseRevenueSum,
-            'total_revenue'          => $totalCustomerPaid,       // Gross Customer Paid (₹112.10)
+            'total_revenue'          => $totalCustomerPaid,       // Gross Customer Paid (₹47.49)
             'total_customer_paid'    => $totalCustomerPaid,
-            'total_payable'          => $totalCustomerPaid,
+            'total_payable'          => $displayTotalAmount,
             'total_discount_applied' => $totalDiscountApplied,
 
-            'platform_fee'           => $platformFeeCollected,    // 34% Platform Fee (₹32.30 / ₹34.00)
+            'platform_fee'           => $platformFeeCollected,    // 34% Platform Fee (₹16.15)
             'platform_fee_collected' => $platformFeeCollected,
             'admin_platform_fee'     => $platformFeeCollected,
 
-            'payable_amount'         => $ownerPayableEarnings,    // 66% Owner Net Share (₹62.70 / ₹66.00)
+            'payable_amount'         => $ownerPayableEarnings,    // 66% Owner Net Share (₹31.35)
             'owner_payable_revenue'  => $ownerPayableEarnings,
             'owner_net_share'        => $ownerPayableEarnings,
             'total_earnings'         => $ownerPayableEarnings,
 
-            'gst_amount'             => $ownerGstAmount,          // 18% GST on Owner Net Share (₹11.29 / ₹11.88)
+            'gst_amount'             => $ownerGstAmount,          // 18% GST on Owner Net Share (₹5.64)
             'owner_gst_amount'       => $ownerGstAmount,
             'customer_gst_amount'    => $customerGstTotal,
 
@@ -130,7 +129,7 @@ class DashboardController extends Controller
                 'customer_gst_total'     => $customerGstTotal,
             ],
             // Top-level aliases for direct property mapping
-            'total_amount'           => $baseRevenueSum,
+            'total_amount'           => $displayTotalAmount,
             'platform_fee'           => $platformFeeCollected,
             'payable_amount'         => $ownerPayableEarnings,
             'gst_amount'             => $ownerGstAmount,
