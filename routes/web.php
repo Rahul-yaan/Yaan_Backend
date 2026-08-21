@@ -29,6 +29,13 @@ Route::get('/vendor/privacy',              [\App\Http\Controllers\LegalControlle
 Route::get('/owner/terms-and-conditions',  [\App\Http\Controllers\LegalController::class, 'vendorTermsView']);
 Route::get('/owner/privacy-policy',        [\App\Http\Controllers\LegalController::class, 'vendorPrivacyView']);
 
+// About Us & Contact Us Web Pages
+Route::get('/about-us',   [\App\Http\Controllers\LegalController::class, 'aboutView']);
+Route::get('/about',      [\App\Http\Controllers\LegalController::class, 'aboutView']);
+Route::get('/contact-us', [\App\Http\Controllers\LegalController::class, 'contactView']);
+Route::get('/contact',    [\App\Http\Controllers\LegalController::class, 'contactView']);
+Route::get('/support',    [\App\Http\Controllers\LegalController::class, 'contactView']);
+
 // Explicitly serve Admin Portal with Cache-Control headers to ensure latest JS is always fetched
 Route::get('/admin/{any?}', function () {
     $indexPath = public_path('admin/index.html');

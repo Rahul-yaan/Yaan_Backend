@@ -39,6 +39,18 @@ Route::middleware('throttle:60,1')->group(function () {
     Route::get('/owner/terms',                 [\App\Http\Controllers\LegalController::class, 'vendorTermsJson']);
     Route::get('/owner/privacy-policy',        [\App\Http\Controllers\LegalController::class, 'vendorPrivacyJson']);
     Route::get('/owner/privacy',               [\App\Http\Controllers\LegalController::class, 'vendorPrivacyJson']);
+
+    // About Us & Contact Us APIs
+    Route::get('/about-us',   [\App\Http\Controllers\LegalController::class, 'aboutJson']);
+    Route::get('/about',      [\App\Http\Controllers\LegalController::class, 'aboutJson']);
+    Route::get('/contact-us', [\App\Http\Controllers\LegalController::class, 'contactJson']);
+    Route::get('/contact',    [\App\Http\Controllers\LegalController::class, 'contactJson']);
+    Route::get('/support',    [\App\Http\Controllers\LegalController::class, 'contactJson']);
+
+    // App Master Settings & Page Links Endpoint
+    Route::get('/app-info',   [\App\Http\Controllers\LegalController::class, 'appInfoJson']);
+    Route::get('/pages',      [\App\Http\Controllers\LegalController::class, 'appInfoJson']);
+    Route::get('/settings',   [\App\Http\Controllers\LegalController::class, 'appInfoJson']);
 });
 
 // Razorpay Webhook — Verified by HMAC signature in controller

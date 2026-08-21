@@ -12,8 +12,10 @@ class LegalController extends Controller
      */
     private function buildPlainText(array $data): string
     {
-        $text = $data['title'] . "\n";
-        $text .= "Effective Date: " . ($data['effective_date'] ?? 'August 21, 2026') . "\n\n";
+        $text = ($data['title'] ?? '') . "\n";
+        if (!empty($data['effective_date'])) {
+            $text .= "Effective Date: " . $data['effective_date'] . "\n\n";
+        }
 
         if (!empty($data['sections']) && is_array($data['sections'])) {
             foreach ($data['sections'] as $sec) {
@@ -40,7 +42,9 @@ class LegalController extends Controller
     {
         $html = "<div style='font-family: sans-serif; line-height: 1.6;'>";
         $html .= "<h1>" . e($data['title'] ?? '') . "</h1>";
-        $html .= "<p><strong>Effective Date:</strong> " . e($data['effective_date'] ?? 'August 21, 2026') . "</p><hr>";
+        if (!empty($data['effective_date'])) {
+            $html .= "<p><strong>Effective Date:</strong> " . e($data['effective_date']) . "</p><hr>";
+        }
 
         if (!empty($data['sections']) && is_array($data['sections'])) {
             foreach ($data['sections'] as $sec) {
@@ -60,6 +64,74 @@ class LegalController extends Controller
         }
         $html .= "</div>";
         return $html;
+    }
+
+    /**
+     * Get About Us data.
+     */
+    private function getAboutData(): array
+    {
+        return [
+            'title' => 'About Yaan',
+            'app_name' => 'Yaan',
+            'tagline' => 'India\'s Premier Truck Parking & Highway Amenities Platform',
+            'entity' => 'Yaan (Sole Proprietorship Firm, Gujarat, India)',
+            'sections' => [
+                [
+                    'id' => 1,
+                    'title' => 'Our Mission',
+                    'content' => 'Yaan connects logistics companies, fleet owners, and independent truck drivers with verified highway hotels and dhabas across India. We ensure drivers get safe overnight parking, clean restrooms, and complimentary meals while providing hotel partners with consistent bookings.'
+                ],
+                [
+                    'id' => 2,
+                    'title' => 'Why Choose Yaan?',
+                    'content' => 'Key features built for highway safety and convenience:',
+                    'items' => [
+                        'Verified Highway Locations: Secure parking spaces at verified hotels and dhabas along major national & state highways.',
+                        'Driver Comfort: Booking includes complimentary breakfast for drivers and access to clean washroom facilities.',
+                        'Seamless Payments: Instant online booking, transparent billing, and GST invoices sent via email within 48 hours.',
+                        'Partner Ecosystem: Empowering local dhabas and hotels with technology, fair commissions, and reliable monthly payouts.'
+                    ]
+                ],
+                [
+                    'id' => 3,
+                    'title' => 'Company Information',
+                    'content' => 'Yaan is a registered sole proprietorship firm operating from Gujarat, India, dedicated to revolutionizing highway logistics and parking infrastructure.'
+                ]
+            ]
+        ];
+    }
+
+    /**
+     * Get Contact & Support data.
+     */
+    private function getContactData(): array
+    {
+        return [
+            'title' => 'Contact Us & Help Support',
+            'app_name' => 'Yaan',
+            'effective_date' => 'August 21, 2026',
+            'sections' => [
+                [
+                    'id' => 1,
+                    'title' => 'Customer & Driver Support',
+                    'content' => 'Need help with a parking booking, location navigation, or invoice? Reach out to our 24/7 support team:',
+                    'items' => [
+                        'Support Email: support@yaanapp.com',
+                        'General Inquiries: info@yaanapp.com'
+                    ]
+                ],
+                [
+                    'id' => 2,
+                    'title' => 'Hotel Partner & Business Inquiries',
+                    'content' => 'Interested in listing your hotel or dhaba on Yaan, or need assistance with GST/payouts?',
+                    'items' => [
+                        'Partner Email: support@yaanapp.com',
+                        'Headquarters: Bharuch, Gujarat, India'
+                    ]
+                ]
+            ]
+        ];
     }
 
     /**
@@ -509,14 +581,20 @@ class LegalController extends Controller
         return view('vendor_privacy', compact('data'));
     }
 
+    public function aboutView()
+    {
+        $data = $this->getAboutData();
+        return view('about', compact('data'));
+    }
+
+    public function contactView()
+    {
+        $data = $this->getContactData();
+        return view('contact', compact('data'));
+    }
+
     // ============================================================
     // UNIVERSAL JSON API RESPONSES
-    // Supports all mobile app Flutter JSON parsers:
-    // - content (String)
-    // - html_content (HTML String)
-    // - terms / privacy (String)
-    // - sections (List<Map>)
-    // - data (Object / List)
     // ============================================================
 
     public function termsJson(): JsonResponse
@@ -620,6 +698,91 @@ class LegalController extends Controller
             'url'          => url('/vendor/privacy-policy'),
             'sections'     => $raw['sections'],
             'data'         => $payload,
+        ]);
+    }
+
+    public function aboutJson(): JsonResponse
+    {
+        $raw   = $this->getAboutData();
+        $plain = $this->buildPlainText($raw);
+        $html  = $this->buildHtmlText($raw);
+
+        $payload = array_merge($raw, [
+            'content'      => $plain,
+            'html_content' => $html,
+            'about'        => $plain,
+            'url'          => url('/about-us'),
+        ]);
+
+        return response()->json([
+            'success'      => true,
+            'status'       => true,
+            'title'        => $raw['title'],
+            'content'      => $plain,
+            'html_content' => $html,
+            'about'        => $plain,
+            'url'          => url('/about-us'),
+            'sections'     => $raw['sections'],
+            'data'         => $payload,
+        ]);
+    }
+
+    public function contactJson(): JsonResponse
+    {
+        $raw   = $this->getContactData();
+        $plain = $this->buildPlainText($raw);
+        $html  = $this->buildHtmlText($raw);
+
+        $payload = array_merge($raw, [
+            'content'      => $plain,
+            'html_content' => $html,
+            'contact'      => $plain,
+            'url'          => url('/contact-us'),
+        ]);
+
+        return response()->json([
+            'success'      => true,
+            'status'       => true,
+            'title'        => $raw['title'],
+            'content'      => $plain,
+            'html_content' => $html,
+            'contact'      => $plain,
+            'url'          => url('/contact-us'),
+            'sections'     => $raw['sections'],
+            'data'         => $payload,
+        ]);
+    }
+
+    /**
+     * Master App Info / Settings endpoint returning all URLs and metadata.
+     */
+    public function appInfoJson(): JsonResponse
+    {
+        $baseUrl = config('app.url', 'https://yaan-backend.onrender.com');
+
+        return response()->json([
+            'success' => true,
+            'status' => true,
+            'app_name' => 'Yaan',
+            'support_email' => 'support@yaanapp.com',
+            'info_email' => 'info@yaanapp.com',
+            'address' => 'Bharuch, Gujarat, India',
+            'urls' => [
+                'terms' => url('/terms-and-conditions'),
+                'privacy' => url('/privacy-policy'),
+                'vendor_terms' => url('/vendor/terms-and-conditions'),
+                'vendor_privacy' => url('/vendor/privacy-policy'),
+                'about' => url('/about-us'),
+                'contact' => url('/contact-us'),
+            ],
+            'pages' => [
+                'terms_url' => url('/terms-and-conditions'),
+                'privacy_url' => url('/privacy-policy'),
+                'vendor_terms_url' => url('/vendor/terms-and-conditions'),
+                'vendor_privacy_url' => url('/vendor/privacy-policy'),
+                'about_url' => url('/about-us'),
+                'contact_url' => url('/contact-us'),
+            ]
         ]);
     }
 }
