@@ -84,17 +84,19 @@ class OwnerController extends Controller
             return (in_array($b->payment_status, ['paid', 'pay_at_hotel', 'cash', 'completed']) || in_array($b->status, ['confirmed', 'completed'])) && $b->payment_status !== 'refunded';
         });
 
-        $baseRevenueSum = (float) $confirmedBookings->sum(function($b) {
-            return (float) ($b->total_amount ?? $b->price_per_night ?? 0);
-        });
-
         $totalCustomerPaid = (float) $confirmedBookings->sum(function($b) {
             return (float) ($b->total_payable ?? $b->total_amount ?? 0);
         });
 
-        $ownerPayableRevenue  = round($baseRevenueSum * 0.66, 2);      // ₹66 per ₹100 base
-        $ownerGstAmount       = round($ownerPayableRevenue * 0.18, 2); // ₹11.88 GST on ₹66
-        $platformFeeCollected = round($baseRevenueSum * 0.34, 2);      // ₹34 Platform Fee (34%)
+        $baseRevenueSum = (float) $confirmedBookings->sum(function($b) {
+            return (float) ($b->total_amount ?? $b->price_per_night ?? 0);
+        });
+
+        $displayTotalAmount = $totalCustomerPaid > 0 ? $totalCustomerPaid : $baseRevenueSum;
+
+        $ownerPayableRevenue  = round($displayTotalAmount * 0.66, 2);      // ₹66% Net Share
+        $ownerGstAmount       = round($ownerPayableRevenue * 0.18, 2); // 18% GST on 66% Net Share
+        $platformFeeCollected = round($displayTotalAmount * 0.34, 2);      // 34% Platform Fee
 
         $totalCancelled = $bookings->filter(function($b) {
             return $b->status === 'cancelled' || in_array($b->payment_status, ['refunded', 'refund_initiated']);
