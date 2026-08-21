@@ -44,8 +44,17 @@ Route::get('/banners', [App\Http\Controllers\BannerController::class, 'index']);
 
 Route::middleware('auth:sanctum')->group(function () {
 
-    Route::get('/me',      [AuthController::class, 'me']);
-    Route::post('/logout', [AuthController::class, 'logout']);
+    Route::get('/me',                   [AuthController::class, 'me']);
+    Route::get('/user/profile',         [AuthController::class, 'me']);
+    Route::get('/profile',              [AuthController::class, 'me']);
+
+    Route::post('/user/update-profile', [AuthController::class, 'updateProfile']);
+    Route::post('/user/profile',        [AuthController::class, 'updateProfile']);
+    Route::post('/profile',             [AuthController::class, 'updateProfile']);
+    Route::put('/user/profile',         [AuthController::class, 'updateProfile']);
+    Route::put('/profile',              [AuthController::class, 'updateProfile']);
+
+    Route::post('/logout',              [AuthController::class, 'logout']);
 
     // User routes
     Route::middleware('role:user')->group(function () {

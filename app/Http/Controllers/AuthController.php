@@ -330,34 +330,75 @@ class AuthController extends Controller
 
     // ============================================================
     // 4.5 UPDATE PROFILE
-    //     URL:    POST /api/user/update-profile
+    //     URL:    POST /api/user/update-profile, POST /api/user/profile, POST /api/profile
     //     Header: Authorization: Bearer YOUR_TOKEN
     // ============================================================
     public function updateProfile(Request $request)
     {
         $user = $request->user();
 
-        $request->validate([
-            'name'  => 'nullable|string|max:100',
-            'email' => 'nullable|email|unique:users,email,' . $user->id,
-            'phone' => 'nullable|string|unique:users,phone,' . $user->id,
-            'avatar'=> 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-        ]);
+        // 1. Update Name (check 'name', 'full_name', 'user_name')
+        $name = $request->input('name') ?? $request->input('full_name') ?? $request->input('user_name');
+        if ($name !== null && trim($name) !== '') {
+            $user->name = trim($name);
+        }
 
-        if ($request->has('name'))  $user->name = $request->name;
-        if ($request->has('email')) $user->email = $request->email;
-        if ($request->has('phone')) $user->phone = $request->phone;
+        // 2. Update Email if changed and valid
+        if ($request->filled('email') && $request->email !== $user->email) {
+            $request->validate([
+                'email' => 'email|unique:users,email,' . $user->id,
+            ]);
+            $user->email = $request->email;
+        }
 
-        if ($request->hasFile('avatar')) {
-            $path = $request->file('avatar')->store('avatars', 'public');
+        // 3. Update Phone if changed and valid
+        if ($request->filled('phone') && $request->phone !== $user->phone) {
+            $request->validate([
+                'phone' => 'string|unique:users,phone,' . $user->id,
+            ]);
+            $user->phone = $request->phone;
+        }
+
+        // 4. Update Profile Avatar Image (file or base64)
+        $imageFile = null;
+        foreach (['avatar', 'image', 'profile_image', 'photo', 'file'] as $key) {
+            if ($request->hasFile($key)) {
+                $imageFile = $request->file($key);
+                break;
+            }
+        }
+
+        if ($imageFile && $imageFile->isValid()) {
+            $path = $imageFile->store('avatars', 'public');
             $user->avatar = url('storage/' . $path);
+        } else {
+            // Check for Base64 image payload
+            $base64Input = $request->input('avatar') ?? $request->input('profile_image') ?? $request->input('image');
+            if (is_string($base64Input) && str_starts_with($base64Input, 'data:image')) {
+                try {
+                    @list($type, $data) = explode(';', $base64Input);
+                    @list(, $data)      = explode(',', $data);
+                    if ($data) {
+                        $decoded = base64_decode($data);
+                        $filename = 'avatars/' . uniqid() . '.png';
+                        \Illuminate\Support\Facades\Storage::disk('public')->put($filename, $decoded);
+                        $user->avatar = url('storage/' . $filename);
+                    }
+                } catch (\Throwable $e) {
+                    // Ignore base64 parsing error
+                }
+            }
         }
 
         $user->save();
+        $updatedUser = $user->fresh();
 
         return response()->json([
+            'success' => true,
+            'status'  => true,
             'message' => 'Profile updated successfully.',
-            'user'    => $user,
+            'user'    => $updatedUser,
+            'data'    => $updatedUser,
         ]);
     }
 

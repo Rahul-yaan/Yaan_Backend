@@ -20,7 +20,21 @@ class User extends Authenticatable
         'role',
         'firebase_uid',
         'is_verified',
+        'avatar',
     ];
+
+    protected $appends = ['avatar_url'];
+
+    public function getAvatarUrlAttribute()
+    {
+        if (!$this->avatar) {
+            return null;
+        }
+        if (str_starts_with($this->avatar, 'http://') || str_starts_with($this->avatar, 'https://')) {
+            return $this->avatar;
+        }
+        return url(ltrim($this->avatar, '/'));
+    }
 
     protected $hidden = [
         'password',
