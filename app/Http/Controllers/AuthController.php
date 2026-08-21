@@ -44,7 +44,7 @@ class AuthController extends Controller
                   ->orWhere('phone', '+' . $rawDigits)
                   ->orWhere('phone', 'LIKE', '%' . $last10);
             })->where(function($q) {
-                $q->where('is_verified', false)->orWhere('is_verified', 0)->orWhereNull('is_verified');
+                $q->whereRaw('(is_verified IS FALSE OR is_verified IS NULL)');
             })->delete();
         }
 
@@ -53,7 +53,7 @@ class AuthController extends Controller
             $request->merge(['email' => $email]);
             User::where('email', $email)
                 ->where(function($q) {
-                    $q->where('is_verified', false)->orWhere('is_verified', 0)->orWhereNull('is_verified');
+                    $q->whereRaw('(is_verified IS FALSE OR is_verified IS NULL)');
                 })
                 ->delete();
         }
