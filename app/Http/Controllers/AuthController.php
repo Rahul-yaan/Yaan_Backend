@@ -33,63 +33,71 @@ class AuthController extends Controller
         }
         $request->merge(['role' => $role]);
 
-        if ($request->phone) {
-            $phone = trim($request->phone);
-            $request->merge(['phone' => $phone]);
-            $rawDigits = preg_replace('/[^0-9]/', '', $phone);
-            $last10 = strlen($rawDigits) >= 10 ? substr($rawDigits, -10) : $rawDigits;
-            User::where(function($q) use ($phone, $rawDigits, $last10) {
-                $q->where('phone', $phone)
+        $name  = trim($request->input('name', ''));
+        $email = trim(strtolower($request->input('email', '')));
+        $phone = trim($request->input('phone', ''));
+
+        if (empty($name) || empty($email) || empty($phone)) {
+            return response()->json([
+                'error'   => 'Validation failed.',
+                'message' => 'Please provide your full name, email address, and phone number.',
+            ], 422);
+        }
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return response()->json([
+                'error'   => 'Validation failed.',
+                'message' => 'Please enter a valid email address.',
+            ], 422);
+        }
+
+        // Extract raw digits for matching last 10 digits
+        $rawDigits = preg_replace('/[^0-9]/', '', $phone);
+        $last10 = strlen($rawDigits) >= 10 ? substr($rawDigits, -10) : $rawDigits;
+
+        if (strlen($last10) < 10) {
+            return response()->json([
+                'error'   => 'Validation failed.',
+                'message' => 'Please enter a valid 10-digit mobile number.',
+            ], 422);
+        }
+
+        // Find existing user by email OR phone (last 10 digits), excluding super admin
+        $existingUser = User::where('role', '!=', 'admin')
+            ->where(function($q) use ($email, $phone, $rawDigits, $last10) {
+                $q->where('email', $email)
+                  ->orWhere('phone', $phone)
                   ->orWhere('phone', $rawDigits)
                   ->orWhere('phone', '+' . $rawDigits)
                   ->orWhere('phone', 'LIKE', '%' . $last10);
-            })->where(function($q) {
-                $q->whereRaw('(is_verified IS FALSE OR is_verified IS NULL)');
-            })->delete();
-        }
-
-        if ($request->email) {
-            $email = trim(strtolower($request->email));
-            $request->merge(['email' => $email]);
-            User::where('email', $email)
-                ->where(function($q) {
-                    $q->whereRaw('(is_verified IS FALSE OR is_verified IS NULL)');
-                })
-                ->delete();
-        }
-
-        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
-            'name'  => 'required|string|max:100',
-            'email' => 'required|email|unique:users,email',
-            'phone' => 'required|string|unique:users,phone',
-            'role'  => 'required|in:user,owner',
-        ]);
-
-        if ($validator->fails()) {
-            Log::warning('Registration Validation Failed', [
-                'input'  => $request->except(['password']),
-                'errors' => $validator->errors()->toArray(),
-            ]);
-
-            return response()->json([
-                'error'   => 'Validation failed.',
-                'message' => 'The given data was invalid.',
-                'errors'  => $validator->errors(),
-            ], 422);
-        }
+            })->first();
 
         $userPassword = $request->filled('password') 
             ? Hash::make($request->password) 
             : Hash::make('temp_' . uniqid());
 
-        $user = User::create([
-            'name'        => $request->name,
-            'email'       => $request->email,
-            'phone'       => $request->phone,
-            'password'    => $userPassword,
-            'role'        => $request->role,
-            'is_verified' => false,
-        ]);
+        if ($existingUser) {
+            // Update existing record for seamless re-registration & OTP verification
+            $existingUser->update([
+                'name'        => $name,
+                'email'       => $email,
+                'phone'       => $phone,
+                'password'    => $userPassword,
+                'role'        => $role,
+                'is_verified' => false,
+            ]);
+            $user = $existingUser;
+        } else {
+            // Create new User record
+            $user = User::create([
+                'name'        => $name,
+                'email'       => $email,
+                'phone'       => $phone,
+                'password'    => $userPassword,
+                'role'        => $role,
+                'is_verified' => false,
+            ]);
+        }
 
         return response()->json([
             'success' => true,
