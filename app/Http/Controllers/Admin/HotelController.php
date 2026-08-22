@@ -124,26 +124,32 @@ class HotelController extends Controller
         if ($newStatus === 'rejected') {
             $hotel->rejection_reason = !empty($reason) ? trim($reason) : 'Admin rejected this hotel listing.';
             if ($hotel->owner_id) {
-                \App\Models\OwnerProfile::where('user_id', $hotel->owner_id)->update([
-                    'status'           => 'rejected',
-                    'rejection_reason' => $hotel->rejection_reason,
-                ]);
-                \App\Models\User::where('id', $hotel->owner_id)->update([
-                    'is_verified' => false,
-                ]);
+                $owner = \App\Models\User::find($hotel->owner_id);
+                if ($owner) {
+                    $owner->is_verified = false;
+                    $owner->save();
+                }
+                $profile = \App\Models\OwnerProfile::where('user_id', $hotel->owner_id)->first();
+                if ($profile) {
+                    $profile->status = 'rejected';
+                    $profile->rejection_reason = $hotel->rejection_reason;
+                    $profile->save();
+                }
             }
         } elseif (in_array($newStatus, ['approved', 'active'])) {
             $hotel->rejection_reason = null;
             $hotel->ensurePrimaryImageExists();
             if ($hotel->owner_id) {
-                \App\Models\User::where('id', $hotel->owner_id)->update([
-                    'is_verified' => true,
-                ]);
-                \App\Models\OwnerProfile::where('user_id', $hotel->owner_id)->update([
-                    'status'              => 'approved',
-                    'is_profile_complete' => true,
-                    'rejection_reason'   => null,
-                ]);
+                $owner = \App\Models\User::find($hotel->owner_id);
+                if ($owner) {
+                    $owner->is_verified = true;
+                    $owner->save();
+                }
+                $profile = \App\Models\OwnerProfile::firstOrCreate(['user_id' => $hotel->owner_id]);
+                $profile->status = 'approved';
+                $profile->is_profile_complete = true;
+                $profile->rejection_reason = null;
+                $profile->save();
             }
         }
 
