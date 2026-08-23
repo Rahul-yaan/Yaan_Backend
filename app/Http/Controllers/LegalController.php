@@ -753,6 +753,60 @@ class LegalController extends Controller
         ]);
     }
 
+    private function getCancellationData(): array
+    {
+        return [
+            'title'          => 'Cancellation & Refund Policy',
+            'effective_date' => 'August 21, 2026',
+            'sections'       => [
+                [
+                    'title'   => '1. Booking Cancellations',
+                    'content' => 'Please review your booking details carefully before confirming. Once a hotel booking is confirmed and payment is processed, cancellations or modifications may be subject to the hotel property cancellation terms.',
+                ],
+                [
+                    'title'   => '2. Refund Eligibility & Processing',
+                    'content' => 'If a cancellation is approved by the admin or hotel management, refunds are processed back to the original payment method via Razorpay within 5 to 7 business days.',
+                ],
+                [
+                    'title'   => '3. Contact Support for Refunds',
+                    'content' => 'For cancellation assistance or refund status inquiries, please contact our support team at support@yaan.com or via the in-app support center.',
+                ],
+            ],
+        ];
+    }
+
+    public function cancellationJson(): JsonResponse
+    {
+        $raw   = $this->getCancellationData();
+        $plain = $this->buildPlainText($raw);
+        $html  = $this->buildHtmlText($raw);
+
+        $payload = array_merge($raw, [
+            'content'      => $plain,
+            'html_content' => $html,
+            'cancellation' => $plain,
+            'url'          => url('/cancellation-policy'),
+        ]);
+
+        return response()->json([
+            'success'      => true,
+            'status'       => true,
+            'title'        => $raw['title'],
+            'content'      => $plain,
+            'html_content' => $html,
+            'cancellation' => $plain,
+            'url'          => url('/cancellation-policy'),
+            'sections'     => $raw['sections'],
+            'data'         => $payload,
+        ]);
+    }
+
+    public function cancellationView()
+    {
+        $data = $this->getCancellationData();
+        return view('terms', compact('data'));
+    }
+
     /**
      * Master App Info / Settings endpoint returning all URLs and metadata.
      */
@@ -767,21 +821,37 @@ class LegalController extends Controller
             'support_email' => 'support@yaanapp.com',
             'info_email' => 'info@yaanapp.com',
             'address' => 'Bharuch, Gujarat, India',
+            'terms_url' => url('/terms-and-conditions'),
+            'privacy_url' => url('/privacy-policy'),
+            'vendor_terms_url' => url('/vendor/terms-and-conditions'),
+            'vendor_privacy_url' => url('/vendor/privacy-policy'),
+            'owner_terms_url' => url('/vendor/terms-and-conditions'),
+            'owner_privacy_url' => url('/vendor/privacy-policy'),
+            'about_url' => url('/about-us'),
+            'contact_url' => url('/contact-us'),
+            'cancellation_url' => url('/cancellation-policy'),
             'urls' => [
                 'terms' => url('/terms-and-conditions'),
                 'privacy' => url('/privacy-policy'),
                 'vendor_terms' => url('/vendor/terms-and-conditions'),
                 'vendor_privacy' => url('/vendor/privacy-policy'),
+                'owner_terms' => url('/vendor/terms-and-conditions'),
+                'owner_privacy' => url('/vendor/privacy-policy'),
                 'about' => url('/about-us'),
                 'contact' => url('/contact-us'),
+                'cancellation' => url('/cancellation-policy'),
             ],
             'pages' => [
                 'terms_url' => url('/terms-and-conditions'),
                 'privacy_url' => url('/privacy-policy'),
                 'vendor_terms_url' => url('/vendor/terms-and-conditions'),
                 'vendor_privacy_url' => url('/vendor/privacy-policy'),
+                'owner_terms_url' => url('/vendor/terms-and-conditions'),
+                'owner_privacy_url' => url('/vendor/privacy-policy'),
                 'about_url' => url('/about-us'),
                 'contact_url' => url('/contact-us'),
+                'cancellation_url' => url('/cancellation-policy'),
+                'refund_url' => url('/cancellation-policy'),
             ]
         ]);
     }

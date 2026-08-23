@@ -47,10 +47,21 @@ Route::middleware('throttle:60,1')->group(function () {
     Route::get('/contact',    [\App\Http\Controllers\LegalController::class, 'contactJson']);
     Route::get('/support',    [\App\Http\Controllers\LegalController::class, 'contactJson']);
 
+    // Cancellation & Refund Policy APIs
+    Route::get('/cancellation-policy', [\App\Http\Controllers\LegalController::class, 'cancellationJson']);
+    Route::get('/cancellation',        [\App\Http\Controllers\LegalController::class, 'cancellationJson']);
+    Route::get('/refund-policy',       [\App\Http\Controllers\LegalController::class, 'cancellationJson']);
+    Route::get('/refund',              [\App\Http\Controllers\LegalController::class, 'cancellationJson']);
+    Route::get('/pages/cancellation',  [\App\Http\Controllers\LegalController::class, 'cancellationJson']);
+    Route::get('/legal/cancellation',  [\App\Http\Controllers\LegalController::class, 'cancellationJson']);
+    Route::get('/vendor/cancellation', [\App\Http\Controllers\LegalController::class, 'cancellationJson']);
+    Route::get('/owner/cancellation',  [\App\Http\Controllers\LegalController::class, 'cancellationJson']);
+
     // App Master Settings & Page Links Endpoint
     Route::get('/app-info',   [\App\Http\Controllers\LegalController::class, 'appInfoJson']);
     Route::get('/pages',      [\App\Http\Controllers\LegalController::class, 'appInfoJson']);
     Route::get('/settings',   [\App\Http\Controllers\LegalController::class, 'appInfoJson']);
+    Route::get('/master-settings', [\App\Http\Controllers\LegalController::class, 'appInfoJson']);
 });
 
 // Razorpay Webhook — Verified by HMAC signature in controller

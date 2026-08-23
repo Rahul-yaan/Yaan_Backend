@@ -35,6 +35,10 @@ Route::get('/about',      [\App\Http\Controllers\LegalController::class, 'aboutV
 Route::get('/contact-us', [\App\Http\Controllers\LegalController::class, 'contactView']);
 Route::get('/contact',    [\App\Http\Controllers\LegalController::class, 'contactView']);
 Route::get('/support',    [\App\Http\Controllers\LegalController::class, 'contactView']);
+Route::get('/cancellation-policy', [\App\Http\Controllers\LegalController::class, 'cancellationView']);
+Route::get('/cancellation',        [\App\Http\Controllers\LegalController::class, 'cancellationView']);
+Route::get('/refund-policy',       [\App\Http\Controllers\LegalController::class, 'cancellationView']);
+Route::get('/refund',              [\App\Http\Controllers\LegalController::class, 'cancellationView']);
 
 // Explicitly serve Admin Portal with Cache-Control headers to ensure latest JS is always fetched
 Route::get('/admin/{any?}', function () {
