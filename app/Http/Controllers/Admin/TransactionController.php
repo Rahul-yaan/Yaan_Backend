@@ -162,10 +162,10 @@ class TransactionController extends Controller
 
         $bookings = $query->latest()->get();
 
-        $filename = 'Yaan_Transactions_Ledger_' . date('Y-m-d_H-i') . '.xls';
+        $filename = 'Yaan_Transactions_Ledger_' . date('Y-m-d_H-i') . '.csv';
 
         $headers = [
-            'Content-Type'        => 'application/vnd.ms-excel; charset=UTF-8',
+            'Content-Type'        => 'text/csv; charset=UTF-8',
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
             'Pragma'              => 'no-cache',
             'Cache-Control'       => 'must-revalidate, post-check=0, pre-check=0',
@@ -173,44 +173,35 @@ class TransactionController extends Controller
         ];
 
         $callback = function() use ($bookings) {
-            echo '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">';
-            echo '<head><meta http-equiv="Content-Type" content="text/html; charset=utf-8">';
-            echo '<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Transactions Ledger</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->';
-            echo '<style>';
-            echo 'table { border-collapse: collapse; font-family: Calibri, sans-serif; font-size: 11pt; }';
-            echo 'th { background-color: #4f46e5; color: #ffffff; font-weight: bold; border: 1px solid #334155; padding: 8px 12px; text-align: left; }';
-            echo 'td { border: 1px solid #cbd5e1; padding: 6px 10px; vertical-align: middle; }';
-            echo '.amount { mso-number-format:"\#\,\#\#0\.00"; text-align: right; }';
-            echo '.center { text-align: center; }';
-            echo '.badge-confirmed { background-color: #d1fae5; color: #065f46; font-weight: bold; }';
-            echo '.badge-refunded { background-color: #f3e8ff; color: #6b21a8; font-weight: bold; }';
-            echo '.badge-cancelled { background-color: #fee2e2; color: #991b1b; font-weight: bold; }';
-            echo '.badge-temporary { background-color: #fef3c7; color: #92400e; font-weight: bold; }';
-            echo '</style></head><body>';
-            echo '<table>';
-            echo '<thead><tr>';
-            echo '<th>Db ID</th>';
-            echo '<th>Transaction Type</th>';
-            echo '<th>Display Transaction ID</th>';
-            echo '<th>Razorpay Order ID</th>';
-            echo '<th>Razorpay Payment ID</th>';
-            echo '<th>Customer Name</th>';
-            echo '<th>Customer Phone</th>';
-            echo '<th>Customer Email</th>';
-            echo '<th>Hotel Name</th>';
-            echo '<th>Hotel City</th>';
-            echo '<th>Check In</th>';
-            echo '<th>Check Out</th>';
-            echo '<th>Payment Method</th>';
-            echo '<th>Total Payable (INR)</th>';
-            echo '<th>GST Amount (INR)</th>';
-            echo '<th>Payment Status</th>';
-            echo '<th>Failure / Cancellation Notes</th>';
-            echo '<th>Date & Time</th>';
-            echo '</tr></thead><tbody>';
+            $file = fopen('php://output', 'w');
+
+            // Write UTF-8 BOM for Microsoft Excel auto-detecting UTF-8 and column alignment
+            fwrite($file, "\xEF\xBB\xBF");
+
+            // Write Header Column Names
+            fputcsv($file, [
+                'Db ID',
+                'Transaction Type',
+                'Display Transaction ID',
+                'Razorpay Order ID',
+                'Razorpay Payment ID',
+                'Customer Name',
+                'Customer Phone',
+                'Customer Email',
+                'Hotel Name',
+                'Hotel City',
+                'Check In Date',
+                'Check Out Date',
+                'Payment Method',
+                'Total Payable (INR)',
+                'GST Amount (INR)',
+                'Payment Status',
+                'Failure / Cancellation Notes',
+                'Date & Time'
+            ]);
 
             if ($bookings->isEmpty()) {
-                echo '<tr><td colspan="18" class="center" style="padding: 20px; font-weight: bold; color: #64748b;">No transaction records found for the selected criteria.</td></tr>';
+                fputcsv($file, ['N/A', 'NO RECORDS', 'No transaction records found for the selected filter criteria.', '', '', '', '', '', '', '', '', '', '', '0.00', '0.00', 'N/A', 'N/A', date('Y-m-d H:i:s')]);
             } else {
                 foreach ($bookings as $b) {
                     $isConfirmed = $b->is_confirmed || $b->payment_status === 'paid' || in_array($b->status, ['confirmed', 'completed']);
@@ -218,33 +209,32 @@ class TransactionController extends Controller
                     $isCancelled = $b->status === 'cancelled' || $isRefunded || $b->payment_status === 'failed';
 
                     $txnType = $isConfirmed ? 'CONFIRMED' : ($isRefunded ? 'REFUNDED' : ($isCancelled ? 'CANCELLED' : 'TEMPORARY'));
-                    $badgeClass = $isConfirmed ? 'badge-confirmed' : ($isRefunded ? 'badge-refunded' : ($isCancelled ? 'badge-cancelled' : 'badge-temporary'));
                     $user = $b->user;
 
-                    echo '<tr>';
-                    echo '<td class="center">' . e($b->id) . '</td>';
-                    echo '<td class="center ' . $badgeClass . '">' . e($txnType) . '</td>';
-                    echo '<td>' . e($b->display_transaction_id ?? $b->transaction_id ?? $b->temp_transaction_id ?? "TMP-{$b->id}") . '</td>';
-                    echo '<td>' . e($b->razorpay_order_id ?? 'N/A') . '</td>';
-                    echo '<td>' . e($b->razorpay_payment_id ?? 'N/A') . '</td>';
-                    echo '<td>' . e($user ? $user->name : 'Guest User') . '</td>';
-                    echo '<td>' . e($user ? ($user->phone ?? 'N/A') : 'N/A') . '</td>';
-                    echo '<td>' . e($user ? ($user->email ?? 'N/A') : 'N/A') . '</td>';
-                    echo '<td>' . e($b->hotel ? $b->hotel->name : 'N/A') . '</td>';
-                    echo '<td>' . e($b->hotel ? $b->hotel->city : 'N/A') . '</td>';
-                    echo '<td class="center">' . e($b->check_in ? $b->check_in->format('Y-m-d') : 'N/A') . '</td>';
-                    echo '<td class="center">' . e($b->check_out ? $b->check_out->format('Y-m-d') : 'N/A') . '</td>';
-                    echo '<td>' . e($b->payment_method ?? 'Razorpay / Online') . '</td>';
-                    echo '<td class="amount">₹' . number_format($b->total_payable ?? $b->total_amount ?? 0, 2) . '</td>';
-                    echo '<td class="amount">₹' . number_format($b->gst_amount ?? 0, 2) . '</td>';
-                    echo '<td class="center ' . $badgeClass . '">' . e($b->payment_status ? strtoupper($b->payment_status) : strtoupper($b->status)) . '</td>';
-                    echo '<td>' . e($b->cancellation_reason ?? 'N/A') . '</td>';
-                    echo '<td class="center">' . e($b->created_at ? $b->created_at->format('Y-m-d H:i:s') : 'N/A') . '</td>';
-                    echo '</tr>';
+                    fputcsv($file, [
+                        $b->id,
+                        $txnType,
+                        $b->display_transaction_id ?? $b->transaction_id ?? $b->temp_transaction_id ?? "TMP-{$b->id}",
+                        $b->razorpay_order_id ?? 'N/A',
+                        $b->razorpay_payment_id ?? 'N/A',
+                        $user ? $user->name : 'Guest User',
+                        $user ? ($user->phone ?? 'N/A') : 'N/A',
+                        $user ? ($user->email ?? 'N/A') : 'N/A',
+                        $b->hotel ? $b->hotel->name : 'N/A',
+                        $b->hotel ? $b->hotel->city : 'N/A',
+                        $b->check_in ? $b->check_in->format('Y-m-d') : 'N/A',
+                        $b->check_out ? $b->check_out->format('Y-m-d') : 'N/A',
+                        $b->payment_method ?? 'Razorpay / Online',
+                        number_format((float)($b->total_payable ?? $b->total_amount ?? 0), 2, '.', ''),
+                        number_format((float)($b->gst_amount ?? 0), 2, '.', ''),
+                        $b->payment_status ? strtoupper($b->payment_status) : strtoupper($b->status),
+                        $b->cancellation_reason ?? 'N/A',
+                        $b->created_at ? $b->created_at->format('Y-m-d H:i:s') : 'N/A',
+                    ]);
                 }
             }
 
-            echo '</tbody></table></body></html>';
+            fclose($file);
         };
 
         return response()->stream($callback, 200, $headers);

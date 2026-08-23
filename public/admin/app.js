@@ -2229,30 +2229,30 @@ async function deleteAdminHotelPhoto(hotelId, imageId) {
                 const searchInput = document.getElementById('search-transactions');
                 const search = searchInput ? searchInput.value : '';
 
-                showToast('Generating formatted Excel spreadsheet report...', 'info');
+                showToast('Generating CSV Excel spreadsheet report...', 'info');
 
                 const exportUrl = `${API_BASE}/admin/transactions/export?type=${currentTxnTypeFilter}&payment_method=${encodeURIComponent(method)}&search=${encodeURIComponent(search)}`;
                 const token = authToken || localStorage.getItem('yaan_admin_token') || sessionStorage.getItem('yaan_admin_token') || '';
                 const res = await fetch(exportUrl, {
                     headers: {
                         'Authorization': `Bearer ${token}`,
-                        'Accept': 'application/vnd.ms-excel'
+                        'Accept': 'text/csv'
                     }
                 });
 
-                if (!res.ok) throw new Error('Failed to download Excel report.');
+                if (!res.ok) throw new Error('Failed to download Excel CSV report.');
 
                 const blob = await res.blob();
                 const downloadUrl = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = downloadUrl;
-                a.download = `Yaan_Transactions_Ledger_${new Date().toISOString().slice(0, 10)}.xls`;
+                a.download = `Yaan_Transactions_Ledger_${new Date().toISOString().slice(0, 10)}.csv`;
                 document.body.appendChild(a);
                 a.click();
                 a.remove();
                 window.URL.revokeObjectURL(downloadUrl);
 
-                showToast('Excel spreadsheet downloaded successfully! Opening in Microsoft Excel...', 'success');
+                showToast('Excel CSV spreadsheet downloaded successfully!', 'success');
             } catch (err) {
                 showToast(err.message || 'Error exporting transactions', 'danger');
             }
