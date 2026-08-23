@@ -19,11 +19,7 @@ class HotelController extends Controller
             ->whereHas('owner', function($oq) {
                 $oq->whereRaw('is_verified IS TRUE')
                    ->whereHas('ownerProfile', function($pq) {
-                       $pq->where(function($spq) {
-                           $spq->where('status', 'approved')
-                               ->orWhereNull('status')
-                               ->orWhere('status', '!=', 'rejected');
-                       });
+                       $pq->where('status', 'approved');
                    });
             });
     }

@@ -18,7 +18,7 @@ class AdminUserSeeder extends Seeder
                 'phone'        => '9999999999',
                 'password'     => Hash::make('admin123456'),
                 'role'         => 'admin',
-                'is_verified'  => DB::raw('true'),
+                'is_verified'  => true,
                 'firebase_uid' => 'admin_bypass_uid',
             ]
         );

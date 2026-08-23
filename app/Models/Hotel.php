@@ -122,7 +122,7 @@ class Hotel extends Model
     public function ensurePrimaryImageExists()
     {
         try {
-            $images = $this->images()->get();
+            $images = $this->relationLoaded('images') ? $this->images : $this->images()->get();
             if ($images->isNotEmpty()) {
                 $hasPrimary = $images->contains(function ($img) {
                     return (bool) $img->is_primary;
@@ -144,8 +144,7 @@ class Hotel extends Model
                     ]);
                 }
             }
-            $this->unsetRelation('primaryImage');
-            $this->unsetRelation('images');
+            $this->load(['images', 'primaryImage']);
         } catch (\Throwable $e) {}
     }
 

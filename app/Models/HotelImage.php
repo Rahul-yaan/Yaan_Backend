@@ -21,8 +21,7 @@ class HotelImage extends Model
 
     public function setIsPrimaryAttribute($value)
     {
-        $isTrue = filter_var($value, FILTER_VALIDATE_BOOLEAN);
-        $this->attributes['is_primary'] = $isTrue ? DB::raw('true') : DB::raw('false');
+        $this->attributes['is_primary'] = filter_var($value, FILTER_VALIDATE_BOOLEAN);
     }
 
     public function getUrlAttribute()
@@ -33,7 +32,7 @@ class HotelImage extends Model
         if (str_starts_with($this->image_path, 'data:') || str_starts_with($this->image_path, 'http://') || str_starts_with($this->image_path, 'https://')) {
             return $this->image_path;
         }
-        $cleanPath = ltrim($this->image_path, '/');
+        $cleanPath = ltrim(str_replace('\\', '/', $this->image_path), '/');
         if (str_starts_with($cleanPath, 'storage/')) {
             $cleanPath = substr($cleanPath, 8);
         }

@@ -21,8 +21,10 @@ class ProfileController extends Controller
         $isVerified = (bool) $user->is_verified;
         $isProfileRejected = $profile && $profile->status === 'rejected';
         $isHotelRejected = $hotel && $hotel->status === 'rejected';
+        $isProfileApproved = $profile && $profile->status === 'approved';
+        $isHotelApproved = $hotel && in_array($hotel->status, ['approved', 'active']);
 
-        if ($isVerified && ($hotel && in_array($hotel->status, ['approved', 'active']))) {
+        if ($isVerified && $isProfileApproved && $isHotelApproved) {
             $kycStatus = 'approved';
             $rejectionReason = null;
             $kycMessage = 'Your Owner KYC and hotel profile are fully verified and active.';

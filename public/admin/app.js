@@ -1202,7 +1202,15 @@ async function deleteAdminHotelPhoto(hotelId, imageId) {
                 const hotels = data.hotels || [];
                 const visitingCustomers = data.visiting_customers || [];
 
-                const getImgUrl = (path) => path ? (path.startsWith('http') ? path : `${STORAGE_BASE}/${path}`) : null;
+                const getImgUrl = (path) => {
+                    if (!path) return null;
+                    if (typeof path === 'object') path = path.url || path.image_path || '';
+                    if (!path) return null;
+                    if (path.startsWith('data:') || path.startsWith('http://') || path.startsWith('https://')) return path;
+                    const clean = path.replace(/^\/?storage\//, '').replace(/^\//, '');
+                    return `${STORAGE_BASE}/${clean}`;
+                };
+                const businessProof = getImgUrl(profile.business_proof);
                 const aadhaarFront = getImgUrl(profile.aadhaar_front);
                 const aadhaarBack = getImgUrl(profile.aadhaar_back);
                 const panCard = getImgUrl(profile.pan_card);
@@ -1332,6 +1340,7 @@ async function deleteAdminHotelPhoto(hotelId, imageId) {
             <h4 style="margin:0 0 8px 0; font-size:14px; color:var(--text-primary);"><i class="fa-solid fa-file-image"></i> KYC Uploaded Documents</h4>
             <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px;">
                 ${[
+                        { label: 'Registration / Proof', url: businessProof },
                         { label: 'Aadhaar Front', url: aadhaarFront },
                         { label: 'Aadhaar Back', url: aadhaarBack },
                         { label: 'PAN Card', url: panCard },

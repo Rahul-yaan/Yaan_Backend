@@ -325,7 +325,10 @@ class AuthController extends Controller
         $message = 'Please wait for approval by the admin.';
 
         if ($user->role === 'owner') {
-            if ($user->is_verified && (!$targetHotel || in_array($targetHotel->status, ['approved', 'active']))) {
+            $isProfileApproved = $ownerProfile && $ownerProfile->status === 'approved';
+            $isHotelApproved = $targetHotel && in_array($targetHotel->status, ['approved', 'active']);
+
+            if ($user->is_verified && $isProfileApproved && $isHotelApproved) {
                 $kycStatus = 'approved';
                 $message = 'Login successful.';
             } elseif (($ownerProfile && $ownerProfile->status === 'rejected') || ($targetHotel && $targetHotel->status === 'rejected')) {
@@ -379,7 +382,10 @@ class AuthController extends Controller
         $message = 'Please wait for approval by the admin.';
 
         if ($user->role === 'owner') {
-            if ($user->is_verified && (!$targetHotel || in_array($targetHotel->status, ['approved', 'active']))) {
+            $isProfileApproved = $ownerProfile && $ownerProfile->status === 'approved';
+            $isHotelApproved = $targetHotel && in_array($targetHotel->status, ['approved', 'active']);
+
+            if ($user->is_verified && $isProfileApproved && $isHotelApproved) {
                 $kycStatus = 'approved';
                 $message = 'Account verified.';
             } elseif (($ownerProfile && $ownerProfile->status === 'rejected') || ($targetHotel && $targetHotel->status === 'rejected')) {

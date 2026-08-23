@@ -50,11 +50,11 @@ class OwnerProfile extends Model
         if (str_starts_with($path, 'data:') || str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
             return $path;
         }
-        $clean = ltrim($path, '/');
+        $clean = ltrim(str_replace('\\', '/', $path), '/');
         if (str_starts_with($clean, 'storage/')) {
             $clean = substr($clean, 8);
         }
-        return asset('storage/' . $clean);
+        return asset('storage/' . ltrim($clean, '/'));
     }
 
     public function getAadhaarFrontAttribute($value)
@@ -119,15 +119,7 @@ class OwnerProfile extends Model
 
     public function setIsProfileCompleteAttribute($value)
     {
-        $isTrue = filter_var($value, FILTER_VALIDATE_BOOLEAN);
-        try {
-            if (DB::getDriverName() === 'pgsql') {
-                $this->attributes['is_profile_complete'] = $isTrue ? DB::raw('true') : DB::raw('false');
-                return;
-            }
-        } catch (\Throwable $e) {}
-
-        $this->attributes['is_profile_complete'] = $isTrue ? 1 : 0;
+        $this->attributes['is_profile_complete'] = filter_var($value, FILTER_VALIDATE_BOOLEAN);
     }
 
     public function user()
