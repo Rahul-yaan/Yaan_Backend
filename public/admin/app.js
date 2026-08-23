@@ -2232,7 +2232,7 @@ async function deleteAdminHotelPhoto(hotelId, imageId) {
                 showToast('Generating Excel / CSV transaction report...', 'info');
 
                 const exportUrl = `${API_BASE}/admin/transactions/export?type=${currentTxnTypeFilter}&payment_method=${encodeURIComponent(method)}&search=${encodeURIComponent(search)}`;
-                const token = getAuthToken();
+                const token = authToken || localStorage.getItem('yaan_admin_token') || sessionStorage.getItem('yaan_admin_token') || '';
                 const res = await fetch(exportUrl, {
                     headers: {
                         'Authorization': `Bearer ${token}`,
