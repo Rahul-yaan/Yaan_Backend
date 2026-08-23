@@ -549,9 +549,14 @@
                 <section id="tab-transactions" class="tab-content">
                     <div class="section-title">
                         <h2>Transactions & Payment Ledger</h2>
-                        <button class="btn-sm" onclick="loadTransactionsData()">
-                            <i class="fa-solid fa-rotate-right"></i> Refresh Ledger
-                        </button>
+                        <div style="display:flex; gap:10px;">
+                            <button class="btn-sm" style="background:#10b981; color:#fff; font-weight:700; padding:8px 14px;" onclick="exportTransactionsToExcel()" title="Export All Transactions to Excel / CSV">
+                                <i class="fa-solid fa-file-excel"></i> Export Excel
+                            </button>
+                            <button class="btn-sm" onclick="loadTransactionsData()">
+                                <i class="fa-solid fa-rotate-right"></i> Refresh Ledger
+                            </button>
+                        </div>
                     </div>
 
                     <!-- Overview Metrics for Transactions -->

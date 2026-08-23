@@ -1927,8 +1927,8 @@ async function deleteAdminHotelPhoto(hotelId, imageId) {
                             <button class="btn-sm" style="background:#4f46e5; color:#fff;" onclick="openTransactionModal(${t.id})" title="Inspect Full Razorpay Details">
                                 <i class="fa-solid fa-eye"></i> Details
                             </button>
-                            <button class="btn-sm" style="background:#10b981; color:#fff;" onclick="openInvoiceModal(${t.id})" title="View & Print Official Invoice">
-                                <i class="fa-solid fa-file-invoice"></i> Invoice
+                            <button class="btn-sm" style="background:#10b981; color:#fff;" onclick="window.open('/admin/invoice.html?id=${t.id}', '_blank')" title="View & Print Official Invoice in New Tab">
+                                <i class="fa-solid fa-file-invoice"></i> Invoice (New Tab)
                             </button>
                             <button class="btn-sm" style="background:#0284c7; color:#fff;" onclick="verifyRazorpayStatus(${t.id})" title="Verify Live Status with Razorpay API">
                                 <i class="fa-solid fa-rotate"></i> Live Sync
@@ -2052,8 +2052,8 @@ async function deleteAdminHotelPhoto(hotelId, imageId) {
             </div>
 
             <div style="display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap; margin-top:20px;">
-                <button class="btn-sm" style="background:#10b981; color:#fff; padding:8px 14px;" onclick="openInvoiceModal(${t.id}); closeTransactionModal();">
-                    <i class="fa-solid fa-file-invoice-dollar"></i> View Payment Invoice
+                <button class="btn-sm" style="background:#10b981; color:#fff; padding:8px 14px;" onclick="window.open('/admin/invoice.html?id=${t.id}', '_blank')">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Open Invoice in New Tab
                 </button>
                 <button class="btn-sm" style="background:#0284c7; color:#fff; padding:8px 14px;" onclick="verifyRazorpayStatus(${t.id})">
                     <i class="fa-solid fa-rotate"></i> Sync Live Razorpay Status
@@ -2220,6 +2220,42 @@ async function deleteAdminHotelPhoto(hotelId, imageId) {
 
         function closeInvoiceModal() {
             document.getElementById('invoice-modal').classList.add('hidden');
+        }
+
+        async function exportTransactionsToExcel() {
+            try {
+                const methodSelect = document.getElementById('filter-txn-method');
+                const method = methodSelect ? methodSelect.value : '';
+                const searchInput = document.getElementById('search-transactions');
+                const search = searchInput ? searchInput.value : '';
+
+                showToast('Generating Excel / CSV transaction report...', 'info');
+
+                const exportUrl = `${API_BASE}/admin/transactions/export?type=${currentTxnTypeFilter}&payment_method=${encodeURIComponent(method)}&search=${encodeURIComponent(search)}`;
+                const token = getAuthToken();
+                const res = await fetch(exportUrl, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'text/csv'
+                    }
+                });
+
+                if (!res.ok) throw new Error('Failed to download Excel report.');
+
+                const blob = await res.blob();
+                const downloadUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                a.download = `Yaan_Transactions_Ledger_${new Date().toISOString().slice(0, 10)}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(downloadUrl);
+
+                showToast('Excel transaction report downloaded successfully!', 'success');
+            } catch (err) {
+                showToast(err.message || 'Error exporting transactions', 'danger');
+            }
         }
 
         function printInvoice() {

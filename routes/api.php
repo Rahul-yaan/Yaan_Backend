@@ -139,6 +139,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Transactions & Razorpay Management
         Route::get('/transactions',                       [App\Http\Controllers\Admin\TransactionController::class, 'index']);
+        Route::get('/transactions/export',                [App\Http\Controllers\Admin\TransactionController::class, 'exportExcel']);
         Route::get('/transactions/{id}',                   [App\Http\Controllers\Admin\TransactionController::class, 'show']);
         Route::get('/transactions/{id}/invoice',           [App\Http\Controllers\Admin\TransactionController::class, 'getInvoice']);
         Route::post('/transactions/{id}/verify-razorpay',  [App\Http\Controllers\Admin\TransactionController::class, 'verifyRazorpay']);

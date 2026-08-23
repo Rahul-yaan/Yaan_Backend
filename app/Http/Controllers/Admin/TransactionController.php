@@ -108,6 +108,135 @@ class TransactionController extends Controller
     }
 
     /**
+     * Export transaction records to CSV / Excel format.
+     * Endpoint: GET /api/admin/transactions/export
+     */
+    public function exportExcel(Request $request)
+    {
+        $this->autoSyncPendingTransactions();
+
+        $query = Booking::with(['user:id,name,email,phone', 'hotel:id,name,city,address']);
+
+        if ($request->has('type') && !empty($request->type)) {
+            $type = strtolower($request->type);
+            if ($type === 'confirmed' || $type === 'success') {
+                $query->where('payment_status', 'paid')
+                      ->whereIn('status', ['confirmed', 'completed']);
+            } elseif ($type === 'temporary' || $type === 'temp') {
+                $query->where('status', 'pending')
+                      ->whereIn('payment_status', ['pending', 'failed']);
+            } elseif ($type === 'refunded' || $type === 'refund') {
+                $query->where(function($q) {
+                    $q->whereIn('payment_status', ['refunded', 'refund_initiated'])
+                      ->orWhere('cancellation_reason', 'like', '%refund%');
+                });
+            } elseif ($type === 'cancelled' || $type === 'failed') {
+                $query->where('status', 'cancelled')
+                      ->whereNotIn('payment_status', ['refunded', 'refund_initiated'])
+                      ->where(function($q) {
+                          $q->whereNull('cancellation_reason')
+                            ->orWhere('cancellation_reason', 'not like', '%refund%');
+                      });
+            }
+        }
+
+        if ($request->has('search') && !empty($request->search)) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('transaction_id', 'like', "%{$search}%")
+                  ->orWhere('temp_transaction_id', 'like', "%{$search}%")
+                  ->orWhere('razorpay_order_id', 'like', "%{$search}%")
+                  ->orWhere('razorpay_payment_id', 'like', "%{$search}%")
+                  ->orWhere('cancellation_reason', 'like', "%{$search}%")
+                  ->orWhereHas('user', function($u) use ($search) {
+                      $u->where('name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%")
+                        ->orWhere('phone', 'like', "%{$search}%");
+                  })
+                  ->orWhereHas('hotel', function($h) use ($search) {
+                      $h->where('name', 'like', "%{$search}%")
+                        ->orWhere('city', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        $bookings = $query->latest()->get();
+
+        $filename = 'Yaan_Transactions_Ledger_' . date('Y-m-d_H-i') . '.csv';
+
+        $headers = [
+            'Content-Type'        => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            'Pragma'              => 'no-cache',
+            'Cache-Control'       => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires'             => '0',
+        ];
+
+        $callback = function() use ($bookings) {
+            $file = fopen('php://output', 'w');
+
+            // Write UTF-8 BOM for Excel compatibility
+            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
+
+            // Write Header Column Names
+            fputcsv($file, [
+                'Db ID',
+                'Transaction Type',
+                'Display Transaction ID',
+                'Razorpay Order ID',
+                'Razorpay Payment ID',
+                'Customer Name',
+                'Customer Phone',
+                'Customer Email',
+                'Hotel Name',
+                'Hotel City',
+                'Check In',
+                'Check Out',
+                'Payment Method',
+                'Total Payable (INR)',
+                'GST Amount (INR)',
+                'Payment Status',
+                'Failure / Cancellation Notes',
+                'Date & Time'
+            ]);
+
+            foreach ($bookings as $b) {
+                $isConfirmed = $b->is_confirmed || $b->payment_status === 'paid' || in_array($b->status, ['confirmed', 'completed']);
+                $isRefunded  = $b->payment_status === 'refunded' || str_contains(strtolower($b->cancellation_reason ?? ''), 'refund');
+                $isCancelled = $b->status === 'cancelled' || $isRefunded || $b->payment_status === 'failed';
+
+                $txnType = $isConfirmed ? 'CONFIRMED' : ($isRefunded ? 'REFUNDED' : ($isCancelled ? 'CANCELLED' : 'TEMPORARY'));
+                $user = $b->user;
+
+                fputcsv($file, [
+                    $b->id,
+                    $txnType,
+                    $b->display_transaction_id ?? $b->transaction_id ?? $b->temp_transaction_id ?? "TMP-{$b->id}",
+                    $b->razorpay_order_id ?? 'N/A',
+                    $b->razorpay_payment_id ?? 'N/A',
+                    $user ? $user->name : 'Guest User',
+                    $user ? ($user->phone ?? 'N/A') : 'N/A',
+                    $user ? ($user->email ?? 'N/A') : 'N/A',
+                    $b->hotel ? $b->hotel->name : 'N/A',
+                    $b->hotel ? $b->hotel->city : 'N/A',
+                    $b->check_in ? $b->check_in->format('Y-m-d') : 'N/A',
+                    $b->check_out ? $b->check_out->format('Y-m-d') : 'N/A',
+                    $b->payment_method ?? 'Razorpay / Online',
+                    $b->total_payable ?? $b->total_amount ?? 0,
+                    $b->gst_amount ?? 0,
+                    $b->payment_status ? strtoupper($b->payment_status) : strtoupper($b->status),
+                    $b->cancellation_reason ?? 'N/A',
+                    $b->created_at ? $b->created_at->format('Y-m-d H:i:s') : 'N/A',
+                ]);
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    /**
      * Show detailed transaction info with Razorpay parameters.
      */
     public function show($id)
