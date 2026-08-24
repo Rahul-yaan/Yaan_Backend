@@ -2208,6 +2208,65 @@ async function deleteAdminHotelPhoto(hotelId, imageId) {
                     </div>
                 </div>
 
+                <!-- HOTEL REPORT FOR GST AND INCOME (Master Excel Format) -->
+                ${inv.gst_income_report ? `
+                    <div style="background:var(--bg-dark); padding:12px; border-radius:8px; border:1px solid #10b981; margin-bottom:16px;">
+                        <h4 style="margin:0 0 8px 0; font-size:12px; color:#10b981; text-transform:uppercase; font-weight:800; letter-spacing:0.5px;">
+                            <i class="fa-solid fa-file-invoice-dollar"></i> HOTEL REPORT FOR GST AND INCOME
+                        </h4>
+                        <div style="overflow-x:auto;">
+                            <table class="custom-table" style="font-size:10px; white-space:nowrap; margin-bottom:0;">
+                                <thead>
+                                    <tr>
+                                        <th>SR.NO</th>
+                                        <th>MOBILE NO</th>
+                                        <th>EMAIL ID</th>
+                                        <th>HOTEL ID</th>
+                                        <th>HOTEL NAME</th>
+                                        <th>HOTEL OWNER NAME</th>
+                                        <th>CITY</th>
+                                        <th>STATE</th>
+                                        <th>GST NO</th>
+                                        <th>FSSAI NO</th>
+                                        <th>BANK</th>
+                                        <th>A/C NO</th>
+                                        <th>IFSC</th>
+                                        <th>TOTAL AMT</th>
+                                        <th>GST 18%</th>
+                                        <th>TOTAL (T)</th>
+                                        <th>20% OUR COMM.</th>
+                                        <th>COMM. GST</th>
+                                        <th>TOTAL COMM.</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>${inv.gst_income_report.sr_no || 1}</td>
+                                        <td>${inv.gst_income_report.mobile_no || 'N/A'}</td>
+                                        <td>${inv.gst_income_report.email_id || 'N/A'}</td>
+                                        <td><span style="font-family:monospace; color:var(--primary); font-weight:700;">${inv.gst_income_report.hotel_id}</span></td>
+                                        <td><strong>${inv.gst_income_report.hotel_name}</strong></td>
+                                        <td>${inv.gst_income_report.hotel_owner_name}</td>
+                                        <td>${inv.gst_income_report.city}</td>
+                                        <td>${inv.gst_income_report.state}</td>
+                                        <td>${inv.gst_income_report.gst_no}</td>
+                                        <td>${inv.gst_income_report.fssai_no}</td>
+                                        <td>${inv.gst_income_report.bank_name}</td>
+                                        <td>${inv.gst_income_report.account_no}</td>
+                                        <td>${inv.gst_income_report.ifsc_code}</td>
+                                        <td>₹${(inv.gst_income_report.total_amount || 0).toFixed(2)}</td>
+                                        <td style="color:#f59e0b;">₹${(inv.gst_income_report.gst_18_percent || 0).toFixed(2)}</td>
+                                        <td><strong>₹${(inv.gst_income_report.total_amount_with_gst || 0).toFixed(2)}</strong></td>
+                                        <td style="color:#a855f7;">₹${(inv.gst_income_report.our_commission_20 || 0).toFixed(2)}</td>
+                                        <td style="color:#a855f7;">₹${(inv.gst_income_report.commission_gst || 0).toFixed(2)}</td>
+                                        <td style="color:#10b981; font-weight:700;">₹${(inv.gst_income_report.total_commission || 0).toFixed(2)}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                ` : ''}
+
                 <div style="text-align:center; font-size:11px; color:var(--text-muted); border-top:1px solid var(--border); padding-top:12px;">
                     Thank you for booking with Yaan! This is a computer-generated tax invoice and requires no physical signature.
                 </div>
