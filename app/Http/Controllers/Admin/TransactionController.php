@@ -161,10 +161,8 @@ class TransactionController extends Controller
         }
 
         $bookings = $query->latest()->get();
-        $hotels   = \App\Models\Hotel::with(['owner.ownerProfile'])->get();
-        $users    = \App\Models\User::where('role', 'user')->orWhereNull('role')->get();
 
-        $filename = 'Yaan_Master_Excel_Report_' . date('Y-m-d_H-i') . '.csv';
+        $filename = 'Yaan_Transactions_Ledger_' . date('Y-m-d_H-i') . '.csv';
 
         $headers = [
             'Content-Type'        => 'text/csv; charset=UTF-8',
@@ -174,204 +172,64 @@ class TransactionController extends Controller
             'Expires'             => '0',
         ];
 
-        $callback = function() use ($bookings, $hotels, $users) {
+        $callback = function() use ($bookings) {
             $file = fopen('php://output', 'w');
 
-            // Write UTF-8 BOM for Microsoft Excel auto-detecting UTF-8
+            // Write UTF-8 BOM for Microsoft Excel auto-detecting UTF-8 and column alignment
             fwrite($file, "\xEF\xBB\xBF");
 
-            // ============================================================
-            // SECTION 1: USER LOGIN DATA
-            // ============================================================
-            fputcsv($file, ['USER LOGIN DATA']);
-            fputcsv($file, ['SR.NO', 'NAME', 'MOBILE NO', 'EMAIL ID']);
-            $sr1 = 1;
-            if ($users->isEmpty()) {
-                fputcsv($file, [1, 'RAHUL', '9738928', 'RAHUL@GMAIL.COM']);
-            } else {
-                foreach ($users as $u) {
-                    fputcsv($file, [$sr1++, $u->name ?? 'N/A', $u->phone ?? 'N/A', strtoupper($u->email ?? 'N/A')]);
-                }
-            }
-            fputcsv($file, []);
+            // Write Header Column Names
+            fputcsv($file, [
+                'Db ID',
+                'Transaction Type',
+                'Display Transaction ID',
+                'Razorpay Order ID',
+                'Razorpay Payment ID',
+                'Customer Name',
+                'Customer Phone',
+                'Customer Email',
+                'Hotel Name',
+                'Hotel City',
+                'Check In Date',
+                'Check Out Date',
+                'Payment Method',
+                'Total Payable (INR)',
+                'GST Amount (INR)',
+                'Payment Status',
+                'Failure / Cancellation Notes',
+                'Date & Time'
+            ]);
 
-            // ============================================================
-            // SECTION 2: HOTEL REGISTRATION DATA
-            // ============================================================
-            fputcsv($file, ['HOTEL REGISTRAION DATA [HOTEL WISE AND FOR ALL COMMAN, SAME FOR UNAPPROVE, AND FOR BLOCK]']);
-            fputcsv($file, ['SR NO', 'DATE', 'HOTEL ID', 'PARKING CAPACITY', 'HOTEL NAME', 'HOTEL OWNER NAME', 'AGE', 'MOBILE NO', 'EMAIL ID', 'CITY', 'ROAD NAME', 'STATE', 'ADDRESS', 'PIN CODE', 'FSSAI NO', 'GST NO', 'BANK NAME', 'BANK A/C NO', 'IFSC CODE', 'AMENITIES LIST', 'WHEEL TYP', 'WHEEL PRICE LIST']);
-            $sr2 = 1;
-            if ($hotels->isEmpty()) {
-                fputcsv($file, [1, '01-02-2024', 'YAAN19', 50, 'DARSHAN', 'PARTH', 20, '98Y372T92', 'DARSH@GMAIL', 'BHARUCH', 'NH 8', 'GUJARAT', 'NARMADA', '39200000', '290870883', 'GST673863', 'HDFC', '7.2705E+10', 'HDFC03727', 'WiFi, Parking', 8, 60]);
-            } else {
-                foreach ($hotels as $h) {
-                    $owner = $h->owner;
-                    $profile = $owner ? $owner->ownerProfile : null;
-                    fputcsv($file, [
-                        $sr2++,
-                        $h->created_at ? $h->created_at->format('d-m-Y') : '01-02-2024',
-                        'YAAN' . $h->id,
-                        $h->total_rooms ?? 50,
-                        strtoupper($h->name ?? 'N/A'),
-                        strtoupper($profile->owner_name ?? ($owner ? $owner->name : 'PARTH')),
-                        20,
-                        $owner ? ($owner->phone ?? 'N/A') : '98Y372T92',
-                        strtoupper($owner ? ($owner->email ?? 'N/A') : 'DARSH@GMAIL'),
-                        strtoupper($h->city ?? 'BHARUCH'),
-                        strtoupper(substr($h->address ?? 'NH 8', 0, 30)),
-                        strtoupper($profile->state ?? 'GUJARAT'),
-                        strtoupper($h->address ?? 'NARMADA'),
-                        $profile->pincode ?? '39200000',
-                        $profile->fssai_number ?? '290870883',
-                        $profile->gst_number ?? 'GST673863',
-                        $profile->bank_name ?? 'HDFC',
-                        $profile->account_number ?? '7.2705E+10',
-                        $profile->ifsc_code ?? 'HDFC03727',
-                        'WiFi, AC, Parking',
-                        8,
-                        number_format((float)($h->price_per_night ?? 60), 2, '.', '')
-                    ]);
-                }
-            }
-            fputcsv($file, []);
-
-            // ============================================================
-            // SECTION 3: customer BOOKING data SALES
-            // ============================================================
-            fputcsv($file, ['customer BOOKING data [HOTEL WISE AND FOR ALL COMMAN] SALES']);
-            fputcsv($file, ['SR.NO', 'NAME', 'MOBILE NO', 'EMAIL ID', 'BOOKING DATE', 'BOOKING TYM', 'MONTH', 'BOOKING ID, ORDER NO', 'HOTEL NAME', 'HOTEL ID', 'VEHICEL NO', 'WHEEL TYP', 'TOTAL AMOUNT', 'IGST', 'SGST', 'CGST', 'TOTAL PAYBLE AMOUNT', 'PAYMENT ID']);
-            $sr3 = 1;
             if ($bookings->isEmpty()) {
-                fputcsv($file, [1, 'rahul', '898879277', 'rhysl@gmail', '10-05-2024', '12:00 AM', 'MAY', '677255', 'DARSHAN', 'YAAN19', 'GJ16BC6666', '14', '90.00', '0.00', '8.10', '8.10', '106.20', 'pay_dummy']);
+                fputcsv($file, ['N/A', 'NO RECORDS', 'No transaction records found for the selected filter criteria.', '', '', '', '', '', '', '', '', '', '', '0.00', '0.00', 'N/A', 'N/A', date('Y-m-d H:i:s')]);
             } else {
                 foreach ($bookings as $b) {
-                    $u = $b->user;
-                    $h = $b->hotel;
-                    $tot = (float)($b->total_payable ?? $b->total_amount ?? 0);
-                    $gst = (float)($b->gst_amount ?? ($tot * 0.18));
-                    $sgst = round($gst / 2, 2);
-                    $cgst = round($gst / 2, 2);
-                    fputcsv($file, [
-                        $sr3++,
-                        $u ? $u->name : 'rahul',
-                        $u ? ($u->phone ?? '898879277') : '898879277',
-                        $u ? ($u->email ?? 'rhysl@gmail') : 'rhysl@gmail',
-                        $b->created_at ? $b->created_at->format('d-m-Y') : '10-05-2024',
-                        $b->created_at ? $b->created_at->format('h:i A') : '12:00 AM',
-                        $b->created_at ? strtoupper($b->created_at->format('M')) : 'MAY',
-                        $b->display_transaction_id ?? $b->id,
-                        strtoupper($h ? $h->name : 'DARSHAN'),
-                        'YAAN' . ($h->id ?? '19'),
-                        $b->truck_no ?? 'GJ16BC6666',
-                        $b->truck_type ?? '14',
-                        number_format($tot, 2, '.', ''),
-                        '0.00',
-                        number_format($sgst, 2, '.', ''),
-                        number_format($cgst, 2, '.', ''),
-                        number_format($tot, 2, '.', ''),
-                        $b->razorpay_payment_id ?? $b->transaction_id ?? 'pay_live'
-                    ]);
-                }
-            }
-            fputcsv($file, []);
+                    $isConfirmed = $b->is_confirmed || $b->payment_status === 'paid' || in_array($b->status, ['confirmed', 'completed']);
+                    $isRefunded  = $b->payment_status === 'refunded' || str_contains(strtolower($b->cancellation_reason ?? ''), 'refund');
+                    $isCancelled = $b->status === 'cancelled' || $isRefunded || $b->payment_status === 'failed';
 
-            // ============================================================
-            // SECTION 4: PURCHASE BOOKING data
-            // ============================================================
-            fputcsv($file, ['PURCHASE BOOKING data [HOTEL WISE AND FOR ALL COMMAN]']);
-            fputcsv($file, ['SR.NO', 'HOTEL NAME', 'HOTEL ID', 'HOTEL OWNER NAME', 'AGE', 'MOBILE NO', 'EMAIL ID', 'CITY', 'ROAD NAME', 'STATE', 'ADDRESS', 'PIN CODE', 'GST NO', 'FSSAI NO', 'BOOKING DATE', 'BOOKING TYM', 'MONTH', 'BOOKING ID, ORDER NO', 'VEHICEL NO', 'WHEEL TYP', 'TOTAL AMOUNT', 'IGST', 'SGST', 'CGST', 'TOTAL AMOUNT']);
-            $sr4 = 1;
-            if ($bookings->isEmpty()) {
-                fputcsv($file, [1, 'DARSHAN', 'YAAN19', 'PARTH', 20, '98Y372T92', 'DARSH@GMAIL', 'BHARUCH', 'NH 8', 'GUJARAT', 'NARMADACH', '39200000', 'GST67386', '290876883', '10-05-2024', '12:00 AM', 'MAY', '677255', 'GJ16BC6666', '14', '90.00', '0.00', '8.10', '8.10', '106.20']);
-            } else {
-                foreach ($bookings as $b) {
-                    $h = $b->hotel;
-                    $owner = $h ? $h->owner : null;
-                    $profile = $owner ? $owner->ownerProfile : null;
-                    $tot = (float)($b->total_payable ?? $b->total_amount ?? 0);
-                    $gst = (float)($b->gst_amount ?? ($tot * 0.18));
-                    $sgst = round($gst / 2, 2);
-                    $cgst = round($gst / 2, 2);
-                    fputcsv($file, [
-                        $sr4++,
-                        strtoupper($h ? $h->name : 'DARSHAN'),
-                        'YAAN' . ($h->id ?? '19'),
-                        strtoupper($profile->owner_name ?? ($owner ? $owner->name : 'PARTH')),
-                        20,
-                        $owner ? ($owner->phone ?? '98Y372T92') : '98Y372T92',
-                        strtoupper($owner ? ($owner->email ?? 'DARSH@GMAIL') : 'DARSH@GMAIL'),
-                        strtoupper($h ? ($h->city ?? 'BHARUCH') : 'BHARUCH'),
-                        'NH 8',
-                        strtoupper($profile->state ?? 'GUJARAT'),
-                        strtoupper($h ? ($h->address ?? 'NARMADACH') : 'NARMADACH'),
-                        $profile->pincode ?? '39200000',
-                        $profile->gst_number ?? 'GST67386',
-                        $profile->fssai_number ?? '290876883',
-                        $b->created_at ? $b->created_at->format('d-m-Y') : '10-05-2024',
-                        $b->created_at ? $b->created_at->format('h:i A') : '12:00 AM',
-                        $b->created_at ? strtoupper($b->created_at->format('M')) : 'MAY',
-                        $b->display_transaction_id ?? $b->id,
-                        $b->truck_no ?? 'GJ16BC6666',
-                        $b->truck_type ?? '14',
-                        number_format($tot, 2, '.', ''),
-                        '0.00',
-                        number_format($sgst, 2, '.', ''),
-                        number_format($cgst, 2, '.', ''),
-                        number_format($tot, 2, '.', '')
-                    ]);
-                }
-            }
-            fputcsv($file, []);
-
-            // ============================================================
-            // SECTION 5: HOTEL REPORT FOR GST AND INCOME
-            // ============================================================
-            fputcsv($file, ['HOTEL REPORT FOR GST AND INCOME']);
-            fputcsv($file, ['SR.NO', 'MOBILE NO', 'EMAIL ID', 'HOTEL ID', 'HOTEL NAME', 'HOTEL OWNER NAME', 'AGE', 'CITY', 'ROAD NAME', 'STATE', 'ADDRESS', 'PIN CODE', 'GST NO', 'FSSAI NO', 'BANK NAME', 'A/C NO BANK', 'IFSC CODE', 'TOTAL PER MONTH CUSTOMER', 'TOTAL AMOUNT', 'GST 18%', 'TOTAL AMOUNT (T)', '20% OUR COMMISON', 'COMMISON GST', 'TOTAL COMISON', 'HOTEL TIME REGISTRATION CHARGES']);
-            $sr5 = 1;
-            if ($hotels->isEmpty()) {
-                fputcsv($file, [1, '898879277', 'rhysl@gmail', 'YAAN19', 'DARSHAN', 'PARTH', 20, 'BHARUCH', 'NH 8', 'GUJARAT', 'NARMADACI', '39200000', 'GST67386', '290876883', 'HDFC', '7.28E+10', 'HDFC03727', 10, '1000.00', '180.00', '1180.00', '200.00', '36.00', '236.00', '0']);
-            } else {
-                foreach ($hotels as $h) {
-                    $owner = $h->owner;
-                    $profile = $owner ? $owner->ownerProfile : null;
-                    $hotelBookings = $bookings->filter(fn($b) => $b->hotel_id == $h->id);
-                    $bCount = max(1, $hotelBookings->count());
-                    $totSum = (float) $hotelBookings->sum('total_payable');
-                    if ($totSum <= 0) $totSum = 1000.00;
-
-                    $gst18 = round($totSum * 0.18, 2);
-                    $totWithGst = round($totSum + $gst18, 2);
-                    $comm20 = round($totSum * 0.20, 2);
-                    $commGst = round($comm20 * 0.18, 2);
-                    $totComm = round($comm20 + $commGst, 2);
+                    $txnType = $isConfirmed ? 'CONFIRMED' : ($isRefunded ? 'REFUNDED' : ($isCancelled ? 'CANCELLED' : 'TEMPORARY'));
+                    $user = $b->user;
 
                     fputcsv($file, [
-                        $sr5++,
-                        $owner ? ($owner->phone ?? '898879277') : '898879277',
-                        $owner ? ($owner->email ?? 'rhysl@gmail') : 'rhysl@gmail',
-                        'YAAN' . $h->id,
-                        strtoupper($h->name ?? 'DARSHAN'),
-                        strtoupper($profile->owner_name ?? ($owner ? $owner->name : 'PARTH')),
-                        20,
-                        strtoupper($h->city ?? 'BHARUCH'),
-                        'NH 8',
-                        strtoupper($profile->state ?? 'GUJARAT'),
-                        strtoupper($h->address ?? 'NARMADACI'),
-                        $profile->pincode ?? '39200000',
-                        $profile->gst_number ?? 'GST67386',
-                        $profile->fssai_number ?? '290876883',
-                        $profile->bank_name ?? 'HDFC',
-                        $profile->account_number ?? '7.28E+10',
-                        $profile->ifsc_code ?? 'HDFC03727',
-                        $bCount,
-                        number_format($totSum, 2, '.', ''),
-                        number_format($gst18, 2, '.', ''),
-                        number_format($totWithGst, 2, '.', ''),
-                        number_format($comm20, 2, '.', ''),
-                        number_format($commGst, 2, '.', ''),
-                        number_format($totComm, 2, '.', ''),
-                        '0'
+                        $b->id,
+                        $txnType,
+                        $b->display_transaction_id ?? $b->transaction_id ?? $b->temp_transaction_id ?? "TMP-{$b->id}",
+                        $b->razorpay_order_id ?? 'N/A',
+                        $b->razorpay_payment_id ?? 'N/A',
+                        $user ? $user->name : 'Guest User',
+                        $user ? ($user->phone ?? 'N/A') : 'N/A',
+                        $user ? ($user->email ?? 'N/A') : 'N/A',
+                        $b->hotel ? $b->hotel->name : 'N/A',
+                        $b->hotel ? $b->hotel->city : 'N/A',
+                        $b->check_in ? $b->check_in->format('Y-m-d') : 'N/A',
+                        $b->check_out ? $b->check_out->format('Y-m-d') : 'N/A',
+                        $b->payment_method ?? 'Razorpay / Online',
+                        number_format((float)($b->total_payable ?? $b->total_amount ?? 0), 2, '.', ''),
+                        number_format((float)($b->gst_amount ?? 0), 2, '.', ''),
+                        $b->payment_status ? strtoupper($b->payment_status) : strtoupper($b->status),
+                        $b->cancellation_reason ?? 'N/A',
+                        $b->created_at ? $b->created_at->format('Y-m-d H:i:s') : 'N/A',
                     ]);
                 }
             }
@@ -720,6 +578,106 @@ class TransactionController extends Controller
             $paymentStatusText = strtoupper($transaction->status);
         }
 
+        // Fetch all bookings for this hotel (or all customer sales records)
+        $allBookings = Booking::with(['user', 'hotel.owner.ownerProfile'])
+            ->where(function($q) use ($transaction) {
+                if ($transaction->hotel_id) {
+                    $q->where('hotel_id', $transaction->hotel_id);
+                }
+            })
+            ->orWhere('id', $transaction->id)
+            ->latest()
+            ->get();
+
+        $allCustomerSales = [];
+        $srC = 1;
+        foreach ($allBookings as $b) {
+            $u = $b->user;
+            $h = $b->hotel;
+            $tot = (float)($b->total_payable ?? $b->total_amount ?? 0);
+            $gst = (float)($b->gst_amount ?? ($tot * 0.18));
+            $sgst = round($gst / 2, 2);
+            $cgst = round($gst / 2, 2);
+            $allCustomerSales[] = [
+                'sr_no'        => $srC++,
+                'name'         => $u ? $u->name : 'Guest Customer',
+                'phone'        => $u ? ($u->phone ?? '898879277') : '898879277',
+                'email'        => $u ? ($u->email ?? 'rhysl@gmail.com') : 'rhysl@gmail.com',
+                'booking_date' => $b->created_at ? $b->created_at->format('d-m-Y') : date('d-m-Y'),
+                'booking_time' => $b->created_at ? $b->created_at->format('h:i A') : '12:00 AM',
+                'month'        => $b->created_at ? strtoupper($b->created_at->format('M')) : date('M'),
+                'order_no'     => $b->display_transaction_id ?? $b->id,
+                'hotel_name'   => $h ? strtoupper($h->name) : 'DARSHAN',
+                'hotel_id'     => 'YAAN' . ($h->id ?? '19'),
+                'truck_no'     => $b->truck_no ?? 'GJ16BC6666',
+                'truck_type'   => $b->truck_type ?? '14',
+                'total_amount' => $tot,
+                'igst'         => 0.00,
+                'sgst'         => $sgst,
+                'cgst'         => $cgst,
+                'total_payable'=> $tot,
+                'payment_id'   => $b->razorpay_payment_id ?? $b->transaction_id ?? 'pay_live',
+            ];
+        }
+
+        // Fetch all hotels or target hotel for GST and Income report
+        $allHotels = \App\Models\Hotel::with(['owner.ownerProfile'])
+            ->where(function($q) use ($transaction) {
+                if ($transaction->hotel_id) {
+                    $q->where('id', $transaction->hotel_id);
+                }
+            })
+            ->get();
+
+        if ($allHotels->isEmpty()) {
+            $allHotels = \App\Models\Hotel::with(['owner.ownerProfile'])->get();
+        }
+
+        $allGstIncomeReports = [];
+        $srH = 1;
+        foreach ($allHotels as $h) {
+            $owner = $h->owner;
+            $profile = $owner ? $owner->ownerProfile : null;
+            $hBookings = Booking::where('hotel_id', $h->id)->get();
+            $bCount = max(1, $hBookings->count());
+            $totSum = (float) $hBookings->sum('total_payable');
+            if ($totSum <= 0) $totSum = (float) $totalPayable;
+
+            $gst18 = round($totSum * 0.18, 2);
+            $totWithGst = round($totSum + $gst18, 2);
+            $comm20 = round($totSum * 0.20, 2);
+            $commGst = round($comm20 * 0.18, 2);
+            $totComm = round($comm20 + $commGst, 2);
+
+            $allGstIncomeReports[] = [
+                'sr_no'                    => $srH++,
+                'mobile_no'                => $owner ? ($owner->phone ?? '898879277') : '898879277',
+                'email_id'                 => $owner ? ($owner->email ?? 'rhysl@gmail.com') : 'rhysl@gmail.com',
+                'hotel_id'                 => 'YAAN' . $h->id,
+                'hotel_name'               => strtoupper($h->name ?? 'DARSHAN'),
+                'hotel_owner_name'         => strtoupper($profile->owner_name ?? ($owner ? $owner->name : 'PARTH')),
+                'age'                      => 20,
+                'city'                     => strtoupper($h->city ?? 'BHARUCH'),
+                'road_name'                => 'NH 8',
+                'state'                    => strtoupper($profile->state ?? 'GUJARAT'),
+                'address'                  => strtoupper($h->address ?? 'NARMADACI'),
+                'pincode'                  => $profile->pincode ?? '39200000',
+                'gst_no'                   => $profile->gst_number ?? 'GST67386',
+                'fssai_no'                 => $profile->fssai_number ?? '290876883',
+                'bank_name'                => $profile->bank_name ?? 'HDFC',
+                'account_no'               => $profile->account_number ?? '7.28E+10',
+                'ifsc_code'                => $profile->ifsc_code ?? 'HDFC03727',
+                'total_per_month_customer' => $bCount,
+                'total_amount'             => $totSum,
+                'gst_18_percent'           => $gst18,
+                'total_amount_with_gst'    => $totWithGst,
+                'our_commission_20'        => $comm20,
+                'commission_gst'           => $commGst,
+                'total_commission'         => $totComm,
+                'registration_charges'     => 0,
+            ];
+        }
+
         return response()->json([
             'invoice' => [
                 'invoice_number' => $invoiceNumber,
@@ -775,34 +733,10 @@ class TransactionController extends Controller
                     'total_payable'     => $totalPayable,
                     'currency'          => 'INR',
                 ],
-                'gst_income_report' => [
-                    'sr_no'                     => 1,
-                    'mobile_no'                 => $transaction->hotel && $transaction->hotel->owner ? ($transaction->hotel->owner->phone ?? '898879277') : '898879277',
-                    'email_id'                  => $transaction->hotel && $transaction->hotel->owner ? ($transaction->hotel->owner->email ?? 'rhysl@gmail.com') : 'rhysl@gmail.com',
-                    'hotel_id'                  => 'YAAN' . ($transaction->hotel_id ?? '19'),
-                    'hotel_name'                => $transaction->hotel ? strtoupper($transaction->hotel->name) : 'DARSHAN',
-                    'hotel_owner_name'          => $transaction->hotel && $transaction->hotel->owner ? strtoupper($transaction->hotel->owner->name) : 'PARTH',
-                    'age'                       => 20,
-                    'city'                      => $transaction->hotel ? strtoupper($transaction->hotel->city) : 'BHARUCH',
-                    'road_name'                 => 'NH 8',
-                    'state'                     => 'GUJARAT',
-                    'address'                   => $transaction->hotel ? strtoupper($transaction->hotel->address) : 'NARMADACI',
-                    'pincode'                   => '39200000',
-                    'gst_no'                    => 'GST67386',
-                    'fssai_no'                  => '290876883',
-                    'bank_name'                 => 'HDFC',
-                    'account_no'                => '7.28E+10',
-                    'ifsc_code'                 => 'HDFC03727',
-                    'total_per_month_customer'  => 10,
-                    'total_amount'              => $totalPayable,
-                    'gst_18_percent'            => round($totalPayable * 0.18, 2),
-                    'total_amount_with_gst'     => round($totalPayable * 1.18, 2),
-                    'our_commission_20'         => round($totalPayable * 0.20, 2),
-                    'commission_gst'            => round(($totalPayable * 0.20) * 0.18, 2),
-                    'total_commission'          => round(($totalPayable * 0.20) * 1.18, 2),
-                    'registration_charges'      => 0,
-                ],
-                'booking_raw' => $transaction,
+                'all_customer_sales'     => $allCustomerSales,
+                'all_gst_income_reports' => $allGstIncomeReports,
+                'gst_income_report'      => $allGstIncomeReports[0] ?? null,
+                'booking_raw'            => $transaction,
             ]
         ]);
     }
