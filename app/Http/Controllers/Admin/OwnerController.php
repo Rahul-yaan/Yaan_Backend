@@ -12,7 +12,11 @@ class OwnerController extends Controller
 {
     public function index(Request $request)
     {
-        $query = User::where('role', 'owner')->with(['ownerProfile', 'hotels']);
+        $query = User::where(function($q) {
+            $q->where('role', 'owner')
+              ->orWhereHas('hotels')
+              ->orWhereHas('ownerProfile');
+        })->with(['ownerProfile', 'hotels']);
 
         if ($request->has('search') && !empty($request->search)) {
             $search = trim($request->search);
@@ -63,9 +67,12 @@ class OwnerController extends Controller
 
     public function show($id)
     {
-        $owner = User::where('role', 'owner')
-            ->with(['ownerProfile', 'hotels.images'])
-            ->findOrFail($id);
+        $owner = User::where(function($q) {
+            $q->where('role', 'owner')
+              ->orWhereHas('hotels')
+              ->orWhereHas('ownerProfile');
+        })->with(['ownerProfile', 'hotels.images'])
+          ->findOrFail($id);
 
         $hotelIds = Hotel::where('owner_id', $owner->id)->pluck('id');
         if ($hotelIds->isEmpty() && $owner->ownerProfile && !empty($owner->ownerProfile->hotel_name)) {
@@ -134,7 +141,9 @@ class OwnerController extends Controller
             'rejection_reason' => 'nullable|string|max:1000',
         ]);
 
-        $owner = User::where('role', 'owner')->findOrFail($id);
+        $owner = User::findOrFail($id);
+        $owner->role = 'owner';
+        $owner->save();
         $profile = OwnerProfile::firstOrCreate(['user_id' => $owner->id]);
 
         $statusInput = strtolower($request->input('status', ''));
