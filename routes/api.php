@@ -23,10 +23,6 @@ Route::middleware('throttle:60,1')->group(function () {
     Route::get('/terms',                [\App\Http\Controllers\LegalController::class, 'termsJson']);
     Route::get('/privacy-policy',       [\App\Http\Controllers\LegalController::class, 'privacyJson']);
     Route::get('/privacy',              [\App\Http\Controllers\LegalController::class, 'privacyJson']);
-    Route::get('/pages/terms',          [\App\Http\Controllers\LegalController::class, 'termsJson']);
-    Route::get('/pages/privacy',        [\App\Http\Controllers\LegalController::class, 'privacyJson']);
-    Route::get('/legal/terms',          [\App\Http\Controllers\LegalController::class, 'termsJson']);
-    Route::get('/legal/privacy',        [\App\Http\Controllers\LegalController::class, 'privacyJson']);
 
     // Vendor / Hotel Owner App
     Route::get('/vendor/terms-and-conditions', [\App\Http\Controllers\LegalController::class, 'vendorTermsJson']);
@@ -47,21 +43,27 @@ Route::middleware('throttle:60,1')->group(function () {
     Route::get('/contact',    [\App\Http\Controllers\LegalController::class, 'contactJson']);
     Route::get('/support',    [\App\Http\Controllers\LegalController::class, 'contactJson']);
 
+    // Share & Rate App APIs
+    Route::get('/share-app',  [\App\Http\Controllers\LegalController::class, 'shareAppJson']);
+    Route::get('/share',      [\App\Http\Controllers\LegalController::class, 'shareAppJson']);
+    Route::get('/rate-us',    [\App\Http\Controllers\LegalController::class, 'rateUsJson']);
+    Route::get('/rate',      [\App\Http\Controllers\LegalController::class, 'rateUsJson']);
+
     // Cancellation & Refund Policy APIs
     Route::get('/cancellation-policy', [\App\Http\Controllers\LegalController::class, 'cancellationJson']);
     Route::get('/cancellation',        [\App\Http\Controllers\LegalController::class, 'cancellationJson']);
     Route::get('/refund-policy',       [\App\Http\Controllers\LegalController::class, 'cancellationJson']);
     Route::get('/refund',              [\App\Http\Controllers\LegalController::class, 'cancellationJson']);
-    Route::get('/pages/cancellation',  [\App\Http\Controllers\LegalController::class, 'cancellationJson']);
-    Route::get('/legal/cancellation',  [\App\Http\Controllers\LegalController::class, 'cancellationJson']);
-    Route::get('/vendor/cancellation', [\App\Http\Controllers\LegalController::class, 'cancellationJson']);
-    Route::get('/owner/cancellation',  [\App\Http\Controllers\LegalController::class, 'cancellationJson']);
 
-    // App Master Settings & Page Links Endpoint
-    Route::get('/app-info',   [\App\Http\Controllers\LegalController::class, 'appInfoJson']);
-    Route::get('/pages',      [\App\Http\Controllers\LegalController::class, 'appInfoJson']);
-    Route::get('/settings',   [\App\Http\Controllers\LegalController::class, 'appInfoJson']);
-    Route::get('/master-settings', [\App\Http\Controllers\LegalController::class, 'appInfoJson']);
+    // App Master Settings & Dynamic Page Slugs Endpoint
+    Route::get('/app-info',             [\App\Http\Controllers\LegalController::class, 'appInfoJson']);
+    Route::get('/settings',             [\App\Http\Controllers\LegalController::class, 'appInfoJson']);
+    Route::get('/master-settings',      [\App\Http\Controllers\LegalController::class, 'appInfoJson']);
+    Route::get('/pages/{slug?}',        [\App\Http\Controllers\LegalController::class, 'getPageBySlug']);
+    Route::get('/page/{slug?}',         [\App\Http\Controllers\LegalController::class, 'getPageBySlug']);
+    Route::get('/legal/{slug?}',        [\App\Http\Controllers\LegalController::class, 'getPageBySlug']);
+    Route::get('/cms/{slug?}',          [\App\Http\Controllers\LegalController::class, 'getPageBySlug']);
+    Route::get('/get-page/{slug?}',     [\App\Http\Controllers\LegalController::class, 'getPageBySlug']);
 });
 
 // Razorpay Webhook — Verified by HMAC signature in controller

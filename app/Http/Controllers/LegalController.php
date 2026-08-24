@@ -597,160 +597,183 @@ class LegalController extends Controller
     // UNIVERSAL JSON API RESPONSES
     // ============================================================
 
-    public function termsJson(): JsonResponse
+    private function formatLegalResponse(array $raw, string $url): JsonResponse
     {
-        $raw   = $this->getTermsData();
         $plain = $this->buildPlainText($raw);
         $html  = $this->buildHtmlText($raw);
+        $title = $raw['title'] ?? 'Legal Information';
 
-        $payload = array_merge($raw, [
-            'content'      => $plain,
-            'html_content' => $html,
-            'terms'        => $plain,
-            'url'          => url('/terms-and-conditions'),
+        $itemData = array_merge($raw, [
+            'id'                   => 1,
+            'title'                => $title,
+            'page_title'           => $title,
+            'heading'              => $title,
+            'content'              => $plain,
+            'description'          => $plain,
+            'details'              => $plain,
+            'body'                 => $plain,
+            'text'                 => $plain,
+            'page_content'         => $plain,
+            'html_content'         => $html,
+            'terms'                => $plain,
+            'privacy'              => $plain,
+            'about'                => $plain,
+            'contact'              => $plain,
+            'url'                  => $url,
+            'link'                 => $url,
+            'sections'             => $raw['sections'] ?? [],
+            'effective_date'       => $raw['effective_date'] ?? date('d M Y'),
         ]);
 
         return response()->json([
-            'success'      => true,
-            'status'       => true,
-            'title'        => $raw['title'],
-            'content'      => $plain,
-            'html_content' => $html,
-            'terms'        => $plain,
-            'url'          => url('/terms-and-conditions'),
-            'sections'     => $raw['sections'],
-            'data'         => $payload,
+            'success'              => true,
+            'status'               => true,
+            'code'                 => 200,
+            'message'              => 'Data retrieved successfully',
+            'title'                => $title,
+            'page_title'           => $title,
+            'heading'              => $title,
+            'content'              => $plain,
+            'description'          => $plain,
+            'details'              => $plain,
+            'body'                 => $plain,
+            'text'                 => $plain,
+            'page_content'         => $plain,
+            'html_content'         => $html,
+            'terms'                => $plain,
+            'privacy'              => $plain,
+            'about'                => $plain,
+            'contact'              => $plain,
+            'url'                  => $url,
+            'link'                 => $url,
+            'sections'             => $raw['sections'] ?? [],
+            'data'                 => $itemData,
+            'result'               => $itemData,
+            'page'                 => $itemData,
         ]);
+    }
+
+    public function termsJson(): JsonResponse
+    {
+        return $this->formatLegalResponse($this->getTermsData(), url('/terms-and-conditions'));
     }
 
     public function privacyJson(): JsonResponse
     {
-        $raw   = $this->getPrivacyData();
-        $plain = $this->buildPlainText($raw);
-        $html  = $this->buildHtmlText($raw);
-
-        $payload = array_merge($raw, [
-            'content'      => $plain,
-            'html_content' => $html,
-            'privacy'      => $plain,
-            'url'          => url('/privacy-policy'),
-        ]);
-
-        return response()->json([
-            'success'      => true,
-            'status'       => true,
-            'title'        => $raw['title'],
-            'content'      => $plain,
-            'html_content' => $html,
-            'privacy'      => $plain,
-            'url'          => url('/privacy-policy'),
-            'sections'     => $raw['sections'],
-            'data'         => $payload,
-        ]);
+        return $this->formatLegalResponse($this->getPrivacyData(), url('/privacy-policy'));
     }
 
     public function vendorTermsJson(): JsonResponse
     {
-        $raw   = $this->getVendorTermsData();
-        $plain = $this->buildPlainText($raw);
-        $html  = $this->buildHtmlText($raw);
-
-        $payload = array_merge($raw, [
-            'content'      => $plain,
-            'html_content' => $html,
-            'terms'        => $plain,
-            'url'          => url('/vendor/terms-and-conditions'),
-        ]);
-
-        return response()->json([
-            'success'      => true,
-            'status'       => true,
-            'title'        => $raw['title'],
-            'content'      => $plain,
-            'html_content' => $html,
-            'terms'        => $plain,
-            'url'          => url('/vendor/terms-and-conditions'),
-            'sections'     => $raw['sections'],
-            'data'         => $payload,
-        ]);
+        return $this->formatLegalResponse($this->getVendorTermsData(), url('/vendor/terms-and-conditions'));
     }
 
     public function vendorPrivacyJson(): JsonResponse
     {
-        $raw   = $this->getVendorPrivacyData();
-        $plain = $this->buildPlainText($raw);
-        $html  = $this->buildHtmlText($raw);
-
-        $payload = array_merge($raw, [
-            'content'      => $plain,
-            'html_content' => $html,
-            'privacy'      => $plain,
-            'url'          => url('/vendor/privacy-policy'),
-        ]);
-
-        return response()->json([
-            'success'      => true,
-            'status'       => true,
-            'title'        => $raw['title'],
-            'content'      => $plain,
-            'html_content' => $html,
-            'privacy'      => $plain,
-            'url'          => url('/vendor/privacy-policy'),
-            'sections'     => $raw['sections'],
-            'data'         => $payload,
-        ]);
+        return $this->formatLegalResponse($this->getVendorPrivacyData(), url('/vendor/privacy-policy'));
     }
 
     public function aboutJson(): JsonResponse
     {
-        $raw   = $this->getAboutData();
-        $plain = $this->buildPlainText($raw);
-        $html  = $this->buildHtmlText($raw);
-
-        $payload = array_merge($raw, [
-            'content'      => $plain,
-            'html_content' => $html,
-            'about'        => $plain,
-            'url'          => url('/about-us'),
-        ]);
-
-        return response()->json([
-            'success'      => true,
-            'status'       => true,
-            'title'        => $raw['title'],
-            'content'      => $plain,
-            'html_content' => $html,
-            'about'        => $plain,
-            'url'          => url('/about-us'),
-            'sections'     => $raw['sections'],
-            'data'         => $payload,
-        ]);
+        return $this->formatLegalResponse($this->getAboutData(), url('/about-us'));
     }
 
     public function contactJson(): JsonResponse
     {
-        $raw   = $this->getContactData();
-        $plain = $this->buildPlainText($raw);
-        $html  = $this->buildHtmlText($raw);
+        return $this->formatLegalResponse($this->getContactData(), url('/contact-us'));
+    }
 
-        $payload = array_merge($raw, [
-            'content'      => $plain,
-            'html_content' => $html,
-            'contact'      => $plain,
-            'url'          => url('/contact-us'),
-        ]);
+    public function shareAppJson(): JsonResponse
+    {
+        $shareUrl = 'https://play.google.com/store/apps/details?id=com.yaan.app';
+        $shareText = 'Download Yaan App - India\'s Premier Highway Truck Parking & Logistics Platform: ' . $shareUrl;
+
+        $itemData = [
+            'id'          => 1,
+            'title'       => 'Share Yaan App',
+            'page_title'  => 'Share Yaan App',
+            'content'     => $shareText,
+            'description' => $shareText,
+            'details'     => $shareText,
+            'body'        => $shareText,
+            'url'         => $shareUrl,
+            'share_url'   => $shareUrl,
+            'share_text'  => $shareText,
+            'link'        => $shareUrl,
+        ];
 
         return response()->json([
-            'success'      => true,
-            'status'       => true,
-            'title'        => $raw['title'],
-            'content'      => $plain,
-            'html_content' => $html,
-            'contact'      => $plain,
-            'url'          => url('/contact-us'),
-            'sections'     => $raw['sections'],
-            'data'         => $payload,
+            'success'     => true,
+            'status'      => true,
+            'code'        => 200,
+            'message'     => 'Share app info retrieved successfully',
+            'title'       => 'Share Yaan App',
+            'content'     => $shareText,
+            'description' => $shareText,
+            'details'     => $shareText,
+            'url'         => $shareUrl,
+            'share_url'   => $shareUrl,
+            'share_text'  => $shareText,
+            'data'        => $itemData,
+            'result'      => $itemData,
         ]);
+    }
+
+    public function rateUsJson(): JsonResponse
+    {
+        $rateUrl = 'https://play.google.com/store/apps/details?id=com.yaan.app';
+        $rateText = 'Rate Yaan App on Google Play Store: ' . $rateUrl;
+
+        $itemData = [
+            'id'          => 1,
+            'title'       => 'Rate Yaan App',
+            'page_title'  => 'Rate Yaan App',
+            'content'     => $rateText,
+            'description' => $rateText,
+            'details'     => $rateText,
+            'body'        => $rateText,
+            'url'         => $rateUrl,
+            'rate_url'    => $rateUrl,
+            'link'        => $rateUrl,
+        ];
+
+        return response()->json([
+            'success'     => true,
+            'status'      => true,
+            'code'        => 200,
+            'message'     => 'Rate us info retrieved successfully',
+            'title'       => 'Rate Yaan App',
+            'content'     => $rateText,
+            'description' => $rateText,
+            'details'     => $rateText,
+            'url'         => $rateUrl,
+            'rate_url'    => $rateUrl,
+            'data'        => $itemData,
+            'result'      => $itemData,
+        ]);
+    }
+
+    public function getPageBySlug(Request $request, $slug = null): JsonResponse
+    {
+        $slugStr = strtolower((string)($slug ?? $request->get('slug') ?? $request->get('page') ?? 'terms'));
+
+        if (str_contains($slugStr, 'term')) {
+            return $this->termsJson();
+        } elseif (str_contains($slugStr, 'privac')) {
+            return $this->privacyJson();
+        } elseif (str_contains($slugStr, 'about')) {
+            return $this->aboutJson();
+        } elseif (str_contains($slugStr, 'contact') || str_contains($slugStr, 'help') || str_contains($slugStr, 'support')) {
+            return $this->contactJson();
+        } elseif (str_contains($slugStr, 'cancel') || str_contains($slugStr, 'refund')) {
+            return $this->cancellationJson();
+        } elseif (str_contains($slugStr, 'share')) {
+            return $this->shareAppJson();
+        } elseif (str_contains($slugStr, 'rate')) {
+            return $this->rateUsJson();
+        }
+
+        return $this->termsJson();
     }
 
     private function getCancellationData(): array
@@ -777,28 +800,7 @@ class LegalController extends Controller
 
     public function cancellationJson(): JsonResponse
     {
-        $raw   = $this->getCancellationData();
-        $plain = $this->buildPlainText($raw);
-        $html  = $this->buildHtmlText($raw);
-
-        $payload = array_merge($raw, [
-            'content'      => $plain,
-            'html_content' => $html,
-            'cancellation' => $plain,
-            'url'          => url('/cancellation-policy'),
-        ]);
-
-        return response()->json([
-            'success'      => true,
-            'status'       => true,
-            'title'        => $raw['title'],
-            'content'      => $plain,
-            'html_content' => $html,
-            'cancellation' => $plain,
-            'url'          => url('/cancellation-policy'),
-            'sections'     => $raw['sections'],
-            'data'         => $payload,
-        ]);
+        return $this->formatLegalResponse($this->getCancellationData(), url('/cancellation-policy'));
     }
 
     public function cancellationView()
