@@ -641,10 +641,12 @@ class TransactionController extends Controller
             $hBookings = Booking::where('hotel_id', $h->id)->get();
             $bCount = max(1, $hBookings->count());
             $totSum = (float) $hBookings->sum('total_payable');
+            $baseSum = (float) $hBookings->sum('total_amount');
             if ($totSum <= 0) $totSum = (float) $totalPayable;
+            if ($baseSum <= 0) $baseSum = round($totSum / 1.18, 2);
 
-            $gst18 = round($totSum * 0.18, 2);
-            $totWithGst = round($totSum + $gst18, 2);
+            $gst18 = round($baseSum * 0.18, 2);
+            $totWithGst = $totSum > 0 ? $totSum : round($baseSum + $gst18, 2);
             $comm20 = round($totSum * 0.20, 2);
             $commGst = round($comm20 * 0.18, 2);
             $totComm = round($comm20 + $commGst, 2);
@@ -668,7 +670,7 @@ class TransactionController extends Controller
                 'account_no'               => $profile->account_number ?? '7.28E+10',
                 'ifsc_code'                => $profile->ifsc_code ?? 'HDFC03727',
                 'total_per_month_customer' => $bCount,
-                'total_amount'             => $totSum,
+                'total_amount'             => $baseSum,
                 'gst_18_percent'           => $gst18,
                 'total_amount_with_gst'    => $totWithGst,
                 'our_commission_20'        => $comm20,
@@ -737,6 +739,7 @@ class TransactionController extends Controller
                 'all_gst_income_reports' => $allGstIncomeReports,
                 'gst_income_report'      => $allGstIncomeReports[0] ?? null,
                 'booking_raw'            => $transaction,
+                
             ]
         ]);
     }

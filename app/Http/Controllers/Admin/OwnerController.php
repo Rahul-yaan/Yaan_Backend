@@ -101,7 +101,7 @@ class OwnerController extends Controller
 
         $displayTotalAmount = $totalCustomerPaid > 0 ? $totalCustomerPaid : $baseRevenueSum;
 
-        $ownerPayableRevenue  = round($displayTotalAmount * 0.66, 2);      // ₹66% Net Share
+        $ownerPayableRevenue  = round($displayTotalAmount * 0.66, 2);      // 66% Net Share
         $ownerGstAmount       = round($ownerPayableRevenue * 0.18, 2); // 18% GST on 66% Net Share
         $platformFeeCollected = round($displayTotalAmount * 0.34, 2);      // 34% Platform Fee
 
@@ -113,15 +113,17 @@ class OwnerController extends Controller
             'owner'       => $owner,
             'hotels'      => $hotels->isNotEmpty() ? $hotels : $owner->hotels,
             'analytics'   => [
-                'total_revenue'          => $totalCustomerPaid,    // ₹112.10 Gross
+                'total_amount'           => $baseRevenueSum,       // ₹100.00 Base Room Price Total
+                'total_payable'          => $totalCustomerPaid,    // ₹118.00 Total Customer Paid
+                'total_revenue'          => $totalCustomerPaid,    // ₹118.00 Gross
                 'total_customer_paid'    => $totalCustomerPaid,
                 'gross_revenue'          => $totalCustomerPaid,
-                'owner_payable_revenue'  => $ownerPayableRevenue,  // ₹62.70 Owner Net
+                'owner_payable_revenue'  => $ownerPayableRevenue,  // Owner Net Share
                 'payable_amount'         => $ownerPayableRevenue,
                 'total_earnings'         => $ownerPayableRevenue,
-                'owner_gst_amount'       => $ownerGstAmount,       // ₹11.29 Owner GST
+                'owner_gst_amount'       => $ownerGstAmount,       // Owner GST
                 'gst_amount'             => $ownerGstAmount,
-                'platform_fee_collected' => $platformFeeCollected, // ₹32.30 Platform Fee
+                'platform_fee_collected' => $platformFeeCollected, // Platform Fee
                 'platform_fee'           => $platformFeeCollected,
                 'total_bookings'         => $totalBookings,
                 'confirmed_bookings'     => $confirmedBookings->count(),
