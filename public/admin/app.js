@@ -843,7 +843,7 @@ async function openHotelDetailsModal(id) {
                         ${hotelPhotos.map(img => `
                             <div class="photo-card-item" style="position:relative; height:130px; border-radius:8px; overflow:hidden; background:#0f172a; border:1px solid var(--border);">
                                 <a href="${img.url}" target="_blank">
-                                    <img src="${img.url}" alt="${img.label}" style="width:100%; height:100%; object-fit:cover;" onerror="this.onerror=null; this.closest('.photo-card-item')?.style.setProperty('display', 'none', 'important');">
+                                    <img src="${img.url}" alt="${img.label}" style="width:100%; height:100%; object-fit:cover;" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'300\' height=\'200\'><rect width=\'300\' height=\'200\' fill=\'%230f172a\'/><text x=\'50%\' y=\'50%\' dominant-baseline=\'middle\' text-anchor=\'middle\' fill=\'%2338bdf8\' font-size=\'13\' font-family=\'sans-serif\' font-weight=\'bold\'>🏨 Hotel Photo</text></svg>';">
                                 </a>
                                 <span style="position:absolute; bottom:6px; left:6px; background:rgba(0,0,0,0.85); color:#38bdf8; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:700;">
                                     ${img.label}
@@ -1351,7 +1351,7 @@ async function openKycModal(id) {
                         <strong style="display:block; margin-bottom:4px;">${doc.label}</strong>
                         ${doc.url ? `
                             <a href="${doc.url}" target="_blank">
-                                <img src="${doc.url}" style="width:100%; height:90px; object-fit:cover; border-radius:4px;" onerror="this.src='https://via.placeholder.com/200x120?text=View+Document'">
+                                <img src="${doc.url}" style="width:100%; height:90px; object-fit:cover; border-radius:4px;" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'200\' height=\'120\'><rect width=\'200\' height=\'120\' fill=\'%231e293b\'/><text x=\'50%\' y=\'50%\' dominant-baseline=\'middle\' text-anchor=\'middle\' fill=\'%2394a3b8\' font-size=\'12\' font-family=\'sans-serif\' font-weight=\'bold\'>📄 View Document</text></svg>';">
                             </a>
                         ` : `<div style="height:90px; display:flex; align-items:center; justify-content:center; color:var(--text-muted); background:rgba(255,255,255,0.03); border-radius:4px;">Not Uploaded</div>`}
                     </div>
