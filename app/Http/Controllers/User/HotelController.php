@@ -43,6 +43,10 @@ class HotelController extends Controller
         $toLat   = $request->input('to_lat')   ?? $request->input('toLat')   ?? $request->input('dest_lat')   ?? $request->input('drop_lat');
         $toLng   = $request->input('to_lng')   ?? $request->input('toLng')   ?? $request->input('dest_lng')   ?? $request->input('drop_lng');
 
+        // 3. Determine Sort Order Direction (forward: Origin -> Destination, reverse: Destination -> Origin)
+        $sortParam = strtolower(trim($request->input('sort') ?? $request->input('sort_order') ?? $request->input('order') ?? $request->input('direction') ?? $request->input('sort_by') ?? 'asc'));
+        $isReverse = in_array($sortParam, ['desc', 'reverse', 'destination_first', 'to_first', 'reverse_flow']);
+
         $hasCoords = is_numeric($fromLat) && is_numeric($fromLng) && is_numeric($toLat) && is_numeric($toLng);
 
         if ($hasCoords) {
@@ -57,16 +61,16 @@ class HotelController extends Controller
             $routeDistance = $this->haversine($fromLat, $fromLng, $toLat, $toLng);
             $radius = ($routeDistance / 2) + 50;
 
-            // Clamped acos formula: GREATEST(-1.0, LEAST(1.0, ...)) to prevent out-of-range SQL math errors
-            $distanceSql = "(6371 * acos(
+            // Distance SQL relative to Origin (From location, e.g., Bharuch)
+            $fromDistSql = "(6371 * acos(
                 GREATEST(-1.0, LEAST(1.0, cos(radians(?)) * cos(radians(latitude))
                 * cos(radians(longitude) - radians(?))
                 + sin(radians(?)) * sin(radians(latitude))))
             ))";
 
             $query = $this->applyApprovedScope(Hotel::query())
-                ->selectRaw("*, {$distanceSql} AS distance", [$midLat, $midLng, $midLat])
-                ->whereRaw("{$distanceSql} <= ?", [$midLat, $midLng, $midLat, $radius])
+                ->selectRaw("*, {$fromDistSql} AS distance", [$fromLat, $fromLng, $fromLat])
+                ->whereRaw("{$fromDistSql} <= ?", [$fromLat, $fromLng, $fromLat, $radius + 50])
                 ->with(['images', 'primaryImage', 'amenities', 'owner.ownerProfile']);
 
             if (!empty($amenities)) {
@@ -77,7 +81,8 @@ class HotelController extends Controller
                 }
             }
 
-            $hotels = $query->orderBy('distance')->get();
+            // Order by distance from origin: ASC = Forward (Bharuch -> Vadodara), DESC = Reverse (Vadodara -> Bharuch)
+            $hotels = $query->orderBy('distance', $isReverse ? 'desc' : 'asc')->get();
         } else {
             $query = $this->applyApprovedScope(Hotel::query())
                 ->with(['images', 'primaryImage', 'amenities', 'owner.ownerProfile']);
@@ -107,7 +112,7 @@ class HotelController extends Controller
                 }
             }
 
-            $hotels = $query->latest()->get();
+            $hotels = $isReverse ? $query->oldest()->get() : $query->latest()->get();
             $fromLat = $fromLng = $toLat = $toLng = $midLat = $midLng = 0;
             $routeDistance = $radius = 0;
         }
@@ -140,12 +145,18 @@ class HotelController extends Controller
         }
 
         return response()->json([
-            'hotels'        => $hotels,
-            'from'          => ['lat' => $fromLat, 'lng' => $fromLng],
-            'to'            => ['lat' => $toLat,   'lng' => $toLng],
-            'midpoint'      => ['lat' => $midLat,  'lng' => $midLng],
-            'route_km'      => round($routeDistance, 2),
-            'search_radius' => round($radius, 2),
+            'hotels'          => $hotels,
+            'from'            => ['lat' => $fromLat, 'lng' => $fromLng],
+            'to'              => ['lat' => $toLat,   'lng' => $toLng],
+            'midpoint'        => ['lat' => $midLat,  'lng' => $midLng],
+            'route_km'        => round($routeDistance, 2),
+            'search_radius'   => round($radius, 2),
+            'sort_order'      => $isReverse ? 'reverse' : 'forward',
+            'is_reversed'     => $isReverse,
+            'available_sorts' => [
+                'forward' => 'Bharuch to Vadodara (Start to Destination)',
+                'reverse' => 'Vadodara to Bharuch (Destination to Start)',
+            ],
         ]);
     }
 
