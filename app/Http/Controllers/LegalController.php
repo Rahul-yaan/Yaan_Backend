@@ -653,13 +653,75 @@ class LegalController extends Controller
         ]);
     }
 
-    public function termsJson(): JsonResponse
+    private function isVendorRequest(Request $request): bool
     {
+        $user = $request->user();
+        if ($user && ($user->role === 'owner' || $user->role === 'vendor')) {
+            return true;
+        }
+
+        $appType = strtolower((string) $request->get('app', $request->get('type', $request->get('role', $request->get('client', '')))));
+        if (in_array($appType, ['owner', 'vendor', 'partner', 'hotel'])) {
+            return true;
+        }
+
+        $referer = strtolower((string) ($request->header('User-Agent', '') . ' ' . $request->header('Referer', '') . ' ' . $request->header('X-App-Type', '')));
+        if (str_contains($referer, 'owner') || str_contains($referer, 'vendor') || str_contains($referer, 'partner')) {
+            return true;
+        }
+
+        $path = strtolower($request->path());
+        if (str_contains($path, 'vendor') || str_contains($path, 'owner')) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private function getFaqData(): array
+    {
+        return [
+            'title' => 'Frequently Asked Questions (FAQ) - Yaan Partner',
+            'app_name' => 'Yaan Partner',
+            'effective_date' => 'August 21, 2026',
+            'sections' => [
+                [
+                    'id' => 1,
+                    'title' => '1. How do I complete my owner profile and KYC?',
+                    'content' => 'Submit your hotel details, 12-digit Aadhaar card number, 10-character PAN card number, Bank Account details, FSSAI license, and GST registration. Admin will review and approve your profile.'
+                ],
+                [
+                    'id' => 2,
+                    'title' => '2. How are pricing and wheel rates configured?',
+                    'content' => 'Set rates for different truck wheel categories (e.g. 12 Wheel, 14 Wheel, 16 Wheel, 18 Wheel, 22 Wheel, 22+ Wheel). Ensure the discount price does not exceed the original price for any wheel type.'
+                ],
+                [
+                    'id' => 3,
+                    'title' => '3. When will I receive booking payments?',
+                    'content' => 'Yaan processes and releases monthly payouts between the 8th and 10th of each month following GST verification.'
+                ],
+                [
+                    'id' => 4,
+                    'title' => '4. What details should I verify at driver check-in?',
+                    'content' => 'Verify the driver’s name, contact phone number, and vehicle registration number (e.g. GJ16AB7888) against the booking details in your Yaan Owner App.'
+                ]
+            ]
+        ];
+    }
+
+    public function termsJson(Request $request): JsonResponse
+    {
+        if ($this->isVendorRequest($request)) {
+            return $this->vendorTermsJson();
+        }
         return $this->formatLegalResponse($this->getTermsData(), url('/terms-and-conditions'));
     }
 
-    public function privacyJson(): JsonResponse
+    public function privacyJson(Request $request): JsonResponse
     {
+        if ($this->isVendorRequest($request)) {
+            return $this->vendorPrivacyJson();
+        }
         return $this->formatLegalResponse($this->getPrivacyData(), url('/privacy-policy'));
     }
 
@@ -671,6 +733,11 @@ class LegalController extends Controller
     public function vendorPrivacyJson(): JsonResponse
     {
         return $this->formatLegalResponse($this->getVendorPrivacyData(), url('/vendor/privacy-policy'));
+    }
+
+    public function faqJson(): JsonResponse
+    {
+        return $this->formatLegalResponse($this->getFaqData(), url('/faq'));
     }
 
     public function aboutJson(): JsonResponse
@@ -757,10 +824,16 @@ class LegalController extends Controller
     {
         $slugStr = strtolower((string)($slug ?? $request->get('slug') ?? $request->get('page') ?? 'terms'));
 
-        if (str_contains($slugStr, 'term')) {
-            return $this->termsJson();
+        if (str_contains($slugStr, 'vendor-term') || str_contains($slugStr, 'owner-term') || (str_contains($slugStr, 'term') && $this->isVendorRequest($request))) {
+            return $this->vendorTermsJson();
+        } elseif (str_contains($slugStr, 'vendor-privac') || str_contains($slugStr, 'owner-privac') || (str_contains($slugStr, 'privac') && $this->isVendorRequest($request))) {
+            return $this->vendorPrivacyJson();
+        } elseif (str_contains($slugStr, 'term')) {
+            return $this->termsJson($request);
         } elseif (str_contains($slugStr, 'privac')) {
-            return $this->privacyJson();
+            return $this->privacyJson($request);
+        } elseif (str_contains($slugStr, 'faq')) {
+            return $this->faqJson();
         } elseif (str_contains($slugStr, 'about')) {
             return $this->aboutJson();
         } elseif (str_contains($slugStr, 'contact') || str_contains($slugStr, 'help') || str_contains($slugStr, 'support')) {
@@ -773,7 +846,7 @@ class LegalController extends Controller
             return $this->rateUsJson();
         }
 
-        return $this->termsJson();
+        return $this->termsJson($request);
     }
 
     private function getCancellationData(): array
