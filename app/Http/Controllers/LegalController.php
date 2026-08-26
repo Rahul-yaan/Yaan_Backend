@@ -709,12 +709,22 @@ class LegalController extends Controller
         ];
     }
 
+    public function customerTermsJson(): JsonResponse
+    {
+        return $this->formatLegalResponse($this->getTermsData(), url('/terms-and-conditions'));
+    }
+
+    public function customerPrivacyJson(): JsonResponse
+    {
+        return $this->formatLegalResponse($this->getPrivacyData(), url('/privacy-policy'));
+    }
+
     public function termsJson(Request $request): JsonResponse
     {
         if ($this->isVendorRequest($request)) {
             return $this->vendorTermsJson();
         }
-        return $this->formatLegalResponse($this->getTermsData(), url('/terms-and-conditions'));
+        return $this->customerTermsJson();
     }
 
     public function privacyJson(Request $request): JsonResponse
@@ -722,7 +732,7 @@ class LegalController extends Controller
         if ($this->isVendorRequest($request)) {
             return $this->vendorPrivacyJson();
         }
-        return $this->formatLegalResponse($this->getPrivacyData(), url('/privacy-policy'));
+        return $this->customerPrivacyJson();
     }
 
     public function vendorTermsJson(): JsonResponse

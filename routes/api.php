@@ -18,11 +18,20 @@ Route::middleware('throttle:60,1')->group(function () {
     
     // Legal & Policy APIs for Mobile Apps (User App & Hotel App)
     // Customer App
-    Route::get('/terms-and-conditions', [\App\Http\Controllers\LegalController::class, 'termsJson']);
-    Route::get('/terms-conditions',     [\App\Http\Controllers\LegalController::class, 'termsJson']);
-    Route::get('/terms',                [\App\Http\Controllers\LegalController::class, 'termsJson']);
-    Route::get('/privacy-policy',       [\App\Http\Controllers\LegalController::class, 'privacyJson']);
-    Route::get('/privacy',              [\App\Http\Controllers\LegalController::class, 'privacyJson']);
+    Route::get('/terms-and-conditions',          [\App\Http\Controllers\LegalController::class, 'customerTermsJson']);
+    Route::get('/terms-conditions',              [\App\Http\Controllers\LegalController::class, 'customerTermsJson']);
+    Route::get('/terms',                         [\App\Http\Controllers\LegalController::class, 'customerTermsJson']);
+    Route::get('/user/terms-and-conditions',     [\App\Http\Controllers\LegalController::class, 'customerTermsJson']);
+    Route::get('/user/terms',                    [\App\Http\Controllers\LegalController::class, 'customerTermsJson']);
+    Route::get('/customer/terms-and-conditions', [\App\Http\Controllers\LegalController::class, 'customerTermsJson']);
+    Route::get('/customer/terms',                [\App\Http\Controllers\LegalController::class, 'customerTermsJson']);
+
+    Route::get('/privacy-policy',                [\App\Http\Controllers\LegalController::class, 'customerPrivacyJson']);
+    Route::get('/privacy',                       [\App\Http\Controllers\LegalController::class, 'customerPrivacyJson']);
+    Route::get('/user/privacy-policy',          [\App\Http\Controllers\LegalController::class, 'customerPrivacyJson']);
+    Route::get('/user/privacy',                 [\App\Http\Controllers\LegalController::class, 'customerPrivacyJson']);
+    Route::get('/customer/privacy-policy',      [\App\Http\Controllers\LegalController::class, 'customerPrivacyJson']);
+    Route::get('/customer/privacy',             [\App\Http\Controllers\LegalController::class, 'customerPrivacyJson']);
 
     // Vendor / Hotel Owner App
     Route::get('/vendor/terms-and-conditions', [\App\Http\Controllers\LegalController::class, 'vendorTermsJson']);
@@ -37,33 +46,43 @@ Route::middleware('throttle:60,1')->group(function () {
     Route::get('/owner/privacy',               [\App\Http\Controllers\LegalController::class, 'vendorPrivacyJson']);
 
     // About Us & Contact Us APIs
-    Route::get('/about-us',      [\App\Http\Controllers\LegalController::class, 'aboutJson']);
-    Route::get('/about',         [\App\Http\Controllers\LegalController::class, 'aboutJson']);
-    Route::get('/vendor/about',  [\App\Http\Controllers\LegalController::class, 'aboutJson']);
-    Route::get('/owner/about',   [\App\Http\Controllers\LegalController::class, 'aboutJson']);
+    Route::get('/about-us',        [\App\Http\Controllers\LegalController::class, 'aboutJson']);
+    Route::get('/about',           [\App\Http\Controllers\LegalController::class, 'aboutJson']);
+    Route::get('/user/about',      [\App\Http\Controllers\LegalController::class, 'aboutJson']);
+    Route::get('/customer/about',  [\App\Http\Controllers\LegalController::class, 'aboutJson']);
+    Route::get('/vendor/about',    [\App\Http\Controllers\LegalController::class, 'aboutJson']);
+    Route::get('/owner/about',     [\App\Http\Controllers\LegalController::class, 'aboutJson']);
 
-    Route::get('/contact-us',     [\App\Http\Controllers\LegalController::class, 'contactJson']);
-    Route::get('/contact',        [\App\Http\Controllers\LegalController::class, 'contactJson']);
-    Route::get('/support',        [\App\Http\Controllers\LegalController::class, 'contactJson']);
-    Route::get('/vendor/contact', [\App\Http\Controllers\LegalController::class, 'contactJson']);
-    Route::get('/owner/contact',  [\App\Http\Controllers\LegalController::class, 'contactJson']);
+    Route::get('/contact-us',       [\App\Http\Controllers\LegalController::class, 'contactJson']);
+    Route::get('/contact',          [\App\Http\Controllers\LegalController::class, 'contactJson']);
+    Route::get('/support',          [\App\Http\Controllers\LegalController::class, 'contactJson']);
+    Route::get('/user/contact',     [\App\Http\Controllers\LegalController::class, 'contactJson']);
+    Route::get('/customer/contact', [\App\Http\Controllers\LegalController::class, 'contactJson']);
+    Route::get('/vendor/contact',   [\App\Http\Controllers\LegalController::class, 'contactJson']);
+    Route::get('/owner/contact',    [\App\Http\Controllers\LegalController::class, 'contactJson']);
 
     // Share & Rate App APIs
-    Route::get('/share-app',     [\App\Http\Controllers\LegalController::class, 'shareAppJson']);
-    Route::get('/share',         [\App\Http\Controllers\LegalController::class, 'shareAppJson']);
-    Route::get('/vendor/share',  [\App\Http\Controllers\LegalController::class, 'shareAppJson']);
-    Route::get('/owner/share',   [\App\Http\Controllers\LegalController::class, 'shareAppJson']);
+    Route::get('/share-app',       [\App\Http\Controllers\LegalController::class, 'shareAppJson']);
+    Route::get('/share',           [\App\Http\Controllers\LegalController::class, 'shareAppJson']);
+    Route::get('/user/share',      [\App\Http\Controllers\LegalController::class, 'shareAppJson']);
+    Route::get('/customer/share',  [\App\Http\Controllers\LegalController::class, 'shareAppJson']);
+    Route::get('/vendor/share',    [\App\Http\Controllers\LegalController::class, 'shareAppJson']);
+    Route::get('/owner/share',     [\App\Http\Controllers\LegalController::class, 'shareAppJson']);
 
-    Route::get('/rate-us',      [\App\Http\Controllers\LegalController::class, 'rateUsJson']);
-    Route::get('/rate',         [\App\Http\Controllers\LegalController::class, 'rateUsJson']);
-    Route::get('/vendor/rate',  [\App\Http\Controllers\LegalController::class, 'rateUsJson']);
-    Route::get('/owner/rate',   [\App\Http\Controllers\LegalController::class, 'rateUsJson']);
+    Route::get('/rate-us',        [\App\Http\Controllers\LegalController::class, 'rateUsJson']);
+    Route::get('/rate',           [\App\Http\Controllers\LegalController::class, 'rateUsJson']);
+    Route::get('/user/rate',      [\App\Http\Controllers\LegalController::class, 'rateUsJson']);
+    Route::get('/customer/rate',  [\App\Http\Controllers\LegalController::class, 'rateUsJson']);
+    Route::get('/vendor/rate',    [\App\Http\Controllers\LegalController::class, 'rateUsJson']);
+    Route::get('/owner/rate',     [\App\Http\Controllers\LegalController::class, 'rateUsJson']);
 
     // FAQ APIs
-    Route::get('/faq',        [\App\Http\Controllers\LegalController::class, 'faqJson']);
-    Route::get('/faqs',       [\App\Http\Controllers\LegalController::class, 'faqJson']);
-    Route::get('/vendor/faq', [\App\Http\Controllers\LegalController::class, 'faqJson']);
-    Route::get('/owner/faq',  [\App\Http\Controllers\LegalController::class, 'faqJson']);
+    Route::get('/faq',          [\App\Http\Controllers\LegalController::class, 'faqJson']);
+    Route::get('/faqs',         [\App\Http\Controllers\LegalController::class, 'faqJson']);
+    Route::get('/user/faq',     [\App\Http\Controllers\LegalController::class, 'faqJson']);
+    Route::get('/customer/faq', [\App\Http\Controllers\LegalController::class, 'faqJson']);
+    Route::get('/vendor/faq',   [\App\Http\Controllers\LegalController::class, 'faqJson']);
+    Route::get('/owner/faq',    [\App\Http\Controllers\LegalController::class, 'faqJson']);
 
     // Cancellation & Refund Policy APIs
     Route::get('/cancellation-policy', [\App\Http\Controllers\LegalController::class, 'cancellationJson']);
