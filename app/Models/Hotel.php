@@ -15,6 +15,8 @@ class Hotel extends Model
         'latitude',
         'longitude',
         'price_per_night',
+        'discount_price',
+        'wheel_prices',
         'total_rooms',
         'available_rooms',
         'rating',
@@ -27,6 +29,8 @@ class Hotel extends Model
         'latitude'       => 'double',
         'longitude'      => 'double',
         'price_per_night'=> 'decimal:2',
+        'discount_price' => 'decimal:2',
+        'wheel_prices'   => 'array',
         'rating'         => 'decimal:2',
     ];
 

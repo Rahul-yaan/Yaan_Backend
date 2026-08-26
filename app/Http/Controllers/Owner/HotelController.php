@@ -113,6 +113,102 @@ class HotelController extends Controller
         return $this->resolveAmenities($input);
     }
 
+    // Helper to validate and process wheel pricing matrix
+    private function validateAndProcessWheelPrices(Request $request)
+    {
+        $rawWheelPrices = $request->input('wheel_prices') ?? $request->input('wheels_prices') ?? $request->input('wheel_matrix');
+
+        if (is_string($rawWheelPrices)) {
+            $decoded = json_decode($rawWheelPrices, true);
+            if (is_array($decoded)) {
+                $rawWheelPrices = $decoded;
+            }
+        }
+
+        $processedMatrix = [];
+        $errors = [];
+
+        $knownCategories = [
+            '4_wheel'       => '4 Wheel',
+            '6_wheel'       => '6 Wheel',
+            '8_wheel'       => '8 Wheel',
+            '10_wheel'      => '10 Wheel',
+            '12_wheel'      => '12 Wheel',
+            '14_wheel'      => '14 Wheel',
+            '16_wheel'      => '16 Wheel',
+            '18_wheel'      => '18 Wheel',
+            '20_wheel'      => '20 Wheel',
+            '22_wheel'      => '22 Wheel',
+            '24_wheel'      => '24 Wheel',
+            '22_plus_wheel' => '22+ Wheel',
+        ];
+
+        if (is_array($rawWheelPrices) && !empty($rawWheelPrices)) {
+            foreach ($rawWheelPrices as $key => $data) {
+                if (isset($knownCategories[$key])) {
+                    $categoryName = $knownCategories[$key];
+                } else {
+                    $cleanKey = str_replace(['_', '-'], ' ', strtolower((string)$key));
+                    $cleanKey = str_replace('plus', '+', $cleanKey);
+                    $categoryName = ucwords($cleanKey);
+                }
+
+                $origRaw = is_array($data) ? ($data['original_price'] ?? $data['price'] ?? $data['base_price'] ?? null) : null;
+                $discRaw = is_array($data) ? ($data['discount_price'] ?? $data['discounted_price'] ?? $data['offer_price'] ?? null) : null;
+
+                if ($origRaw !== null && $origRaw !== '') {
+                    if (!is_numeric($origRaw) || (float)$origRaw < 0) {
+                        $errors["wheel_prices.{$key}.original_price"] = ["Enter a valid numeric price for {$categoryName}."];
+                    }
+                }
+
+                if ($discRaw !== null && $discRaw !== '') {
+                    if (!is_numeric($discRaw) || (float)$discRaw < 0) {
+                        $errors["wheel_prices.{$key}.discount_price"] = ["Enter a valid numeric price for {$categoryName}."];
+                    } elseif ($origRaw !== null && $origRaw !== '' && is_numeric($origRaw)) {
+                        $origVal = (float) $origRaw;
+                        $discVal = (float) $discRaw;
+                        if ($discVal > $origVal) {
+                            $errors["wheel_prices.{$key}.discount_price"] = ["Discount price cannot be greater than the original price for {$categoryName}."];
+                        }
+                    }
+                }
+
+                if (is_array($data)) {
+                    $processedMatrix[$key] = [
+                        'original_price' => ($origRaw !== null && is_numeric($origRaw)) ? (float)$origRaw : null,
+                        'discount_price' => ($discRaw !== null && is_numeric($discRaw)) ? (float)$discRaw : null,
+                    ];
+                }
+            }
+        }
+
+        // Single Base / Discount Price validation at root level
+        $rootBasePrice = $request->input('price_per_night') ?? $request->input('price') ?? $request->input('wheels_price') ?? $request->input('base_price');
+        $rootDiscountPrice = $request->input('discount_price') ?? $request->input('discounted_price') ?? $request->input('offer_price');
+
+        if ($rootBasePrice !== null && $rootBasePrice !== '') {
+            if (!is_numeric($rootBasePrice) || (float)$rootBasePrice < 0) {
+                $errors['price_per_night'] = ["Enter a valid numeric price."];
+            }
+        }
+
+        if ($rootDiscountPrice !== null && $rootDiscountPrice !== '') {
+            if (!is_numeric($rootDiscountPrice) || (float)$rootDiscountPrice < 0) {
+                $errors['discount_price'] = ["Enter a valid numeric price."];
+            } elseif ($rootBasePrice !== null && $rootBasePrice !== '' && is_numeric($rootBasePrice)) {
+                if ((float)$rootDiscountPrice > (float)$rootBasePrice) {
+                    $errors['discount_price'] = ["Discount price cannot be greater than the base price."];
+                }
+            }
+        }
+
+        return [
+            'errors'       => $errors,
+            'wheel_matrix' => $processedMatrix,
+        ];
+    }
+
     // ============================================================
     // 2. ADD HOTEL
     //    URL:    POST /api/owner/hotels
@@ -125,6 +221,15 @@ class HotelController extends Controller
             $request->merge(['amenities' => $resolvedAmenities]);
         }
 
+        $wheelPricingCheck = $this->validateAndProcessWheelPrices($request);
+        if (!empty($wheelPricingCheck['errors'])) {
+            return response()->json([
+                'error'   => 'Validation failed.',
+                'message' => 'The given data was invalid.',
+                'errors'  => $wheelPricingCheck['errors'],
+            ], 422);
+        }
+
         $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
             'name'           => 'required|string|max:200',
             'description'    => 'nullable|string',
@@ -133,6 +238,7 @@ class HotelController extends Controller
             'latitude'       => 'required|numeric',
             'longitude'      => 'required|numeric',
             'price_per_night'=> 'required|numeric|min:1',
+            'discount_price' => 'nullable|numeric|min:0',
             'total_rooms'    => 'required|integer|min:1',
             'amenities'      => 'nullable|array',
             'amenities.*'    => 'exists:amenities,id',
@@ -152,6 +258,7 @@ class HotelController extends Controller
         }
 
         $existingHotel = Hotel::where('owner_id', $request->user()->id)->first();
+        $wheelMatrixData = !empty($wheelPricingCheck['wheel_matrix']) ? $wheelPricingCheck['wheel_matrix'] : null;
 
         if ($existingHotel) {
             $existingHotel->update([
@@ -162,6 +269,8 @@ class HotelController extends Controller
                 'latitude'       => $request->latitude,
                 'longitude'      => $request->longitude,
                 'price_per_night'=> $request->price_per_night,
+                'discount_price' => $request->input('discount_price'),
+                'wheel_prices'   => $wheelMatrixData ?? $existingHotel->wheel_prices,
                 'total_rooms'    => $request->total_rooms,
                 'available_rooms'=> $request->total_rooms,
                 'status'         => 'pending',
@@ -188,6 +297,8 @@ class HotelController extends Controller
             'latitude'       => $request->latitude,
             'longitude'      => $request->longitude,
             'price_per_night'=> $request->price_per_night,
+            'discount_price' => $request->input('discount_price'),
+            'wheel_prices'   => $wheelMatrixData,
             'total_rooms'    => $request->total_rooms,
             'available_rooms'=> $request->total_rooms,
             'status'         => 'pending',
@@ -223,6 +334,15 @@ class HotelController extends Controller
             $request->merge(['amenities' => $resolvedAmenities]);
         }
 
+        $wheelPricingCheck = $this->validateAndProcessWheelPrices($request);
+        if (!empty($wheelPricingCheck['errors'])) {
+            return response()->json([
+                'error'   => 'Validation failed.',
+                'message' => 'The given data was invalid.',
+                'errors'  => $wheelPricingCheck['errors'],
+            ], 422);
+        }
+
         $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
             'name'           => 'sometimes|string|max:200',
             'description'    => 'nullable|string',
@@ -231,6 +351,7 @@ class HotelController extends Controller
             'latitude'       => 'sometimes|numeric',
             'longitude'      => 'sometimes|numeric',
             'price_per_night'=> 'sometimes|numeric|min:1',
+            'discount_price' => 'nullable|numeric|min:0',
             'total_rooms'    => 'sometimes|integer|min:1',
             'status'         => 'sometimes|in:active,inactive',
             'amenities'      => 'nullable|array',
@@ -253,8 +374,12 @@ class HotelController extends Controller
         $updateData = $request->only([
             'name', 'description', 'city', 'address',
             'latitude', 'longitude', 'price_per_night',
-            'total_rooms', 'status',
+            'discount_price', 'total_rooms', 'status',
         ]);
+
+        if (!empty($wheelPricingCheck['wheel_matrix'])) {
+            $updateData['wheel_prices'] = $wheelPricingCheck['wheel_matrix'];
+        }
 
         if (isset($updateData['total_rooms'])) {
             $today = \Carbon\Carbon::today()->toDateString();

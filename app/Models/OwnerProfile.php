@@ -15,6 +15,8 @@ class OwnerProfile extends Model
         'state',
         'city',
         'pincode',
+        'aadhaar_number',
+        'pan_number',
         'business_proof',
         'aadhaar_front',
         'aadhaar_back',

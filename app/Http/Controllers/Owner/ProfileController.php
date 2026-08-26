@@ -58,25 +58,37 @@ class ProfileController extends Controller
     public function update(Request $request)
     {
         $request->validate([
-            'hotel_name'     => 'nullable|string|max:200',
-            'owner_name'     => 'nullable|string|max:200',
-            'name'           => 'nullable|string|max:200',
-            'phone'          => 'nullable|string|max:30',
-            'address'        => 'nullable|string',
-            'state'          => 'nullable|string',
-            'city'           => 'nullable|string',
-            'pincode'        => 'nullable|string|max:10',
-            'fssai_number'   => 'nullable|string',
-            'gst_number'     => 'nullable|string',
-            'bank_name'      => 'nullable|string',
-            'account_number' => 'nullable|string',
-            'ifsc_code'      => 'nullable|string',
-            'business_proof' => 'nullable',
-            'aadhaar_front'  => 'nullable',
-            'aadhaar_back'   => 'nullable',
-            'pan_card'       => 'nullable',
-            'fssai_license'  => 'nullable',
-            'gst_image'      => 'nullable',
+            'hotel_name'      => 'nullable|string|max:200',
+            'owner_name'      => 'nullable|string|max:200',
+            'name'            => 'nullable|string|max:200',
+            'phone'           => 'nullable|string|max:30',
+            'address'         => 'nullable|string',
+            'state'           => 'nullable|string',
+            'city'            => 'nullable|string',
+            'pincode'         => 'nullable|string|max:10',
+            'aadhaar_number'  => 'nullable|string|regex:/^[0-9]{12}$/',
+            'pan_number'      => 'nullable|string|regex:/^[A-Z]{5}[0-9]{4}[A-Z]$/i',
+            'pan_card_number' => 'nullable|string|regex:/^[A-Z]{5}[0-9]{4}[A-Z]$/i',
+            'fssai_number'    => 'nullable|string',
+            'gst_number'      => 'nullable|string',
+            'bank_name'       => 'nullable|string|min:2|max:100|regex:/^(?![0-9]+$)[a-zA-Z0-9\s\&\.\-]{2,100}$/',
+            'account_number'  => 'nullable|string|regex:/^[0-9]{9,18}$/',
+            'ifsc_code'       => 'nullable|string|regex:/^[A-Z]{4}0[A-Z0-9]{6}$/i',
+            'business_proof'  => 'nullable',
+            'aadhaar_front'   => 'nullable',
+            'aadhaar_back'    => 'nullable',
+            'pan_card'        => 'nullable',
+            'fssai_license'   => 'nullable',
+            'gst_image'       => 'nullable',
+        ], [
+            'aadhaar_number.regex'  => 'Aadhaar number must contain exactly 12 digits.',
+            'pan_number.regex'      => 'Enter a valid PAN number, for example ABCDE1234F.',
+            'pan_card_number.regex' => 'Enter a valid PAN number, for example ABCDE1234F.',
+            'bank_name.min'         => 'Enter a valid bank name.',
+            'bank_name.max'         => 'Enter a valid bank name.',
+            'bank_name.regex'       => 'Enter a valid bank name.',
+            'account_number.regex'  => 'Enter a valid bank account number.',
+            'ifsc_code.regex'       => 'Enter a valid 11-character IFSC code.',
         ]);
 
         $user = $request->user();
@@ -97,9 +109,83 @@ class ProfileController extends Controller
 
         $data = $request->only([
             'hotel_name', 'owner_name', 'address', 'state',
-            'city', 'pincode', 'fssai_number', 'gst_number',
+            'city', 'pincode', 'aadhaar_number', 'pan_number', 'fssai_number', 'gst_number',
             'bank_name', 'account_number', 'ifsc_code',
         ]);
+
+        // Support alternative field aliases for aadhaar_number (e.g. aadhaar_no, aadhar)
+        $aadhaarInput = $request->input('aadhaar_number') ?? $request->input('aadhaar_no') ?? $request->input('aadhar_number') ?? $request->input('aadhar');
+        if (!empty($aadhaarInput)) {
+            if (!preg_match('/^[0-9]{12}$/', trim($aadhaarInput))) {
+                return response()->json([
+                    'message' => 'The given data was invalid.',
+                    'errors'  => [
+                        'aadhaar_number' => ['Aadhaar number must contain exactly 12 digits.']
+                    ]
+                ], 422);
+            }
+            $data['aadhaar_number'] = preg_replace('/[^0-9]/', '', trim($aadhaarInput));
+        }
+
+        // PAN Card Number handling (auto uppercase, regex check, support aliases)
+        $panInput = $request->input('pan_number') ?? $request->input('pan_card_number') ?? $request->input('pan_no') ?? $request->input('pan');
+        if (!empty($panInput)) {
+            $panUpper = strtoupper(trim($panInput));
+            if (!preg_match('/^[A-Z]{5}[0-9]{4}[A-Z]$/', $panUpper)) {
+                return response()->json([
+                    'message' => 'The given data was invalid.',
+                    'errors'  => [
+                        'pan_number' => ['Enter a valid PAN number, for example ABCDE1234F.']
+                    ]
+                ], 422);
+            }
+            $data['pan_number'] = $panUpper;
+        }
+
+        // Bank Name handling (trim, length & allowed characters check)
+        $bankNameInput = $request->input('bank_name');
+        if (!empty($bankNameInput)) {
+            $trimmedBankName = trim($bankNameInput);
+            if (!preg_match('/^(?![0-9]+$)[a-zA-Z0-9\s\&\.\-]{2,100}$/', $trimmedBankName)) {
+                return response()->json([
+                    'message' => 'The given data was invalid.',
+                    'errors'  => [
+                        'bank_name' => ['Enter a valid bank name.']
+                    ]
+                ], 422);
+            }
+            $data['bank_name'] = $trimmedBankName;
+        }
+
+        // Bank Account Number handling (numeric digits only, 9-18 range, support aliases)
+        $accountInput = $request->input('account_number') ?? $request->input('bank_account_number') ?? $request->input('bank_account_no');
+        if (!empty($accountInput)) {
+            $trimmedAccount = trim($accountInput);
+            if (!preg_match('/^[0-9]{9,18}$/', $trimmedAccount)) {
+                return response()->json([
+                    'message' => 'The given data was invalid.',
+                    'errors'  => [
+                        'account_number' => ['Enter a valid bank account number.']
+                    ]
+                ], 422);
+            }
+            $data['account_number'] = $trimmedAccount;
+        }
+
+        // IFSC Code handling (auto uppercase, regex check, support aliases)
+        $ifscInput = $request->input('ifsc_code') ?? $request->input('ifsc') ?? $request->input('ifsc_number');
+        if (!empty($ifscInput)) {
+            $ifscUpper = strtoupper(trim($ifscInput));
+            if (!preg_match('/^[A-Z]{4}0[A-Z0-9]{6}$/', $ifscUpper)) {
+                return response()->json([
+                    'message' => 'The given data was invalid.',
+                    'errors'  => [
+                        'ifsc_code' => ['Enter a valid 11-character IFSC code.']
+                    ]
+                ], 422);
+            }
+            $data['ifsc_code'] = $ifscUpper;
+        }
 
         if (empty($data['owner_name']) && !empty($user->name)) {
             $data['owner_name'] = $user->name;

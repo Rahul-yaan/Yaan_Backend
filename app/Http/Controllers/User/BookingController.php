@@ -28,6 +28,26 @@ class BookingController extends Controller
             'payment_method'   => 'required|string',
         ]);
 
+        // Support alternative field aliases for truck_no (e.g. truck_number, vehicle_no, registration_no)
+        $rawTruckNo = trim((string) ($request->input('truck_no') ?? $request->input('truck_number') ?? $request->input('vehicle_no') ?? $request->input('vehicle_number') ?? $request->input('registration_no')));
+
+        $hasIllegalChars = !empty($rawTruckNo) && !preg_match('/^[a-zA-Z0-9\s\.\-]+$/', $rawTruckNo);
+
+        // Normalize vehicle registration number: convert to uppercase and strip spaces/hyphens/dots
+        $cleanTruckNo = preg_replace('/[^A-Z0-9]/', '', strtoupper($rawTruckNo));
+
+        // Indian Vehicle Registration Number regex pattern (State RTO series + Bharat BH series)
+        $vehicleRegex = '/^([A-Z]{2}[0-9]{1,2}[A-Z]{0,3}[0-9]{1,4}|[0-9]{2}BH[0-9]{1,4}[A-Z]{1,2})$/';
+
+        if ($hasIllegalChars || empty($cleanTruckNo) || !preg_match($vehicleRegex, $cleanTruckNo)) {
+            return response()->json([
+                'message' => 'The given data was invalid.',
+                'errors'  => [
+                    'truck_no' => ['Enter a valid vehicle registration number, for example GJ16AB7888 or GJ16A7888.']
+                ]
+            ], 422);
+        }
+
         $hotel = Hotel::where('id', $request->hotel_id)
             ->where(function($q) {
                 $q->where('status', 'approved')->orWhere('status', 'active');
@@ -92,7 +112,7 @@ class BookingController extends Controller
             'check_out'           => \Carbon\Carbon::parse($request->booking_date)->addDay()->toDateString(),
             'total_nights'        => 1,
             'truck_type'          => $request->truck_type,
-            'truck_no'            => $request->truck_no,
+            'truck_no'            => $cleanTruckNo,
             'logistics_name'      => $request->logistics_name,
             'logistics_number'    => $request->logistics_number,
             'payment_method'      => $isOnlinePayment ? 'Online Payment' : $request->payment_method,
