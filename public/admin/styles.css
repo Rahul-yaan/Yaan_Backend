@@ -826,6 +826,8 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 5px;
+}
+
 .invoice-modal-content {
     background: #ffffff !important;
     color: #0f172a !important;
