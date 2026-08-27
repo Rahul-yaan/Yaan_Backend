@@ -32,3 +32,20 @@ services:
         value: postgresql://neondb_owner:npg_b3qmYRF8jKlr@ep-curly-brook-axbavkx0.c-4.us-east-2.aws.neon.tech/neondb?sslmode=require
       - key: RUN_MIGRATIONS
         value: "true"
+
+      - key: MAIL_MAILER
+        value: smtp
+      - key: MAIL_HOST
+        value: smtp.gmail.com
+      - key: MAIL_PORT
+        value: "587"
+      - key: MAIL_USERNAME
+        value: yaan.smt@gmail.com
+      - key: MAIL_PASSWORD
+        value: sweqslxlnvdvvtak
+      - key: MAIL_ENCRYPTION
+        value: tls
+      - key: MAIL_FROM_ADDRESS
+        value: yaan.smt@gmail.com
+      - key: MAIL_FROM_NAME
+        value: Yaan
