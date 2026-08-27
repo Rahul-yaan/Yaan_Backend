@@ -42,7 +42,7 @@ class OwnerController extends Controller
             });
         }
 
-        if ($request->has('verified') && $request->verified !== '' && $request->verified !== null && $request->verified !== 'all') {
+        if ($request->has('verified') && $request->verified !== '' && $request->verified !== null) {
             $verifiedStr = strtolower(trim((string)$request->verified));
             if ($verifiedStr === 'true' || $verifiedStr === '1') {
                 $query->whereRaw('is_verified IS TRUE')
@@ -53,13 +53,21 @@ class OwnerController extends Controller
                 $query->whereHas('ownerProfile', function($q) {
                     $q->where('status', 'rejected');
                 });
-            } else {
+            } elseif ($verifiedStr === 'false' || $verifiedStr === 'pending' || $verifiedStr === '0') {
                 $query->where(function($q) {
                     $q->whereRaw('(is_verified IS FALSE OR is_verified IS NULL)')
                     ->whereHas('ownerProfile', function($sq) {
                         $sq->whereRaw('is_profile_complete IS TRUE')
                            ->where('status', 'pending');
                     });
+                });
+            } else {
+                // 'all': Active/Verified and Pending owners (excluding rejected/reset owners)
+                $query->where(function($q) {
+                    $q->whereDoesntHave('ownerProfile')
+                      ->orWhereHas('ownerProfile', function($sq) {
+                          $sq->where('status', '!=', 'rejected');
+                      });
                 });
             }
         }
@@ -223,10 +231,15 @@ class OwnerController extends Controller
 
         \Illuminate\Support\Facades\DB::statement("UPDATE users SET is_verified = false, updated_at = NOW() WHERE id = ?", [$owner->id]);
 
-        \Illuminate\Support\Facades\DB::statement("UPDATE owner_profiles SET is_profile_complete = false, aadhaar_number = NULL, pan_number = NULL, aadhaar_front = NULL, aadhaar_back = NULL, pan_card = NULL, fssai_license = NULL, gst_image = NULL, business_proof = NULL, gst_number = NULL, fssai_number = NULL, bank_name = NULL, account_number = NULL, ifsc_code = NULL, updated_at = NOW() WHERE user_id = ?", [$owner->id]);
+        \Illuminate\Support\Facades\DB::statement("UPDATE owner_profiles SET is_profile_complete = false, status = 'rejected', rejection_reason = 'Admin reset your KYC details. Please submit fresh valid KYC details.', aadhaar_number = NULL, pan_number = NULL, aadhaar_front = NULL, aadhaar_back = NULL, pan_card = NULL, fssai_license = NULL, gst_image = NULL, business_proof = NULL, gst_number = NULL, fssai_number = NULL, bank_name = NULL, account_number = NULL, ifsc_code = NULL, updated_at = NOW() WHERE user_id = ?", [$owner->id]);
+
+        Hotel::where('owner_id', $owner->id)->update([
+            'status'           => 'rejected',
+            'rejection_reason' => 'Admin reset your KYC details. Please submit fresh valid KYC details.',
+        ]);
 
         return response()->json([
-            'message' => "Owner KYC data has been removed and reset successfully. The owner can now re-submit fresh KYC details.",
+            'message' => "Owner KYC data has been removed and reset successfully. Account moved to Rejected Applications.",
             'owner'   => $owner->fresh('ownerProfile'),
         ]);
     }
