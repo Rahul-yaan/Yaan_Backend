@@ -92,7 +92,7 @@ class DashboardController extends Controller
         $startOfMonth = Carbon::now()->startOfMonth();
         $endOfMonth   = Carbon::now()->endOfMonth();
 
-        $currentMonthRevenue = (float) Booking::where(function($q) {
+        $currentMonthGross = (float) Booking::where(function($q) {
             $q->where('payment_status', 'paid')
               ->orWhereIn('status', ['confirmed', 'completed']);
         })
@@ -100,6 +100,8 @@ class DashboardController extends Controller
         ->whereNotIn('payment_status', ['refunded', 'refund_initiated'])
         ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
         ->sum(DB::raw('COALESCE(total_payable, total_amount)'));
+
+        $currentMonthRevenue = round($currentMonthGross * 0.34, 2);
 
         // Saved Custom Target Goal (Default ₹5,00,000)
         $targetGoal = (float) Setting::get('monthly_target_goal', 500000);
@@ -135,7 +137,7 @@ class DashboardController extends Controller
             ->whereBetween('created_at', [$monthStart, $monthEnd])
             ->count();
 
-            $monthlyIncomeData[]   = round($mRev, 2);
+            $monthlyIncomeData[]   = round($mRev * 0.34, 2);
             $monthlyBookingsData[] = $mCount;
         }
 
@@ -191,8 +193,8 @@ class DashboardController extends Controller
             'total_revenue'          => (float) $totalRevenue,         // Gross Customer Payments (e.g. ₹112.10)
             'gross_revenue'          => (float) $totalRevenue,
             'total_customer_paid'    => (float) $totalRevenue,
-            'platform_revenue'       => (float) $totalRevenue,         // Primary platform gross revenue alias
-            'total_platform_revenue' => (float) $totalRevenue,
+            'platform_revenue'       => (float) $adminPlatformRevenue,         // Primary platform gross revenue alias
+            'total_platform_revenue' => (float) $adminPlatformRevenue,
             'admin_platform_revenue' => (float) $adminPlatformRevenue, // 34% Admin Share (e.g. ₹32.30)
             'platform_fee'           => (float) $adminPlatformRevenue,
             'platform_fee_collected' => (float) $adminPlatformRevenue,
@@ -219,8 +221,8 @@ class DashboardController extends Controller
             ],
             // Top level aliases
             'total_revenue'          => (float) $totalRevenue,
-            'platform_revenue'       => (float) $totalRevenue,
-            'total_platform_revenue' => (float) $totalRevenue,
+            'platform_revenue'       => (float) $adminPlatformRevenue,
+            'total_platform_revenue' => (float) $adminPlatformRevenue,
             'admin_platform_revenue' => (float) $adminPlatformRevenue,
             'active_bookings'        => $confirmedBookingsCount,
             'conversion_rate'        => $conversionRate,
@@ -262,7 +264,7 @@ class DashboardController extends Controller
         $endOfMonth   = Carbon::now()->endOfMonth();
         $daysRemainingInMonth = max(1, Carbon::now()->daysInMonth - Carbon::now()->day);
 
-        $currentMonthRevenue = (float) Booking::where(function($q) {
+        $currentMonthGross = (float) Booking::where(function($q) {
             $q->where('payment_status', 'paid')
               ->orWhereIn('status', ['confirmed', 'completed']);
         })
@@ -270,6 +272,8 @@ class DashboardController extends Controller
         ->whereNotIn('payment_status', ['refunded', 'refund_initiated'])
         ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
         ->sum(DB::raw('COALESCE(total_payable, total_amount)'));
+
+        $currentMonthRevenue = round($currentMonthGross * 0.34, 2);
 
         $remainingShortfall = max(0, $targetGoal - $currentMonthRevenue);
         $goalPercentage = $targetGoal > 0 ? min(100, round(($currentMonthRevenue / $targetGoal) * 100, 1)) : 0;

@@ -262,7 +262,7 @@ async function loadDashboardData() {
             currentTargetGoal = g.target_goal;
         }
 
-        document.getElementById('stat-revenue').textContent = `₹${(m.platform_revenue || m.total_revenue || m.admin_platform_revenue || 0).toLocaleString('en-IN')}`;
+        document.getElementById('stat-revenue').textContent = `₹${((m.platform_revenue !== undefined ? m.platform_revenue : m.admin_platform_revenue) || 0).toLocaleString('en-IN')}`;
         if (document.getElementById('stat-gross-volume')) {
             document.getElementById('stat-gross-volume').textContent = `₹${(m.total_revenue || 0).toLocaleString('en-IN')}`;
         }
