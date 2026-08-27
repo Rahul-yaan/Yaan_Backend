@@ -18,6 +18,7 @@ class DashboardController extends Controller
     public function index()
     {
         $totalUsers     = User::where('role', 'user')->count();
+        $totalOwners    = User::where('role', 'owner')->count();
         $verifiedOwners = OwnerProfile::where('status', 'approved')->count();
         $pendingOwners  = User::where('role', 'owner')
             ->where(function($q) {
