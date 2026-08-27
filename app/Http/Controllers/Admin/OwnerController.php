@@ -86,12 +86,23 @@ class OwnerController extends Controller
         })->with(['ownerProfile', 'hotels.images'])
           ->findOrFail($id);
 
-        $hotelIds = Hotel::where('owner_id', $owner->id)->pluck('id');
-        if ($hotelIds->isEmpty() && $owner->ownerProfile && !empty($owner->ownerProfile->hotel_name)) {
-            $hotelIds = Hotel::where('name', 'like', "%{$owner->ownerProfile->hotel_name}%")->pluck('id');
+        $hotelQuery = Hotel::where('owner_id', $owner->id);
+        if ($owner->ownerProfile && !empty(trim($owner->ownerProfile->hotel_name))) {
+            $registeredHotelName = trim($owner->ownerProfile->hotel_name);
+            $matchedHotels = (clone $hotelQuery)->where('name', 'like', "%{$registeredHotelName}%")->with('images')->get();
+            if ($matchedHotels->isNotEmpty()) {
+                $hotels = $matchedHotels;
+            } else {
+                $hotels = $hotelQuery->with('images')->get();
+            }
+        } else {
+            $hotels = $hotelQuery->with('images')->get();
         }
 
-        $hotels = Hotel::whereIn('id', $hotelIds)->with('images')->get();
+        $hotelIds = $hotels->pluck('id');
+        if ($hotelIds->isEmpty()) {
+            $hotelIds = Hotel::where('owner_id', $owner->id)->pluck('id');
+        }
 
         $bookings = \App\Models\Booking::whereIn('hotel_id', $hotelIds)
             ->with(['user:id,name,email,phone', 'hotel:id,name,city'])

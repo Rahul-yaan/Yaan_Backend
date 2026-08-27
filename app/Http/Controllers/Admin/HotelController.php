@@ -91,7 +91,11 @@ class HotelController extends Controller
         return response()->json([
             'hotel'      => $hotel,
             'analytics'  => [
-                'total_revenue'      => $totalRevenue,
+                'total_revenue'          => round($totalRevenue * 0.66, 2),
+                'owner_payable_revenue'  => round($totalRevenue * 0.66, 2),
+                'gross_revenue'          => $totalRevenue,
+                'platform_fee_collected' => round($totalRevenue * 0.34, 2),
+                'owner_gst_amount'       => round(round($totalRevenue * 0.66, 2) * 0.18, 2),
                 'total_bookings'     => $totalBookings,
                 'confirmed_bookings' => $confirmedBookings->count(),
                 'cancelled_bookings' => $totalCancelled,
