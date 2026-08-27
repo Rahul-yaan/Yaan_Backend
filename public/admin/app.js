@@ -2138,45 +2138,45 @@ async function openInvoiceModal(txnId) {
         const price = inv.pricing || {};
 
         modalBody.innerHTML = `
-            <div class="invoice-box">
+            <div class="invoice-box" style="background:#ffffff; color:#0f172a; padding:24px; border-radius:12px; border:1px solid #cbd5e1;">
                 <!-- Invoice Header / Letterhead -->
                 <div class="invoice-header-row" style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px;">
                     <div>
                         <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
                             <i class="fa-solid fa-hotel" style="font-size:28px; color:var(--primary);"></i>
-                            <h2 style="margin:0; font-size:22px; font-weight:800; color:var(--text-primary);">${comp.name || 'Yaan Platform'}</h2>
+                            <h2 style="margin:0; font-size:22px; font-weight:800; color:#0f172a;">${comp.name || 'Yaan Platform'}</h2>
                         </div>
-                        <div style="font-size:12px; color:var(--text-secondary); line-height:1.4;">
+                        <div style="font-size:12px; color:#475569; line-height:1.4;">
                             <div>${comp.address}</div>
                             <div>${comp.city} • Email: ${comp.email}</div>
                             <div><strong>GSTIN:</strong> ${comp.gstin}</div>
                         </div>
                     </div>
                     <div style="text-align:right;">
-                        <span class="badge ${pay.is_refunded || pay.status === 'REFUNDED' ? 'failed' : (pay.status === 'PAID' || pay.status === 'CONFIRMED' ? 'confirmed' : 'pending')}" style="font-size:12px; padding:6px 12px; text-transform:uppercase; ${pay.is_refunded || pay.status === 'REFUNDED' ? 'background:#e11d48; color:#ffffff;' : ''}">
+                        <span class="badge ${pay.is_refunded || pay.status === 'REFUNDED' ? 'failed' : (pay.status === 'PAID' || pay.status === 'CONFIRMED' ? 'confirmed' : 'pending')}" style="font-size:12px; padding:6px 12px; text-transform:uppercase; ${pay.is_refunded || pay.status === 'REFUNDED' ? 'background:#fee2e2; color:#991b1b; border:1px solid #fca5a5;' : (pay.status === 'PAID' || pay.status === 'CONFIRMED' ? 'background:#ecfdf5; color:#047857; border:1px solid #a7f3d0;' : '')}">
                             ${pay.is_refunded || pay.status === 'REFUNDED' ? 'REFUNDED (RAZORPAY)' : pay.status}
                         </span>
                         <h3 style="margin:8px 0 2px 0; font-size:18px; color:var(--primary); font-family:monospace;">${inv.invoice_number}</h3>
-                        <div style="font-size:12px; color:var(--text-muted);">Date: <strong>${inv.invoice_date}</strong></div>
+                        <div style="font-size:12px; color:#64748b;">Date: <strong>${inv.invoice_date}</strong></div>
                     </div>
                 </div>
 
-                <hr style="border:0; border-top:1px solid var(--border); margin:16px 0;">
+                <hr style="border:0; border-top:1px solid #e2e8f0; margin:16px 0;">
 
                 <!-- Customer & Hotel Columns -->
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
-                    <div style="background:var(--bg-dark); padding:12px; border-radius:8px; border:1px solid var(--border);">
+                    <div style="background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0;">
                         <h4 style="margin:0 0 6px 0; font-size:13px; color:var(--primary);"><i class="fa-solid fa-user"></i> Billed To (Customer)</h4>
-                        <div style="font-size:12px; display:flex; flex-direction:column; gap:2px;">
-                            <div><strong>${cust.name}</strong></div>
+                        <div style="font-size:12px; display:flex; flex-direction:column; gap:2px; color:#334155;">
+                            <div><strong style="color:#0f172a;">${cust.name}</strong></div>
                             <div>Email: ${cust.email}</div>
                             <div>Phone: ${cust.phone}</div>
                         </div>
                     </div>
-                    <div style="background:var(--bg-dark); padding:12px; border-radius:8px; border:1px solid var(--border);">
+                    <div style="background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0;">
                         <h4 style="margin:0 0 6px 0; font-size:13px; color:var(--primary);"><i class="fa-solid fa-building-user"></i> Hotel & Stay Details</h4>
-                        <div style="font-size:12px; display:flex; flex-direction:column; gap:2px;">
-                            <div><strong>${hotel.name}</strong> (${hotel.city})</div>
+                        <div style="font-size:12px; display:flex; flex-direction:column; gap:2px; color:#334155;">
+                            <div><strong style="color:#0f172a;">${hotel.name}</strong> (${hotel.city})</div>
                             <div>${hotel.address}</div>
                             <div>Check-in: <strong>${stay.check_in}</strong> to <strong>${stay.check_out}</strong></div>
                         </div>
@@ -2184,18 +2184,18 @@ async function openInvoiceModal(txnId) {
                 </div>
 
                 <!-- Logistics & Vehicle Info -->
-                <div style="background:var(--bg-dark); padding:10px 12px; border-radius:8px; border:1px solid var(--border); margin-bottom:16px;">
+                <div style="background:#f8fafc; padding:10px 12px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:16px;">
                     <div style="font-size:12px; font-weight:700; color:var(--info); margin-bottom:4px;"><i class="fa-solid fa-truck"></i> Vehicle & Transport Details</div>
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; font-size:12px;">
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; font-size:12px; color:#334155;">
                         <div><strong>Truck No:</strong> ${logi.truck_no} (${logi.truck_type})</div>
                         <div><strong>Logistics Partner:</strong> ${logi.logistics_name} (${logi.logistics_number})</div>
                     </div>
                 </div>
 
                 <!-- Financial Table -->
-                <table class="custom-table" style="margin-bottom:16px;">
+                <table class="custom-table" style="margin-bottom:16px; background:#ffffff; border:1px solid #e2e8f0; color:#0f172a;">
                     <thead>
-                        <tr>
+                        <tr style="background:#f1f5f9; color:#475569;">
                             <th>Description</th>
                             <th style="text-align:center;">Nights</th>
                             <th style="text-align:right;">Rate / Night</th>
@@ -2204,44 +2204,44 @@ async function openInvoiceModal(txnId) {
                     </thead>
                     <tbody>
                         <tr>
-                            <td>
+                            <td style="color:#0f172a;">
                                 <strong>${hotel.name} Booking</strong><br>
-                                <small class="text-muted">Accommodation & Parking for ${stay.check_in} to ${stay.check_out}</small>
+                                <small style="color:#64748b;">Accommodation & Parking for ${stay.check_in} to ${stay.check_out}</small>
                             </td>
-                            <td style="text-align:center;">${stay.total_nights}</td>
-                            <td style="text-align:right;">₹${(price.price_per_night || 0).toFixed(2)}</td>
-                            <td style="text-align:right;">₹${(price.subtotal || 0).toFixed(2)}</td>
+                            <td style="text-align:center; color:#0f172a;">${stay.total_nights}</td>
+                            <td style="text-align:right; color:#0f172a;">₹${(price.price_per_night || 0).toFixed(2)}</td>
+                            <td style="text-align:right; color:#0f172a;">₹${(price.subtotal || 0).toFixed(2)}</td>
                         </tr>
                     </tbody>
                 </table>
 
                 <!-- Summary Breakdown -->
                 <div style="display:grid; grid-template-columns:1.2fr 1fr; gap:16px; margin-bottom:16px;">
-                    <div style="background:var(--bg-dark); padding:12px; border-radius:8px; border:1px solid var(--border); font-size:12px; display:flex; flex-direction:column; gap:4px;">
-                        <h4 style="margin:0 0 6px 0; font-size:13px; color:#a855f7;"><i class="fa-solid fa-shield-halved"></i> Payment Metadata</h4>
+                    <div style="background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0; font-size:12px; display:flex; flex-direction:column; gap:4px; color:#334155;">
+                        <h4 style="margin:0 0 6px 0; font-size:13px; color:#7c3aed;"><i class="fa-solid fa-shield-halved"></i> Payment Metadata</h4>
                         <div><strong>Payment Method:</strong> ${pay.payment_method}</div>
-                        <div><strong>Transaction ID:</strong> <span style="font-family:monospace; color:var(--success); font-weight:700;">${pay.display_transaction_id}</span></div>
+                        <div><strong>Transaction ID:</strong> <span style="font-family:monospace; color:#059669; font-weight:700;">${pay.display_transaction_id}</span></div>
                         ${pay.razorpay_order_id ? `<div><strong>Razorpay Order ID:</strong> <span style="font-family:monospace;">${pay.razorpay_order_id}</span></div>` : ''}
                         ${pay.razorpay_payment_id ? `<div><strong>Razorpay Payment ID:</strong> <span style="font-family:monospace;">${pay.razorpay_payment_id}</span></div>` : ''}
                         <div><strong>Region Timestamp:</strong> ${pay.region_time}</div>
                         ${pay.is_refunded || pay.status === 'REFUNDED' ? `
-                            <div style="background:rgba(225,29,72,0.12); border:1px solid #e11d48; padding:8px 10px; border-radius:6px; margin-top:6px;">
-                                <div style="color:#fecdd3; font-weight:700; font-size:12px; margin-bottom:2px;">
+                            <div style="background:#fef2f2; border:1px solid #fca5a5; padding:8px 10px; border-radius:6px; margin-top:6px; color:#991b1b;">
+                                <div style="font-weight:700; font-size:12px; margin-bottom:2px;">
                                     <i class="fa-solid fa-arrow-rotate-left"></i> Payment Refunded via Razorpay
                                 </div>
-                                ${pay.refund_id ? `<div><strong>Razorpay Refund ID:</strong> <span style="font-family:monospace; color:#f43f5e; font-weight:700;">${pay.refund_id}</span></div>` : ''}
-                                ${pay.refund_time_formatted ? `<div><strong>Refund Date & Time:</strong> <span style="color:#e9d5ff; font-weight:700;">${pay.refund_time_formatted}</span></div>` : ''}
-                                ${pay.cancellation_reason ? `<div style="font-size:11px; color:#fda4af; margin-top:2px;"><strong>Reason / Note:</strong> ${pay.cancellation_reason}</div>` : ''}
+                                ${pay.refund_id ? `<div><strong>Razorpay Refund ID:</strong> <span style="font-family:monospace; font-weight:700;">${pay.refund_id}</span></div>` : ''}
+                                ${pay.refund_time_formatted ? `<div><strong>Refund Date & Time:</strong> <span>${pay.refund_time_formatted}</span></div>` : ''}
+                                ${pay.cancellation_reason ? `<div style="font-size:11px; margin-top:2px;"><strong>Reason / Note:</strong> ${pay.cancellation_reason}</div>` : ''}
                             </div>
                         ` : ''}
                     </div>
 
-                    <div style="background:var(--bg-dark); padding:12px; border-radius:8px; border:1px solid var(--border); display:flex; flex-direction:column; gap:6px; font-size:13px;">
+                    <div style="background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0; display:flex; flex-direction:column; gap:6px; font-size:13px; color:#334155;">
                         <div style="display:flex; justify-content:space-between;"><span>Subtotal:</span> <strong>₹${(price.subtotal || 0).toFixed(2)}</strong></div>
-                        ${price.promotion_applied > 0 ? `<div style="display:flex; justify-content:space-between; color:var(--success);"><span>Discount:</span> <strong>-₹${(price.promotion_applied).toFixed(2)}</strong></div>` : ''}
+                        ${price.promotion_applied > 0 ? `<div style="display:flex; justify-content:space-between; color:#059669;"><span>Discount:</span> <strong>-₹${(price.promotion_applied).toFixed(2)}</strong></div>` : ''}
                         <div style="display:flex; justify-content:space-between;"><span>GST (18%):</span> <strong>₹${(price.gst_amount || 0).toFixed(2)}</strong></div>
-                        <hr style="border:0; border-top:1px solid var(--border); margin:4px 0;">
-                        <div style="display:flex; justify-content:space-between; font-size:16px; color:var(--primary);"><span>Total Payable:</span> <strong>₹${(price.total_payable || 0).toFixed(2)}</strong></div>
+                        <hr style="border:0; border-top:1px solid #cbd5e1; margin:4px 0;">
+                        <div style="display:flex; justify-content:space-between; font-size:16px; color:#0f172a; font-weight:800;"><span>Total Payable:</span> <strong>₹${(price.total_payable || 0).toFixed(2)}</strong></div>
                     </div>
                 </div>
 
