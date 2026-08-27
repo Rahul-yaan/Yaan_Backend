@@ -1139,8 +1139,26 @@ async function loadOwnersData() {
 
         container.innerHTML = currentOwners.map(o => {
             const profile = o.owner_profile || o.ownerProfile || {};
-            const isVerified = (o.is_verified === true || o.is_verified === 1) && (profile.is_profile_complete === true || profile.is_profile_complete === 1);
+            const isVerified = (o.is_verified === true || o.is_verified === 1) && (profile.status === 'approved' || profile.is_profile_complete === true);
+            const isRejected = profile.status === 'rejected';
             const joinedDate = o.created_at ? new Date(o.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A';
+
+            let badgeClass = 'pending';
+            let badgeText = 'Pending KYC';
+            let badgeIcon = 'fa-clock';
+            let badgeStyle = 'background:#f59e0b; color:#000;';
+
+            if (isVerified) {
+                badgeClass = 'confirmed';
+                badgeText = 'Verified Owner';
+                badgeIcon = 'fa-circle-check';
+                badgeStyle = '';
+            } else if (isRejected) {
+                badgeClass = 'cancelled';
+                badgeText = 'KYC Rejected';
+                badgeIcon = 'fa-circle-xmark';
+                badgeStyle = 'background:#ef4444; color:#fff;';
+            }
 
             return `
             <div class="data-card" style="display:flex; flex-direction:column; justify-content:space-between; position:relative;">
@@ -1152,8 +1170,8 @@ async function loadOwnersData() {
                             </h4>
                             <div class="data-card-sub" style="font-size:11px; margin-top:2px;">Joined: ${joinedDate}</div>
                         </div>
-                        <span class="badge ${isVerified ? 'confirmed' : 'pending'}" style="font-size:11px; ${!isVerified ? 'background:#f59e0b; color:#000;' : ''}">
-                            <i class="fa-solid ${isVerified ? 'fa-circle-check' : 'fa-clock'}"></i> ${isVerified ? 'Verified Owner' : 'Pending KYC'}
+                        <span class="badge ${badgeClass}" style="font-size:11px; ${badgeStyle}">
+                            <i class="fa-solid ${badgeIcon}"></i> ${badgeText}
                         </span>
                     </div>
 
@@ -1161,6 +1179,7 @@ async function loadOwnersData() {
                         <div><i class="fa-solid fa-hotel" style="color:var(--success); font-size:12px; margin-right:4px;"></i> <strong>Hotel Property:</strong> <span style="color:var(--text-primary); font-weight:700;">${profile.hotel_name || 'N/A'}</span></div>
                         <div><i class="fa-solid fa-location-dot" style="color:#38bdf8; font-size:12px; margin-right:4px;"></i> <strong>Location:</strong> ${profile.city || 'N/A'}${profile.state ? ', ' + profile.state : ''}</div>
                         <div><i class="fa-solid fa-building-user" style="color:#a855f7; font-size:12px; margin-right:4px;"></i> <strong>Listings:</strong> ${o.hotels_count || 0} Registered Hotels</div>
+                        ${isRejected && profile.rejection_reason ? `<div style="color:#f87171;"><i class="fa-solid fa-circle-exclamation"></i> <strong>Rejection Reason:</strong> ${profile.rejection_reason}</div>` : ''}
                     </div>
                 </div>
 
@@ -1168,10 +1187,12 @@ async function loadOwnersData() {
                     <button class="btn-sm" style="background:#4f46e5; color:white; font-weight:600;" onclick="openKycModal(${o.id})">
                         <i class="fa-solid fa-chart-line"></i> Inspect & Analytics
                     </button>
-                    ${!isVerified ?
-                    `<button class="btn-sm btn-success" onclick="verifyOwner(${o.id}, true)"><i class="fa-solid fa-user-check"></i> Approve KYC</button>` :
-                    `<button class="btn-sm btn-warning" onclick="verifyOwner(${o.id}, false)"><i class="fa-solid fa-user-xmark"></i> Revoke</button>`
-                }
+                    ${!isVerified ? `
+                        <button class="btn-sm btn-success" onclick="verifyOwner(${o.id}, true)"><i class="fa-solid fa-user-check"></i> Approve KYC</button>
+                        ${!isRejected ? `<button class="btn-sm" style="background:#dc2626; color:white;" onclick="rejectOwnerPrompt(${o.id})"><i class="fa-solid fa-user-xmark"></i> Reject</button>` : ''}
+                    ` : `
+                        <button class="btn-sm btn-warning" onclick="verifyOwner(${o.id}, false)"><i class="fa-solid fa-user-xmark"></i> Revoke</button>
+                    `}
                     <button class="btn-sm" style="background:#e11d48; color:white;" onclick="resetOwnerKyc(${o.id})" title="Remove & Reset Owner KYC Documents"><i class="fa-solid fa-trash-can"></i> Reset</button>
                 </div>
             </div>
@@ -1223,16 +1244,18 @@ async function openKycModal(id) {
                 <div>
                     <h3 style="margin:0; font-size:20px; font-weight:700; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
                         <i class="fa-solid fa-user-tie" style="color:var(--primary);"></i> ${owner.name}
-                        <span class="badge ${isVerified ? 'confirmed' : 'pending'}" style="font-size:11px; padding:4px 10px; border-radius:6px; font-weight:700; ${!isVerified ? 'background:#f59e0b; color:#000;' : ''}">
-                            ${isVerified ? 'Verified Owner' : 'Pending KYC Verification'}
+                        <span class="badge ${isVerified ? 'confirmed' : (owner.owner_profile?.status === 'rejected' ? 'cancelled' : 'pending')}" style="font-size:11px; padding:4px 10px; border-radius:6px; font-weight:700; ${isVerified ? '' : (owner.owner_profile?.status === 'rejected' ? 'background:#ef4444; color:#fff;' : 'background:#f59e0b; color:#000;')}">
+                            ${isVerified ? 'Verified Owner' : (owner.owner_profile?.status === 'rejected' ? 'KYC Rejected' : 'Pending KYC Verification')}
                         </span>
                     </h3>
                 </div>
                 <div style="display:flex; gap:8px;">
-                    ${!isVerified ?
-                `<button class="btn-sm btn-success" style="padding:8px 14px; font-weight:700;" onclick="verifyOwner(${owner.id}, true); closeKycModal();"><i class="fa-solid fa-user-check"></i> Approve KYC</button>` :
-                `<button class="btn-sm btn-warning" style="padding:8px 14px; font-weight:700;" onclick="verifyOwner(${owner.id}, false); closeKycModal();"><i class="fa-solid fa-user-xmark"></i> Revoke KYC</button>`
-            }
+                    ${!isVerified ? `
+                        <button class="btn-sm btn-success" style="padding:8px 14px; font-weight:700;" onclick="verifyOwner(${owner.id}, true); closeKycModal();"><i class="fa-solid fa-user-check"></i> Approve KYC</button>
+                        ${owner.owner_profile?.status !== 'rejected' ? `<button class="btn-sm" style="background:#dc2626; color:white; padding:8px 14px; font-weight:700;" onclick="rejectOwnerPrompt(${owner.id}); closeKycModal();"><i class="fa-solid fa-user-xmark"></i> Reject KYC</button>` : ''}
+                    ` : `
+                        <button class="btn-sm btn-warning" style="padding:8px 14px; font-weight:700;" onclick="verifyOwner(${owner.id}, false); closeKycModal();"><i class="fa-solid fa-user-xmark"></i> Revoke KYC</button>
+                    `}
                     <button class="btn-sm" style="background:#e11d48; color:white; padding:8px 14px; font-weight:700;" onclick="resetOwnerKyc(${owner.id}); closeKycModal();"><i class="fa-solid fa-trash-can"></i> Reset KYC</button>
                 </div>
             </div>
@@ -1368,12 +1391,20 @@ function closeKycModal() {
     document.getElementById('kyc-modal').classList.add('hidden');
 }
 
-async function verifyOwner(id, isVerified) {
+async function verifyOwner(id, isVerified, rejectionReason = null) {
     try {
+        const payload = { is_verified: isVerified };
+        if (isVerified === false) {
+            payload.status = 'rejected';
+            if (rejectionReason) payload.rejection_reason = rejectionReason;
+        } else if (isVerified === true) {
+            payload.status = 'approved';
+        }
+
         const res = await fetch(`${API_BASE}/admin/owners/${id}/verify`, {
             method: 'PUT',
             headers: getHeaders(),
-            body: JSON.stringify({ is_verified: isVerified })
+            body: JSON.stringify(payload)
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || data.message || 'Failed to update owner verification');
@@ -1384,6 +1415,12 @@ async function verifyOwner(id, isVerified) {
     } catch (err) {
         showToast(err.message, 'danger');
     }
+}
+
+async function rejectOwnerPrompt(id) {
+    const reason = prompt('Please enter rejection reason for this hotel owner (will be shown to owner):', 'KYC documents incomplete or invalid.');
+    if (reason === null) return;
+    await verifyOwner(id, false, reason);
 }
 
 async function resetOwnerKyc(id) {

@@ -43,19 +43,23 @@ class OwnerController extends Controller
         }
 
         if ($request->has('verified') && $request->verified !== '' && $request->verified !== null && $request->verified !== 'all') {
-            $isVerified = filter_var($request->verified, FILTER_VALIDATE_BOOLEAN);
-            if ($isVerified) {
+            $verifiedStr = strtolower(trim((string)$request->verified));
+            if ($verifiedStr === 'true' || $verifiedStr === '1') {
                 $query->whereRaw('is_verified IS TRUE')
                 ->whereHas('ownerProfile', function($q) {
-                    $q->whereRaw('is_profile_complete IS TRUE');
+                    $q->where('status', 'approved');
+                });
+            } elseif ($verifiedStr === 'rejected') {
+                $query->whereHas('ownerProfile', function($q) {
+                    $q->where('status', 'rejected');
                 });
             } else {
                 $query->where(function($q) {
                     $q->whereRaw('(is_verified IS FALSE OR is_verified IS NULL)')
-                    ->orWhereHas('ownerProfile', function($sq) {
-                        $sq->whereRaw('(is_profile_complete IS FALSE OR is_profile_complete IS NULL)');
-                    })
-                    ->orDoesntHave('ownerProfile');
+                    ->whereHas('ownerProfile', function($sq) {
+                        $sq->whereRaw('is_profile_complete IS TRUE')
+                           ->where('status', 'pending');
+                    });
                 });
             }
         }

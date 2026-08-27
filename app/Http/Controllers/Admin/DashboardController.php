@@ -18,17 +18,14 @@ class DashboardController extends Controller
     public function index()
     {
         $totalUsers     = User::where('role', 'user')->count();
-        $totalOwners    = User::where('role', 'owner')->count();
-        $verifiedOwners = OwnerProfile::whereRaw('is_profile_complete IS TRUE')->count();
+        $verifiedOwners = OwnerProfile::where('status', 'approved')->count();
         $pendingOwners  = User::where('role', 'owner')
             ->where(function($q) {
-                $q->where(function($sq) {
-                    $sq->whereRaw('(is_verified IS FALSE OR is_verified IS NULL)');
-                })
-                ->orWhereHas('ownerProfile', function($sq) {
-                    $sq->whereRaw('(is_profile_complete IS FALSE OR is_profile_complete IS NULL)');
-                })
-                ->orDoesntHave('ownerProfile');
+                $q->whereRaw('(is_verified IS FALSE OR is_verified IS NULL)')
+                  ->whereHas('ownerProfile', function($sq) {
+                      $sq->whereRaw('is_profile_complete IS TRUE')
+                         ->where('status', 'pending');
+                  });
             })
             ->count();
 
@@ -303,10 +300,11 @@ class DashboardController extends Controller
         $pendingHotels = Hotel::where('status', 'pending')->with('owner:id,name,email')->get();
         $pendingOwners = User::where('role', 'owner')
             ->where(function($q) {
-                $q->where(function($sq) {
-                    $sq->whereRaw('(is_verified IS FALSE OR is_verified IS NULL)');
-                })
-                ->orWhereDoesntHave('ownerProfile');
+                $q->whereRaw('(is_verified IS FALSE OR is_verified IS NULL)')
+                  ->whereHas('ownerProfile', function($sq) {
+                      $sq->whereRaw('is_profile_complete IS TRUE')
+                         ->where('status', 'pending');
+                  });
             })->get();
 
         $activeBannersCount = \App\Models\Banner::whereRaw('is_active IS TRUE')->count();

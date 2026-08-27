@@ -12,7 +12,8 @@ class PurgeUnverifiedUsers extends Command
 
     public function handle(): void
     {
-        $deleted = User::where(function($q) {
+        $deleted = User::where('role', 'user')
+            ->where(function($q) {
                 $q->whereRaw('(is_verified IS FALSE OR is_verified IS NULL)');
             })
             ->where('created_at', '<', now()->subHours(24))
