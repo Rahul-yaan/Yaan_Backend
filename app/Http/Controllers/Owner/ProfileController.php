@@ -40,6 +40,15 @@ class ProfileController extends Controller
             $kycMessage = 'Please wait for approval by the admin.';
         }
 
+        $notification = [
+            'show'             => true,
+            'type'             => $kycStatus === 'rejected' ? 'danger' : ($kycStatus === 'approved' ? 'success' : 'warning'),
+            'title'            => $kycStatus === 'rejected' ? 'Application Rejected by Admin' : ($kycStatus === 'approved' ? 'KYC Approved' : 'Approval Pending'),
+            'message'          => $kycMessage,
+            'kyc_message'      => $kycMessage,
+            'rejection_reason' => $rejectionReason,
+        ];
+
         return response()->json([
             'profile'          => $profile,
             'user'             => $user,
@@ -48,6 +57,9 @@ class ProfileController extends Controller
             'rejection_reason' => $rejectionReason,
             'kyc_message'      => $kycMessage,
             'message'          => $kycMessage,
+            'admin_message'    => $rejectionReason ?? $kycMessage,
+            'notification'     => $notification,
+            'notification_bar' => $notification,
             'hotel_status'     => $hotel ? $hotel->status : 'pending',
         ]);
     }
@@ -283,10 +295,24 @@ class ProfileController extends Controller
             $targetHotel->ensurePrimaryImageExists();
         }
 
+        $pendingMsg = 'Please wait for approval by the admin.';
+        $updateNotification = [
+            'show'             => true,
+            'type'             => 'warning',
+            'title'            => 'Approval Pending',
+            'message'          => $pendingMsg,
+            'kyc_message'      => $pendingMsg,
+            'rejection_reason' => null,
+        ];
+
         return response()->json([
-            'message'    => 'Please wait for approval by the admin.',
-            'profile'    => $profile->fresh(),
-            'kyc_status' => 'pending_approval',
+            'message'          => $pendingMsg,
+            'kyc_message'      => $pendingMsg,
+            'admin_message'    => $pendingMsg,
+            'profile'          => $profile->fresh(),
+            'kyc_status'       => 'pending_approval',
+            'notification'     => $updateNotification,
+            'notification_bar' => $updateNotification,
         ]);
     }
 

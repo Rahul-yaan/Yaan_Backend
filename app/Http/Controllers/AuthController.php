@@ -349,13 +349,26 @@ class AuthController extends Controller
             $message = 'Login successful.';
         }
 
+        $loginNotification = [
+            'show'             => true,
+            'type'             => $kycStatus === 'rejected' ? 'danger' : ($kycStatus === 'approved' ? 'success' : 'warning'),
+            'title'            => $kycStatus === 'rejected' ? 'Application Rejected by Admin' : ($kycStatus === 'approved' ? 'Account Verified' : 'Approval Pending'),
+            'message'          => $message,
+            'kyc_message'      => $message,
+            'rejection_reason' => $rejectionReason,
+        ];
+
         return response()->json([
             'message'          => $message,
+            'kyc_message'      => $message,
+            'admin_message'    => $rejectionReason ?? $message,
             'token'            => $token,
             'user'             => $user->load('ownerProfile'),
             'kyc_status'       => $kycStatus,
             'rejection_reason' => $rejectionReason,
             'hotel_status'     => $targetHotel ? $targetHotel->status : 'pending',
+            'notification'     => $loginNotification,
+            'notification_bar' => $loginNotification,
         ]);
     }
 
@@ -406,12 +419,25 @@ class AuthController extends Controller
             $message = 'Account verified.';
         }
 
+        $meNotification = [
+            'show'             => true,
+            'type'             => $kycStatus === 'rejected' ? 'danger' : ($kycStatus === 'approved' ? 'success' : 'warning'),
+            'title'            => $kycStatus === 'rejected' ? 'Application Rejected by Admin' : ($kycStatus === 'approved' ? 'Account Verified' : 'Approval Pending'),
+            'message'          => $message,
+            'kyc_message'      => $message,
+            'rejection_reason' => $rejectionReason,
+        ];
+
         return response()->json([
             'user'             => $user->load('ownerProfile'),
             'kyc_status'       => $kycStatus,
             'rejection_reason' => $rejectionReason,
             'hotel_status'     => $targetHotel ? $targetHotel->status : 'pending',
             'message'          => $message,
+            'kyc_message'      => $message,
+            'admin_message'    => $rejectionReason ?? $message,
+            'notification'     => $meNotification,
+            'notification_bar' => $meNotification,
         ]);
     }
 

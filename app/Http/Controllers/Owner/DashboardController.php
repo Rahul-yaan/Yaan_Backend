@@ -120,6 +120,41 @@ class DashboardController extends Controller
             'confirmed_bookings'     => $confirmedBookings,
         ];
 
+        $user = $request->user();
+        $ownerProfile = \App\Models\OwnerProfile::where('user_id', $user->id)->first();
+        $targetHotel = Hotel::where('owner_id', $user->id)->first();
+
+        $isVerified = (bool) $user->is_verified;
+        $isProfileRejected = $ownerProfile && $ownerProfile->status === 'rejected';
+        $isHotelRejected = $targetHotel && $targetHotel->status === 'rejected';
+        $isProfileApproved = $ownerProfile && $ownerProfile->status === 'approved';
+        $isHotelApproved = $targetHotel && in_array($targetHotel->status, ['approved', 'active']);
+
+        if ($isVerified && $isProfileApproved && $isHotelApproved) {
+            $kycStatus = 'approved';
+            $rejectionReason = null;
+            $kycMessage = 'Your Owner KYC and hotel profile are fully verified and active.';
+        } elseif ($isProfileRejected || $isHotelRejected) {
+            $kycStatus = 'rejected';
+            $rejectionReason = ($ownerProfile && !empty($ownerProfile->rejection_reason))
+                ? $ownerProfile->rejection_reason
+                : (($targetHotel && !empty($targetHotel->rejection_reason)) ? $targetHotel->rejection_reason : 'Admin rejected your application.');
+            $kycMessage = "Admin rejected your application for this reason: {$rejectionReason}";
+        } else {
+            $kycStatus = 'pending_approval';
+            $rejectionReason = null;
+            $kycMessage = 'Please wait for approval by the admin.';
+        }
+
+        $dashNotification = [
+            'show'             => true,
+            'type'             => $kycStatus === 'rejected' ? 'danger' : ($kycStatus === 'approved' ? 'success' : 'warning'),
+            'title'            => $kycStatus === 'rejected' ? 'Application Rejected by Admin' : ($kycStatus === 'approved' ? 'Account Verified' : 'Approval Pending'),
+            'message'          => $kycMessage,
+            'kyc_message'      => $kycMessage,
+            'rejection_reason' => $rejectionReason,
+        ];
+
         return response()->json([
             'stats' => $stats,
             'financial_breakdown' => [
@@ -140,6 +175,12 @@ class DashboardController extends Controller
             'total_order'            => $totalBookings,
             'today_order'            => $todayBookings,
             'recent_bookings'        => $recentBookings,
+            'kyc_status'             => $kycStatus,
+            'rejection_reason'       => $rejectionReason,
+            'kyc_message'            => $kycMessage,
+            'admin_message'          => $rejectionReason ?? $kycMessage,
+            'notification'           => $dashNotification,
+            'notification_bar'       => $dashNotification,
         ]);
     }
 }
