@@ -551,9 +551,9 @@ class TransactionController extends Controller
         $invoiceNumber = 'INV-' . date('Y', strtotime($transaction->created_at ?? now())) . '-' . str_pad($transaction->id, 6, '0', STR_PAD_LEFT);
         $invoiceDate   = $transaction->created_at ? $transaction->created_at->format('d M Y') : date('d M Y');
 
-        $basePrice    = (float) ($transaction->price_per_night ?? ($transaction->total_amount / max(1, $transaction->total_nights)));
-        $gstAmount    = (float) ($transaction->gst_amount ?? ($transaction->total_amount * 0.18));
-        $totalPayable = (float) ($transaction->total_payable ?? ($transaction->total_amount + $gstAmount));
+        $totalPayable = (float) ($transaction->total_payable ?? $transaction->total_amount ?? 0);
+        $basePrice    = $totalPayable > 0 ? round($totalPayable / 1.18, 2) : (float) ($transaction->total_amount ?? 0);
+        $gstAmount    = (float) ($transaction->gst_amount ?? round($totalPayable - $basePrice, 2));
 
         $isRefunded = $transaction->payment_status === 'refunded' || str_contains(strtolower($transaction->cancellation_reason ?? ''), 'refund');
         $refundId   = null;

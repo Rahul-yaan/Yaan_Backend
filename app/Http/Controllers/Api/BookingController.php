@@ -62,9 +62,9 @@ public function store(Request $request)
         $discountAmount = round($price * ($discountPct / 100), 2);
     }
 
-    $discountedBasePrice = max(0, $price - $discountAmount);
-    $gstAmount = round($discountedBasePrice * 0.18, 2);
-    $totalPayable = round($discountedBasePrice + $gstAmount, 2);
+    $totalPayable = max(0, $price - $discountAmount);
+    $baseHotelPrice = round($totalPayable / 1.18, 2);
+    $gstAmount = round($totalPayable - $baseHotelPrice, 2);
 
     $rawPayment = strtolower(trim($request->payment_method ?? 'online'));
     $isOfflinePayment = in_array($rawPayment, ['cash', 'pay_at_hotel', 'pay at hotel', 'offline']);
@@ -80,7 +80,7 @@ public function store(Request $request)
         'payment_method'   => $request->payment_method,
         
         'price_per_night'  => $price,
-        'total_amount'     => $discountedBasePrice,
+        'total_amount'     => $baseHotelPrice,
         'promotion_applied'=> $discountAmount,
         'gst_amount'       => $gstAmount,
         'total_payable'    => $totalPayable,

@@ -56,21 +56,32 @@ class DashboardController extends Controller
             ->whereNotIn('status', ['cancelled'])
             ->whereNotIn('payment_status', ['refunded', 'refund_initiated']);
 
-        // Financial Calculation Model (34% Admin Platform Fee & 66% Owner Net Revenue):
-        // Total actual amount paid by customer (including offer discount & GST)
-        $totalCustomerPaid    = (float) (clone $ownerBookingsQuery)->sum(DB::raw('COALESCE(total_payable, total_amount)'));
+        // Financial Calculation Model (34% Platform Fee on Base Hotel Price, 18% GST breakdown):
+        // Total actual amount paid by customer (including offer discount & GST, e.g. ₹50.00)
+        $grossCustomerPaid    = (float) (clone $ownerBookingsQuery)->sum(DB::raw('COALESCE(total_payable, total_amount)'));
         $baseRevenueSum       = (float) (clone $ownerBookingsQuery)->sum(DB::raw('COALESCE(total_amount, price_per_night)'));
         $totalDiscountApplied = (float) (clone $ownerBookingsQuery)->sum(DB::raw('COALESCE(promotion_applied, 0)'));
-        $customerGstTotal     = (float) (clone $ownerBookingsQuery)->sum(DB::raw('COALESCE(gst_amount, 0)'));
 
-        // Gross customer paid total (₹118 for ₹100 room + 18% GST)
-        $grossCustomerPaid    = $totalCustomerPaid > 0 ? $totalCustomerPaid : ($baseRevenueSum > 0 ? round($baseRevenueSum * 1.18, 2) : 0.00);
-        // Base room price total before GST (₹100)
-        $baseRoomAmount       = $baseRevenueSum > 0 ? $baseRevenueSum : ($grossCustomerPaid > 0 ? round($grossCustomerPaid / 1.18, 2) : 0.00);
+        if ($grossCustomerPaid <= 0 && $baseRevenueSum > 0) {
+            $grossCustomerPaid = round($baseRevenueSum * 1.18, 2);
+        }
 
-        $platformFeeCollected = round($grossCustomerPaid * 0.34, 2);       // 34% Platform Fee (e.g. ₹40.12)
-        $ownerPayableEarnings = round($grossCustomerPaid * 0.66, 2);       // 66% Owner Net Share (e.g. ₹77.88)
-        $ownerGstAmount       = round($ownerPayableEarnings * 0.18, 2);  // 18% GST on Net Share (e.g. ₹14.02)
+        // Base room price total before GST (e.g. ₹42.37 for ₹50.00 gross)
+        $baseRoomAmount       = $grossCustomerPaid > 0 ? round($grossCustomerPaid / 1.18, 2) : 0.00;
+        // Total GST paid by customer (e.g. ₹7.63 for ₹50.00 gross)
+        $customerGstTotal     = $grossCustomerPaid > 0 ? round($grossCustomerPaid - $baseRoomAmount, 2) : 0.00;
+
+        // 34% Platform Fee calculated on Base Hotel Price (e.g. 34% of ₹42.37 = ₹14.40)
+        $platformFeeCollected = round($baseRoomAmount * 0.34, 2);
+
+        // Owner Profit / Payable Amount = Base Price minus Platform Fee (e.g. ₹42.37 - ₹14.40 = ₹27.97)
+        $ownerPayableEarnings = round($baseRoomAmount - $platformFeeCollected, 2);
+
+        // 18% GST on Owner Profit (e.g. 18% of ₹27.97 = ₹5.03)
+        $ownerGstAmount       = round($ownerPayableEarnings * 0.18, 2);
+
+        // 18% GST on Platform Fee (e.g. 18% of ₹14.40 = ₹2.59)
+        $platformGstAmount    = round($platformFeeCollected * 0.18, 2);
 
         $pendingBookings = (clone $bookingsQuery)
             ->where('status', 'pending')
@@ -96,25 +107,26 @@ class DashboardController extends Controller
             'today_order'            => $todayBookings,
 
             // Financial Summary Keys
-            'total_amount'           => $baseRoomAmount,          // Base room price (₹100.00) so frontend total_amount * 1.18 = ₹118.00
-            'base_amount'            => $baseRoomAmount,
-            'total_revenue'          => $grossCustomerPaid,       // Gross Customer Paid (₹118.00)
-            'total_customer_paid'    => $grossCustomerPaid,       // ₹118.00
-            'total_payable'          => $grossCustomerPaid,       // ₹118.00
+            'total_amount'           => $grossCustomerPaid,       // Total Paid by Customer (₹50.00)
+            'base_amount'            => $baseRoomAmount,          // Base room price (₹42.37)
+            'total_revenue'          => $grossCustomerPaid,       // Gross Customer Paid (₹50.00)
+            'total_customer_paid'    => $grossCustomerPaid,       // ₹50.00
+            'total_payable'          => $grossCustomerPaid,       // ₹50.00
             'total_discount_applied' => $totalDiscountApplied,
 
-            'platform_fee'           => $platformFeeCollected,    // 34% Platform Fee (₹40.12)
+            'platform_fee'           => $platformFeeCollected,    // 34% Platform Fee on Base (₹14.40)
             'platform_fee_collected' => $platformFeeCollected,
             'admin_platform_fee'     => $platformFeeCollected,
 
-            'payable_amount'         => $ownerPayableEarnings,    // 66% Owner Net Share (₹77.88)
+            'payable_amount'         => $ownerPayableEarnings,    // Owner Profit / Net Share (₹27.97)
             'owner_payable_revenue'  => $ownerPayableEarnings,
             'owner_net_share'        => $ownerPayableEarnings,
             'total_earnings'         => $ownerPayableEarnings,
 
-            'gst_amount'             => $ownerGstAmount,          // 18% GST on Owner Net Share (₹14.02)
+            'gst_amount'             => $ownerGstAmount,          // 18% GST on Owner Profit (₹5.03)
             'owner_gst_amount'       => $ownerGstAmount,
-            'customer_gst_amount'    => $customerGstTotal,        // 18% GST paid by customer (₹18.00)
+            'customer_gst_amount'    => $customerGstTotal,        // Total GST (₹7.63)
+            'platform_gst_amount'    => $platformGstAmount,       // 18% GST on Platform Fee (₹2.59)
 
             'pending_bookings'       => $pendingBookings,
             'confirmed_bookings'     => $confirmedBookings,
@@ -128,23 +140,26 @@ class DashboardController extends Controller
         $isProfileRejected = $ownerProfile && $ownerProfile->status === 'rejected';
         $isHotelRejected = $targetHotel && $targetHotel->status === 'rejected';
         $isProfileApproved = $ownerProfile && $ownerProfile->status === 'approved';
-        $isHotelApproved = $targetHotel && in_array($targetHotel->status, ['approved', 'active']);
 
-        if ($isVerified && $isProfileApproved && $isHotelApproved) {
-            $kycStatus = 'approved';
-            $rejectionReason = null;
-            $kycMessage = 'Your Owner KYC and hotel profile are fully verified and active.';
-        } elseif ($isProfileRejected || $isHotelRejected) {
+        $kycStatus = 'pending';
+        if ($isProfileRejected || $isHotelRejected) {
             $kycStatus = 'rejected';
-            $rejectionReason = ($ownerProfile && !empty($ownerProfile->rejection_reason))
-                ? $ownerProfile->rejection_reason
-                : (($targetHotel && !empty($targetHotel->rejection_reason)) ? $targetHotel->rejection_reason : 'Admin rejected your application.');
-            $kycMessage = "Admin rejected your application for this reason: {$rejectionReason}";
-        } else {
-            $kycStatus = 'pending_approval';
-            $rejectionReason = null;
-            $kycMessage = 'Please wait for approval by the admin.';
+        } elseif ($isVerified || $isProfileApproved) {
+            $kycStatus = 'approved';
         }
+
+        $rejectionReason = null;
+        if ($isProfileRejected) {
+            $rejectionReason = $ownerProfile->rejection_reason ?? 'Your Profile/KYC documents were rejected by Admin.';
+        } elseif ($isHotelRejected) {
+            $rejectionReason = $targetHotel->rejection_reason ?? 'Your Hotel listing was rejected by Admin.';
+        }
+
+        $kycMessage = match ($kycStatus) {
+            'approved' => 'Your account is fully verified & active.',
+            'rejected' => $rejectionReason ?? 'Your verification failed.',
+            default    => 'Your profile or hotel document is under verification by Admin.',
+        };
 
         $dashNotification = [
             'show'             => true,
@@ -159,19 +174,20 @@ class DashboardController extends Controller
             'stats' => $stats,
             'financial_breakdown' => [
                 'base_room_price_total'  => $baseRoomAmount,
-                'owner_net_share_66'     => $ownerPayableEarnings,
+                'owner_net_share'        => $ownerPayableEarnings,
                 'owner_gst_18_percent'   => $ownerGstAmount,
                 'admin_platform_fee_34'  => $platformFeeCollected,
+                'platform_gst_18'        => $platformGstAmount,
                 'total_paid_by_customer' => $grossCustomerPaid,
                 'customer_gst_total'     => $customerGstTotal,
             ],
             // Top-level aliases for direct property mapping
-            'total_amount'           => $baseRoomAmount,         // Base Room Amount (₹100.00)
-            'total_payable'          => $grossCustomerPaid,      // Gross Customer Paid (₹118.00)
-            'total_customer_paid'    => $grossCustomerPaid,      // ₹118.00
-            'platform_fee'           => $platformFeeCollected,   // ₹40.12
-            'payable_amount'         => $ownerPayableEarnings,   // ₹77.88
-            'gst_amount'             => $ownerGstAmount,         // ₹14.02
+            'total_amount'           => $grossCustomerPaid,      // Total Customer Paid (₹50.00)
+            'total_payable'          => $grossCustomerPaid,      // Gross Customer Paid (₹50.00)
+            'total_customer_paid'    => $grossCustomerPaid,      // ₹50.00
+            'platform_fee'           => $platformFeeCollected,   // ₹14.40
+            'payable_amount'         => $ownerPayableEarnings,   // ₹27.97
+            'gst_amount'             => $ownerGstAmount,         // ₹5.03
             'total_order'            => $totalBookings,
             'today_order'            => $todayBookings,
             'recent_bookings'        => $recentBookings,

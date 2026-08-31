@@ -77,15 +77,16 @@ class DashboardController extends Controller
         $totalRevenue = (float) (clone $confirmedBookingsQuery)->sum(DB::raw('COALESCE(total_payable, total_amount)'));
         $baseRevenueSum = (float) (clone $confirmedBookingsQuery)->sum(DB::raw('COALESCE(total_amount, price_per_night)'));
 
-        $displayTotalAmount = $totalRevenue > 0 ? $totalRevenue : $baseRevenueSum;
+        $displayTotalAmount = $totalRevenue > 0 ? $totalRevenue : ($baseRevenueSum > 0 ? round($baseRevenueSum * 1.18, 2) : 0.00);
+        $baseHotelRevenue = $displayTotalAmount > 0 ? round($displayTotalAmount / 1.18, 2) : 0.00;
 
-        // 2. Admin Platform Fee Revenue (34% Platform Fee = 34% of gross customer paid total)
-        $adminPlatformRevenue = round($displayTotalAmount * 0.34, 2);
+        // 2. Admin Platform Fee Revenue (34% of Base Hotel Price)
+        $adminPlatformRevenue = round($baseHotelRevenue * 0.34, 2);
 
-        // 3. Hotel Owners Net Payable Share (66% Net Share = 66% of gross customer paid total)
-        $hotelOwnersRevenue = round($displayTotalAmount * 0.66, 2);
+        // 3. Hotel Owners Net Payable Profit (Base Hotel Price minus 34% Platform Fee)
+        $hotelOwnersRevenue = round($baseHotelRevenue - $adminPlatformRevenue, 2);
 
-        // 4. Hotel Owners GST Total (18% GST on 66% Net Share)
+        // 4. Hotel Owners GST Total (18% GST on Owner Profit)
         $hotelOwnersGstTotal = round($hotelOwnersRevenue * 0.18, 2);
 
         // Current Month Revenue
@@ -101,7 +102,8 @@ class DashboardController extends Controller
         ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
         ->sum(DB::raw('COALESCE(total_payable, total_amount)'));
 
-        $currentMonthRevenue = round($currentMonthGross * 0.34, 2);
+        $currentMonthBase = $currentMonthGross > 0 ? round($currentMonthGross / 1.18, 2) : 0.00;
+        $currentMonthRevenue = round($currentMonthBase * 0.34, 2);
 
         // Saved Custom Target Goal (Default ₹5,00,000)
         $targetGoal = (float) Setting::get('monthly_target_goal', 500000);
@@ -137,7 +139,8 @@ class DashboardController extends Controller
             ->whereBetween('created_at', [$monthStart, $monthEnd])
             ->count();
 
-            $monthlyIncomeData[]   = round($mRev * 0.34, 2);
+            $mBase = $mRev > 0 ? round($mRev / 1.18, 2) : 0.00;
+            $monthlyIncomeData[]   = round($mBase * 0.34, 2);
             $monthlyBookingsData[] = $mCount;
         }
 
@@ -273,7 +276,8 @@ class DashboardController extends Controller
         ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
         ->sum(DB::raw('COALESCE(total_payable, total_amount)'));
 
-        $currentMonthRevenue = round($currentMonthGross * 0.34, 2);
+        $currentMonthBase = $currentMonthGross > 0 ? round($currentMonthGross / 1.18, 2) : 0.00;
+        $currentMonthRevenue = round($currentMonthBase * 0.34, 2);
 
         $remainingShortfall = max(0, $targetGoal - $currentMonthRevenue);
         $goalPercentage = $targetGoal > 0 ? min(100, round(($currentMonthRevenue / $targetGoal) * 100, 1)) : 0;

@@ -122,11 +122,12 @@ class OwnerController extends Controller
             return (float) ($b->total_amount ?? $b->price_per_night ?? 0);
         });
 
-        $displayTotalAmount = $totalCustomerPaid > 0 ? $totalCustomerPaid : $baseRevenueSum;
+        $displayTotalAmount = $totalCustomerPaid > 0 ? $totalCustomerPaid : ($baseRevenueSum > 0 ? round($baseRevenueSum * 1.18, 2) : 0.00);
+        $baseRoomAmount = $displayTotalAmount > 0 ? round($displayTotalAmount / 1.18, 2) : 0.00;
 
-        $ownerPayableRevenue  = round($displayTotalAmount * 0.66, 2);      // 66% Net Share
-        $ownerGstAmount       = round($ownerPayableRevenue * 0.18, 2); // 18% GST on 66% Net Share
-        $platformFeeCollected = round($displayTotalAmount * 0.34, 2);      // 34% Platform Fee
+        $platformFeeCollected = round($baseRoomAmount * 0.34, 2);           // 34% Platform Fee on Base Price
+        $ownerPayableRevenue  = round($baseRoomAmount - $platformFeeCollected, 2); // Owner Net Profit
+        $ownerGstAmount       = round($ownerPayableRevenue * 0.18, 2);      // 18% GST on Owner Profit
 
         $totalCancelled = $bookings->filter(function($b) {
             return $b->status === 'cancelled' || in_array($b->payment_status, ['refunded', 'refund_initiated']);

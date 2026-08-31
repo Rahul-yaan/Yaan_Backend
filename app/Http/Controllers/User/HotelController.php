@@ -214,9 +214,9 @@ class HotelController extends Controller
         $price = (float) $hotel->price_per_night;
 
         $discountAmount = round($price * ($discountPct / 100), 2);
-        $discountedPrice = max(0, $price - $discountAmount);
-        $gstAmount = round($discountedPrice * 0.18, 2);
-        $totalPayable = round($discountedPrice + $gstAmount, 2);
+        $totalPayable = max(0, $price - $discountAmount);
+        $discountedPrice = round($totalPayable / 1.18, 2);
+        $gstAmount = round($totalPayable - $discountedPrice, 2);
 
         $hotel->active_discount_percentage = $discountPct;
         $hotel->active_promo_code           = $activeUserBanner ? ($activeUserBanner->discount_code ?? $activeUserBanner->promo_code ?? null) : null;
