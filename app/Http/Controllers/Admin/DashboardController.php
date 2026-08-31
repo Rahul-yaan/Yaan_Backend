@@ -465,4 +465,23 @@ class DashboardController extends Controller
             ],
         ]);
     }
+
+    public function cleanTestDataApi(Request $request)
+    {
+        try {
+            \Illuminate\Support\Facades\Artisan::call('db:clean-test-data');
+            $output = \Illuminate\Support\Facades\Artisan::output();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'All test hotels, owners, customer accounts, bookings, and transactions have been safely wiped. Super Admin (admin@yaan.com / admin123456) is ready.',
+                'output'  => $output
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'error'   => $e->getMessage()
+            ], 500);
+        }
+    }
 }

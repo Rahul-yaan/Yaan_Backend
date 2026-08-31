@@ -197,6 +197,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/dashboard',             [App\Http\Controllers\Admin\DashboardController::class, 'index']);
         Route::get('/dashboard/ai-analysis', [App\Http\Controllers\Admin\DashboardController::class, 'getAiAnalysis']);
         Route::post('/dashboard/target-goal', [App\Http\Controllers\Admin\DashboardController::class, 'updateTargetGoal']);
+        Route::post('/clean-test-data',       [App\Http\Controllers\Admin\DashboardController::class, 'cleanTestDataApi']);
         
         // Hotels
         Route::get('/hotels/locations',              [App\Http\Controllers\Admin\HotelController::class, 'getLocations']);
