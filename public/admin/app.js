@@ -868,7 +868,7 @@ async function openHotelDetailsModal(id) {
             <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; background:var(--bg-dark); padding:14px; border-radius:8px; border:1px solid var(--border); margin-bottom:14px;">
                 <div style="text-align:center;">
                     <span style="font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Hotel Revenue</span>
-                    <h3 style="margin:4px 0 0 0; color:var(--success); font-size:18px;">₹${(analytics.total_revenue || 0).toLocaleString('en-IN')}</h3>
+                    <h3 style="margin:4px 0 0 0; color:var(--success); font-size:18px;">₹${((analytics.owner_payable_revenue !== undefined ? analytics.owner_payable_revenue : analytics.total_revenue) || 0).toLocaleString('en-IN')}</h3>
                 </div>
                 <div style="text-align:center;">
                     <span style="font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Total Bookings</span>

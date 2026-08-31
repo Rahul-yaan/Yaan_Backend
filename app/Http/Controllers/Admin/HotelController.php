@@ -96,9 +96,10 @@ class HotelController extends Controller
         return response()->json([
             'hotel'      => $hotel,
             'analytics'  => [
-                'total_revenue'          => $totalRevenue,
+                'total_revenue'          => $ownerPayableRevenue,
                 'owner_payable_revenue'  => $ownerPayableRevenue,
                 'gross_revenue'          => $totalRevenue,
+                'total_customer_paid'    => $totalRevenue,
                 'base_revenue'           => $baseHotelRevenue,
                 'platform_fee_collected' => $platformFeeCollected,
                 'owner_gst_amount'       => $ownerGstAmount,
