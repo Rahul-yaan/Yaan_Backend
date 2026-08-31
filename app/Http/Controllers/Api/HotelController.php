@@ -44,18 +44,22 @@ class HotelController extends Controller
 
         $discountAmount = round($price * ($discountPct / 100), 2);
         $totalPayable = max(0, $price - $discountAmount);
-        $discountedPrice = round($totalPayable / 1.18, 2);
-        $gstAmount = round($totalPayable - $discountedPrice, 2);
+        $baseRoomPrice = round($totalPayable / 1.18, 2);
+        $gstAmount = round($totalPayable - $baseRoomPrice, 2);
 
         $hotel->active_discount_percentage = $discountPct;
         $hotel->active_promo_code           = $activeUserBanner ? ($activeUserBanner->discount_code ?? $activeUserBanner->promo_code) : null;
         $hotel->banner_title                = $activeUserBanner->title ?? null;
         $hotel->banner_image                = $activeUserBanner->image_url ?? null;
-        $hotel->original_price              = $price;
+        $hotel->original_price              = $baseRoomPrice;
+        $hotel->base_price                  = $baseRoomPrice;
+        $hotel->price_per_night             = $baseRoomPrice;
+        $hotel->price                       = $baseRoomPrice;
         $hotel->discount_amount             = $discountAmount;
-        $hotel->discounted_price            = $discountedPrice;
+        $hotel->discounted_price            = $baseRoomPrice;
         $hotel->gst_amount                  = $gstAmount;
         $hotel->total_payable               = $totalPayable;
+        $hotel->display_total_payable       = $totalPayable;
 
         return $hotel;
     }

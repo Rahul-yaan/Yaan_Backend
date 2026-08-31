@@ -118,7 +118,7 @@ class BookingController extends Controller
             'payment_method'      => $isOnlinePayment ? 'Online Payment' : $request->payment_method,
             'temp_transaction_id' => $tempTxnId,
             
-            'price_per_night'  => $price,
+            'price_per_night'  => $baseHotelPrice,
             'total_amount'     => $baseHotelPrice,
             'promotion_applied'=> $discountAmount,
             'gst_amount'       => $gstAmount,

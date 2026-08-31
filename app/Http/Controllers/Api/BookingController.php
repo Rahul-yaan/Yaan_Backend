@@ -79,7 +79,7 @@ public function store(Request $request)
         'logistics_number' => $request->logistics_number,
         'payment_method'   => $request->payment_method,
         
-        'price_per_night'  => $price,
+        'price_per_night'  => $baseHotelPrice,
         'total_amount'     => $baseHotelPrice,
         'promotion_applied'=> $discountAmount,
         'gst_amount'       => $gstAmount,
