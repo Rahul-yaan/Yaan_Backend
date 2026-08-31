@@ -84,6 +84,10 @@ class HotelController extends Controller
             return (float) ($b->total_payable ?? $b->total_amount ?? 0);
         });
 
+        $totalCancelled = $bookings->filter(function($b) {
+            return $b->status === 'cancelled' || in_array($b->payment_status, ['refunded', 'refund_initiated']);
+        })->count();
+
         $baseHotelRevenue = $totalRevenue > 0 ? round($totalRevenue / 1.18, 2) : 0.00;
         $platformFeeCollected = round($baseHotelRevenue * 0.34, 2);
         $ownerPayableRevenue = round($baseHotelRevenue - $platformFeeCollected, 2);
