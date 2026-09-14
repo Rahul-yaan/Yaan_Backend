@@ -127,9 +127,14 @@ class OwnerController extends Controller
         }
 
         $baseRoomAmount       = $baseRevenueSum > 0 ? $baseRevenueSum : ($totalCustomerPaid > 0 ? round($totalCustomerPaid / 1.18, 2) : 0.00);
-        $platformFeeCollected = round($baseRoomAmount * 0.34, 2);           // 34% Platform Fee on Base Price
-        $ownerPayableRevenue  = round($baseRoomAmount * 0.66, 2);           // 66% Owner Net Profit
-        $ownerGstAmount       = round($ownerPayableRevenue * 0.18, 2);      // 18% GST on Owner Profit
+        $platformFeeBase      = round($baseRoomAmount * 0.34, 2);           // 34% Platform Fee Base (e.g. ₹20.40)
+        $platformGst          = round($platformFeeBase * 0.18, 2);          // 18% Platform GST (e.g. ₹3.67)
+        $platformFeeCollected = round($platformFeeBase + $platformGst, 2);  // Platform Fee Collection (e.g. ₹24.07)
+
+        $ownerBaseShare       = round($baseRoomAmount * 0.66, 2);           // 66% Owner Share Base (e.g. ₹39.60)
+        $ownerGstAmount       = round($ownerBaseShare * 0.18, 2);           // 18% Owner GST (e.g. ₹7.13)
+        $ownerTotalPayout     = round($ownerBaseShare + $ownerGstAmount, 2);// Total Owner Net Payout (e.g. ₹46.73)
+        $totalGst             = round($ownerGstAmount + $platformGst, 2);   // Total Customer GST (e.g. ₹10.80)
 
         $totalCancelled = $bookings->filter(function($b) {
             return $b->status === 'cancelled' || in_array($b->payment_status, ['refunded', 'refund_initiated']);
@@ -139,18 +144,24 @@ class OwnerController extends Controller
             'owner'       => $owner,
             'hotels'      => $hotels->isNotEmpty() ? $hotels : $owner->hotels,
             'analytics'   => [
-                'total_amount'           => $baseRevenueSum,       // ₹100.00 Base Room Price Total
-                'total_payable'          => $totalCustomerPaid,    // ₹118.00 Total Customer Paid
-                'total_revenue'          => $totalCustomerPaid,    // ₹118.00 Gross
+                'total_amount'           => $baseRevenueSum,       // Base Room Price Total (e.g. ₹60.00)
+                'base_room_amount'       => $baseRevenueSum,
+                'total_payable'          => $totalCustomerPaid,    // Total Customer Paid (e.g. ₹70.80)
+                'total_revenue'          => $totalCustomerPaid,
                 'total_customer_paid'    => $totalCustomerPaid,
                 'gross_revenue'          => $totalCustomerPaid,
-                'owner_payable_revenue'  => $ownerPayableRevenue,  // Owner Net Share
-                'payable_amount'         => $ownerPayableRevenue,
-                'total_earnings'         => $ownerPayableRevenue,
-                'owner_gst_amount'       => $ownerGstAmount,       // Owner GST
-                'gst_amount'             => $ownerGstAmount,
-                'platform_fee_collected' => $platformFeeCollected, // Platform Fee
+                'owner_base_share'       => $ownerBaseShare,       // Owner Base Share (e.g. ₹39.60)
+                'owner_payable_revenue'  => $ownerTotalPayout,     // Owner Net Payout (e.g. ₹46.73)
+                'payable_amount'         => $ownerTotalPayout,
+                'total_earnings'         => $ownerTotalPayout,
+                'owner_total_payout'     => $ownerTotalPayout,
+                'owner_gst_amount'       => $ownerGstAmount,       // Owner GST (e.g. ₹7.13)
+                'platform_fee_base'      => $platformFeeBase,      // Platform Base Fee (e.g. ₹20.40)
+                'platform_fee_gst'       => $platformGst,          // Platform GST (e.g. ₹3.67)
+                'platform_fee_collected' => $platformFeeCollected, // Platform Fee Total Collection (e.g. ₹24.07)
                 'platform_fee'           => $platformFeeCollected,
+                'gst_amount'             => $totalGst,             // Total GST (e.g. ₹10.80)
+                'total_gst'              => $totalGst,
                 'total_bookings'         => $totalBookings,
                 'confirmed_bookings'     => $confirmedBookings->count(),
                 'cancelled_bookings'     => $totalCancelled,
