@@ -82,14 +82,15 @@ class DashboardController extends Controller
 
         $baseHotelRevenue = $baseRevenueSum > 0 ? $baseRevenueSum : ($totalRevenue > 0 ? round($totalRevenue / 1.18, 2) : 0.00);
 
-        // 2. Admin Platform Fee Revenue (34% of Base Hotel Price)
-        $adminPlatformRevenue = round($baseHotelRevenue * 0.34, 2);
+        // 2. Admin Platform Fee Collection (34% Base Fee + 18% Platform GST = 24.07 for 60 base)
+        $platformFeeBase      = round($baseHotelRevenue * 0.34, 2);
+        $platformGst          = round($platformFeeBase * 0.18, 2);
+        $adminPlatformRevenue = round($platformFeeBase + $platformGst, 2); // e.g. ₹24.07
 
-        // 3. Hotel Owners Net Payable Profit (66% of Base Hotel Price)
-        $hotelOwnersRevenue = round($baseHotelRevenue * 0.66, 2);
-
-        // 4. Hotel Owners GST Total (18% GST on Owner Profit)
-        $hotelOwnersGstTotal = round($hotelOwnersRevenue * 0.18, 2);
+        // 3. Hotel Owners Net Payable Profit (66% Base Share + 18% Owner GST = 46.73 for 60 base)
+        $hotelOwnersBase     = round($baseHotelRevenue * 0.66, 2);
+        $hotelOwnersGstTotal = round($hotelOwnersBase * 0.18, 2);
+        $hotelOwnersRevenue  = round($hotelOwnersBase + $hotelOwnersGstTotal, 2); // e.g. ₹46.73
 
         // Current Month Revenue
         $startOfMonth = Carbon::now()->startOfMonth();
