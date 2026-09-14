@@ -114,19 +114,21 @@ class OwnerController extends Controller
             return (in_array($b->payment_status, ['paid', 'pay_at_hotel', 'cash', 'completed']) || in_array($b->status, ['confirmed', 'completed'])) && $b->payment_status !== 'refunded';
         });
 
-        $totalCustomerPaid = (float) $confirmedBookings->sum(function($b) {
-            return (float) ($b->total_payable ?? $b->total_amount ?? 0);
-        });
-
         $baseRevenueSum = (float) $confirmedBookings->sum(function($b) {
             return (float) ($b->total_amount ?? $b->price_per_night ?? 0);
         });
 
-        $displayTotalAmount = $totalCustomerPaid > 0 ? $totalCustomerPaid : ($baseRevenueSum > 0 ? round($baseRevenueSum * 1.18, 2) : 0.00);
-        $baseRoomAmount = $displayTotalAmount > 0 ? round($displayTotalAmount / 1.18, 2) : 0.00;
+        $totalCustomerPaid = (float) $confirmedBookings->sum(function($b) {
+            return (float) ($b->total_payable ?? round(($b->total_amount ?? 0) * 1.18, 2));
+        });
 
+        if ($totalCustomerPaid <= 0 && $baseRevenueSum > 0) {
+            $totalCustomerPaid = round($baseRevenueSum * 1.18, 2);
+        }
+
+        $baseRoomAmount       = $baseRevenueSum > 0 ? $baseRevenueSum : ($totalCustomerPaid > 0 ? round($totalCustomerPaid / 1.18, 2) : 0.00);
         $platformFeeCollected = round($baseRoomAmount * 0.34, 2);           // 34% Platform Fee on Base Price
-        $ownerPayableRevenue  = round($baseRoomAmount - $platformFeeCollected, 2); // Owner Net Profit
+        $ownerPayableRevenue  = round($baseRoomAmount * 0.66, 2);           // 66% Owner Net Profit
         $ownerGstAmount       = round($ownerPayableRevenue * 0.18, 2);      // 18% GST on Owner Profit
 
         $totalCancelled = $bookings->filter(function($b) {

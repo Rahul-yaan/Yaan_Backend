@@ -74,17 +74,19 @@ class DashboardController extends Controller
         });
 
         // 1. Gross Customer Revenue (actual total_payable paid by customers across all hotels)
-        $totalRevenue = (float) (clone $confirmedBookingsQuery)->sum(DB::raw('COALESCE(total_payable, total_amount)'));
         $baseRevenueSum = (float) (clone $confirmedBookingsQuery)->sum(DB::raw('COALESCE(total_amount, price_per_night)'));
+        $totalRevenue   = (float) (clone $confirmedBookingsQuery)->sum(DB::raw('COALESCE(total_payable, round(total_amount * 1.18, 2))'));
+        if ($totalRevenue <= 0 && $baseRevenueSum > 0) {
+            $totalRevenue = round($baseRevenueSum * 1.18, 2);
+        }
 
-        $displayTotalAmount = $totalRevenue > 0 ? $totalRevenue : ($baseRevenueSum > 0 ? round($baseRevenueSum * 1.18, 2) : 0.00);
-        $baseHotelRevenue = $displayTotalAmount > 0 ? round($displayTotalAmount / 1.18, 2) : 0.00;
+        $baseHotelRevenue = $baseRevenueSum > 0 ? $baseRevenueSum : ($totalRevenue > 0 ? round($totalRevenue / 1.18, 2) : 0.00);
 
         // 2. Admin Platform Fee Revenue (34% of Base Hotel Price)
         $adminPlatformRevenue = round($baseHotelRevenue * 0.34, 2);
 
-        // 3. Hotel Owners Net Payable Profit (Base Hotel Price minus 34% Platform Fee)
-        $hotelOwnersRevenue = round($baseHotelRevenue - $adminPlatformRevenue, 2);
+        // 3. Hotel Owners Net Payable Profit (66% of Base Hotel Price)
+        $hotelOwnersRevenue = round($baseHotelRevenue * 0.66, 2);
 
         // 4. Hotel Owners GST Total (18% GST on Owner Profit)
         $hotelOwnersGstTotal = round($hotelOwnersRevenue * 0.18, 2);

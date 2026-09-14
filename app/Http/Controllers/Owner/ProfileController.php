@@ -240,6 +240,17 @@ class ProfileController extends Controller
         $price = $request->input('price_per_night') ?? $request->input('price') ?? 1500;
         $rooms = $request->input('total_rooms') ?? $request->input('rooms') ?? 10;
 
+        if ($request->filled('price_per_night') || $request->filled('price')) {
+            if (!is_numeric($price) || (float)$price < 42.37) {
+                return response()->json([
+                    'message' => 'The given data was invalid.',
+                    'errors'  => [
+                        'price_per_night' => ['Hotel price cannot be less than ₹42.37.']
+                    ]
+                ], 422);
+            }
+        }
+
         $targetHotel = \App\Models\Hotel::where('owner_id', $user->id)->first();
         if (!$targetHotel) {
             $targetHotel = \App\Models\Hotel::create([

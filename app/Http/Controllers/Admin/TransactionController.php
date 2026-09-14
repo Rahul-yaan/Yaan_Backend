@@ -647,9 +647,9 @@ class TransactionController extends Controller
 
             $gst18 = round($baseSum * 0.18, 2);
             $totWithGst = $totSum > 0 ? $totSum : round($baseSum + $gst18, 2);
-            $comm20 = round($totSum * 0.20, 2);
-            $commGst = round($comm20 * 0.18, 2);
-            $totComm = round($comm20 + $commGst, 2);
+            $comm34 = round($baseSum * 0.34, 2);
+            $commGst = round($comm34 * 0.18, 2);
+            $totComm = round($comm34 + $commGst, 2);
 
             $allGstIncomeReports[] = [
                 'sr_no'                    => $srH++,
@@ -673,7 +673,8 @@ class TransactionController extends Controller
                 'total_amount'             => $baseSum,
                 'gst_18_percent'           => $gst18,
                 'total_amount_with_gst'    => $totWithGst,
-                'our_commission_20'        => $comm20,
+                'our_commission_34'        => $comm34,
+                'platform_fee_34'          => $comm34,
                 'commission_gst'           => $commGst,
                 'total_commission'         => $totComm,
                 'registration_charges'     => 0,

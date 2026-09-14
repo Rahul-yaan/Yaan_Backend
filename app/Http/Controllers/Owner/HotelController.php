@@ -157,8 +157,8 @@ class HotelController extends Controller
                 $discRaw = is_array($data) ? ($data['discount_price'] ?? $data['discounted_price'] ?? $data['offer_price'] ?? null) : null;
 
                 if ($origRaw !== null && $origRaw !== '') {
-                    if (!is_numeric($origRaw) || (float)$origRaw < 0) {
-                        $errors["wheel_prices.{$key}.original_price"] = ["Enter a valid numeric price for {$categoryName}."];
+                    if (!is_numeric($origRaw) || (float)$origRaw < 42.37) {
+                        $errors["wheel_prices.{$key}.original_price"] = ["Hotel price cannot be less than ₹42.37 for {$categoryName}."];
                     }
                 }
 
@@ -188,8 +188,8 @@ class HotelController extends Controller
         $rootDiscountPrice = $request->input('discount_price') ?? $request->input('discounted_price') ?? $request->input('offer_price');
 
         if ($rootBasePrice !== null && $rootBasePrice !== '') {
-            if (!is_numeric($rootBasePrice) || (float)$rootBasePrice < 0) {
-                $errors['price_per_night'] = ["Enter a valid numeric price."];
+            if (!is_numeric($rootBasePrice) || (float)$rootBasePrice < 42.37) {
+                $errors['price_per_night'] = ["Hotel price cannot be less than ₹42.37."];
             }
         }
 
@@ -237,11 +237,13 @@ class HotelController extends Controller
             'address'        => 'required|string',
             'latitude'       => 'required|numeric',
             'longitude'      => 'required|numeric',
-            'price_per_night'=> 'required|numeric|min:1',
+            'price_per_night'=> 'required|numeric|min:42.37',
             'discount_price' => 'nullable|numeric|min:0',
             'total_rooms'    => 'required|integer|min:1',
             'amenities'      => 'nullable|array',
             'amenities.*'    => 'exists:amenities,id',
+        ], [
+            'price_per_night.min' => 'Hotel price cannot be less than ₹42.37.',
         ]);
 
         if ($validator->fails()) {
@@ -350,12 +352,14 @@ class HotelController extends Controller
             'address'        => 'sometimes|string',
             'latitude'       => 'sometimes|numeric',
             'longitude'      => 'sometimes|numeric',
-            'price_per_night'=> 'sometimes|numeric|min:1',
+            'price_per_night'=> 'sometimes|numeric|min:42.37',
             'discount_price' => 'nullable|numeric|min:0',
             'total_rooms'    => 'sometimes|integer|min:1',
             'status'         => 'sometimes|in:active,inactive',
             'amenities'      => 'nullable|array',
             'amenities.*'    => 'exists:amenities,id',
+        ], [
+            'price_per_night.min' => 'Hotel price cannot be less than ₹42.37.',
         ]);
 
         if ($validator->fails()) {

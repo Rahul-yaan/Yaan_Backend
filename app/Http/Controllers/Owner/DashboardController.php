@@ -56,31 +56,33 @@ class DashboardController extends Controller
             ->whereNotIn('status', ['cancelled'])
             ->whereNotIn('payment_status', ['refunded', 'refund_initiated']);
 
-        // Financial Calculation Model (34% Platform Fee on Base Hotel Price, 18% GST breakdown):
-        // Total actual amount paid by customer (including offer discount & GST, e.g. ₹50.00)
-        $grossCustomerPaid    = (float) (clone $ownerBookingsQuery)->sum(DB::raw('COALESCE(total_payable, total_amount)'));
+        // Financial Calculation Model (34% Platform Fee on Base Hotel Price, 66% Owner Share, 18% GST breakdown):
         $baseRevenueSum       = (float) (clone $ownerBookingsQuery)->sum(DB::raw('COALESCE(total_amount, price_per_night)'));
+        $grossCustomerPaid    = (float) (clone $ownerBookingsQuery)->sum(DB::raw('COALESCE(total_payable, round(total_amount * 1.18, 2))'));
         $totalDiscountApplied = (float) (clone $ownerBookingsQuery)->sum(DB::raw('COALESCE(promotion_applied, 0)'));
 
         if ($grossCustomerPaid <= 0 && $baseRevenueSum > 0) {
             $grossCustomerPaid = round($baseRevenueSum * 1.18, 2);
         }
 
-        // Base room price total before GST (e.g. ₹42.37 for ₹50.00 gross)
-        $baseRoomAmount       = $grossCustomerPaid > 0 ? round($grossCustomerPaid / 1.18, 2) : 0.00;
-        // Total GST paid by customer (e.g. ₹7.63 for ₹50.00 gross)
-        $customerGstTotal     = $grossCustomerPaid > 0 ? round($grossCustomerPaid - $baseRoomAmount, 2) : 0.00;
+        // Base room price total before GST (e.g. ₹50.00 for ₹59.00 gross)
+        $baseRoomAmount       = $baseRevenueSum > 0 ? $baseRevenueSum : ($grossCustomerPaid > 0 ? round($grossCustomerPaid / 1.18, 2) : 0.00);
+        // Total GST paid by customer (e.g. ₹9.00 for ₹59.00 gross)
+        $customerGstTotal     = (float) (clone $ownerBookingsQuery)->sum(DB::raw('COALESCE(gst_amount, 0)'));
+        if ($customerGstTotal <= 0 && $grossCustomerPaid > 0) {
+            $customerGstTotal = round($grossCustomerPaid - $baseRoomAmount, 2);
+        }
 
-        // 34% Platform Fee calculated on Base Hotel Price (e.g. 34% of ₹42.37 = ₹14.40)
+        // 34% Platform Fee calculated on Base Hotel Price (e.g. 34% of ₹50.00 = ₹17.00)
         $platformFeeCollected = round($baseRoomAmount * 0.34, 2);
 
-        // Owner Profit / Payable Amount = Base Price minus Platform Fee (e.g. ₹42.37 - ₹14.40 = ₹27.97)
-        $ownerPayableEarnings = round($baseRoomAmount - $platformFeeCollected, 2);
+        // Owner Profit / Payable Amount (66% of Base Price, e.g. ₹50.00 * 0.66 = ₹33.00)
+        $ownerPayableEarnings = round($baseRoomAmount * 0.66, 2);
 
-        // 18% GST on Owner Profit (e.g. 18% of ₹27.97 = ₹5.03)
+        // 18% GST on Owner Profit (e.g. 18% of ₹33.00 = ₹5.94)
         $ownerGstAmount       = round($ownerPayableEarnings * 0.18, 2);
 
-        // 18% GST on Platform Fee (e.g. 18% of ₹14.40 = ₹2.59)
+        // 18% GST on Platform Fee (e.g. 18% of ₹17.00 = ₹3.06)
         $platformGstAmount    = round($platformFeeCollected * 0.18, 2);
 
         $pendingBookings = (clone $bookingsQuery)
@@ -101,32 +103,34 @@ class DashboardController extends Controller
             'total_hotels'           => $totalHotels,
             'total_bookings'         => $totalBookings,
             'total_orders'           => $totalBookings,
-            'total_order'            => $totalBookings,
+            'total_order'            => (string) $totalBookings,
             'today_bookings'         => $todayBookings,
             'today_orders'           => $todayBookings,
-            'today_order'            => $todayBookings,
+            'today_order'            => (string) $todayBookings,
 
             // Financial Summary Keys
-            'total_amount'           => $grossCustomerPaid,       // Total Paid by Customer (₹50.00)
-            'base_amount'            => $baseRoomAmount,          // Base room price (₹42.37)
-            'total_revenue'          => $grossCustomerPaid,       // Gross Customer Paid (₹50.00)
-            'total_customer_paid'    => $grossCustomerPaid,       // ₹50.00
-            'total_payable'          => $grossCustomerPaid,       // ₹50.00
+            'total_amount'           => number_format($grossCustomerPaid, 2, '.', ''), // Total Paid by Customer (₹59.00)
+            'base_amount'            => number_format($baseRoomAmount, 2, '.', ''),    // Base room price (₹50.00)
+            'total_revenue'          => number_format($grossCustomerPaid, 2, '.', ''),
+            'total_customer_paid'    => number_format($grossCustomerPaid, 2, '.', ''),
+            'total_payable'          => number_format($grossCustomerPaid, 2, '.', ''),
             'total_discount_applied' => $totalDiscountApplied,
 
-            'platform_fee'           => $platformFeeCollected,    // 34% Platform Fee on Base (₹14.40)
-            'platform_fee_collected' => $platformFeeCollected,
-            'admin_platform_fee'     => $platformFeeCollected,
+            'platform_fee'           => number_format($platformFeeCollected, 2, '.', ''), // 34% Platform Fee (₹17.00)
+            'platform_fee_collected' => number_format($platformFeeCollected, 2, '.', ''),
+            'admin_platform_fee'     => number_format($platformFeeCollected, 2, '.', ''),
 
-            'payable_amount'         => $ownerPayableEarnings,    // Owner Profit / Net Share (₹27.97)
-            'owner_payable_revenue'  => $ownerPayableEarnings,
-            'owner_net_share'        => $ownerPayableEarnings,
-            'total_earnings'         => $ownerPayableEarnings,
+            'payable_amount'         => number_format($ownerPayableEarnings, 2, '.', ''), // 66% Owner Profit (₹33.00)
+            'total_payableamount'    => number_format($ownerPayableEarnings, 2, '.', ''),
+            'owner_payable_revenue'  => number_format($ownerPayableEarnings, 2, '.', ''),
+            'owner_net_share'        => number_format($ownerPayableEarnings, 2, '.', ''),
+            'total_earnings'         => number_format($ownerPayableEarnings, 2, '.', ''),
 
-            'gst_amount'             => $ownerGstAmount,          // 18% GST on Owner Profit (₹5.03)
-            'owner_gst_amount'       => $ownerGstAmount,
-            'customer_gst_amount'    => $customerGstTotal,        // Total GST (₹7.63)
-            'platform_gst_amount'    => $platformGstAmount,       // 18% GST on Platform Fee (₹2.59)
+            'gst_amount'             => number_format($ownerGstAmount, 2, '.', ''),       // 18% GST on Owner Profit (₹5.94)
+            'total_gst'              => number_format($ownerGstAmount, 2, '.', ''),
+            'owner_gst_amount'       => number_format($ownerGstAmount, 2, '.', ''),
+            'customer_gst_amount'    => number_format($customerGstTotal, 2, '.', ''),     // Total Customer GST (₹9.00)
+            'platform_gst_amount'    => number_format($platformGstAmount, 2, '.', ''),
 
             'pending_bookings'       => $pendingBookings,
             'confirmed_bookings'     => $confirmedBookings,
@@ -181,15 +185,17 @@ class DashboardController extends Controller
                 'total_paid_by_customer' => $grossCustomerPaid,
                 'customer_gst_total'     => $customerGstTotal,
             ],
-            // Top-level aliases for direct property mapping
-            'total_amount'           => $grossCustomerPaid,      // Total Customer Paid (₹50.00)
-            'total_payable'          => $grossCustomerPaid,      // Gross Customer Paid (₹50.00)
-            'total_customer_paid'    => $grossCustomerPaid,      // ₹50.00
-            'platform_fee'           => $platformFeeCollected,   // ₹14.40
-            'payable_amount'         => $ownerPayableEarnings,   // ₹27.97
-            'gst_amount'             => $ownerGstAmount,         // ₹5.03
-            'total_order'            => $totalBookings,
-            'today_order'            => $todayBookings,
+            // Top-level aliases for direct property mapping (used by Android DashBoardModel)
+            'total_amount'           => number_format($grossCustomerPaid, 2, '.', ''),      // Total Customer Paid (e.g. "59.00")
+            'total_payable'          => number_format($grossCustomerPaid, 2, '.', ''),
+            'total_customer_paid'    => number_format($grossCustomerPaid, 2, '.', ''),
+            'platform_fee'           => number_format($platformFeeCollected, 2, '.', ''),   // Platform Fee 34% (e.g. "17.00")
+            'payable_amount'         => number_format($ownerPayableEarnings, 2, '.', ''),   // Owner 66% Share (e.g. "33.00")
+            'total_payableamount'    => number_format($ownerPayableEarnings, 2, '.', ''),   // Android Vendor field alias
+            'gst_amount'             => number_format($ownerGstAmount, 2, '.', ''),         // Owner GST 18% (e.g. "5.94")
+            'total_gst'              => number_format($ownerGstAmount, 2, '.', ''),         // Android Vendor field alias
+            'total_order'            => (string) $totalBookings,
+            'today_order'            => (string) $todayBookings,
             'recent_bookings'        => $recentBookings,
             'kyc_status'             => $kycStatus,
             'rejection_reason'       => $rejectionReason,

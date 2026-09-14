@@ -81,8 +81,17 @@ class HotelController extends Controller
                 }
             }
 
-            // Order by distance from origin: ASC = Forward (Bharuch -> Vadodara), DESC = Reverse (Vadodara -> Bharuch)
-            $hotels = $query->orderBy('distance', $isReverse ? 'desc' : 'asc')->get();
+            // Order by selection: price_low, price_high, rating, or route distance (forward/reverse)
+            if (in_array($sortParam, ['price_low', 'price_asc', 'price_low_to_high'])) {
+                $hotels = $query->orderBy('price_per_night', 'asc')->get();
+            } elseif (in_array($sortParam, ['price_high', 'price_desc', 'price_high_to_low'])) {
+                $hotels = $query->orderBy('price_per_night', 'desc')->get();
+            } elseif (in_array($sortParam, ['rating', 'rating_desc', 'top_rated'])) {
+                $hotels = $query->orderBy('rating', 'desc')->get();
+            } else {
+                // Order by distance from origin: ASC = Forward (Origin -> Destination), DESC = Reverse (Destination -> Origin)
+                $hotels = $query->orderBy('distance', $isReverse ? 'desc' : 'asc')->get();
+            }
         } else {
             $query = $this->applyApprovedScope(Hotel::query())
                 ->with(['images', 'primaryImage', 'amenities', 'owner.ownerProfile']);
@@ -112,7 +121,15 @@ class HotelController extends Controller
                 }
             }
 
-            $hotels = $isReverse ? $query->oldest()->get() : $query->latest()->get();
+            if (in_array($sortParam, ['price_low', 'price_asc', 'price_low_to_high'])) {
+                $hotels = $query->orderBy('price_per_night', 'asc')->get();
+            } elseif (in_array($sortParam, ['price_high', 'price_desc', 'price_high_to_low'])) {
+                $hotels = $query->orderBy('price_per_night', 'desc')->get();
+            } elseif (in_array($sortParam, ['rating', 'rating_desc', 'top_rated'])) {
+                $hotels = $query->orderBy('rating', 'desc')->get();
+            } else {
+                $hotels = $isReverse ? $query->oldest()->get() : $query->latest()->get();
+            }
             $fromLat = $fromLng = $toLat = $toLng = $midLat = $midLng = 0;
             $routeDistance = $radius = 0;
         }
@@ -211,23 +228,23 @@ class HotelController extends Controller
             ->first();
 
         $discountPct = $activeUserBanner ? (float) $activeUserBanner->discount_percentage : 0;
-        $price = (float) $hotel->price_per_night;
+        $basePrice = (float) $hotel->price_per_night;
 
-        $discountAmount = round($price * ($discountPct / 100), 2);
-        $totalPayable = max(0, $price - $discountAmount);
-        $baseRoomPrice = round($totalPayable / 1.18, 2);
-        $gstAmount = round($totalPayable - $baseRoomPrice, 2);
+        $discountAmount = round($basePrice * ($discountPct / 100), 2);
+        $discountedBasePrice = max(0, $basePrice - $discountAmount);
+        $gstAmount = round($discountedBasePrice * 0.18, 2);
+        $totalPayable = round($discountedBasePrice + $gstAmount, 2);
 
         $hotel->active_discount_percentage = $discountPct;
         $hotel->active_promo_code           = $activeUserBanner ? ($activeUserBanner->discount_code ?? $activeUserBanner->promo_code ?? null) : null;
         $hotel->banner_title                = $activeUserBanner->title ?? null;
         $hotel->banner_image                = $activeUserBanner->image_url ?? null;
-        $hotel->original_price              = $baseRoomPrice;
-        $hotel->base_price                  = $baseRoomPrice;
-        $hotel->price_per_night             = $baseRoomPrice;
-        $hotel->price                       = $baseRoomPrice;
+        $hotel->original_price              = $basePrice;
+        $hotel->base_price                  = $basePrice;
+        $hotel->price_per_night             = $basePrice;
+        $hotel->price                       = $basePrice;
         $hotel->discount_amount             = $discountAmount;
-        $hotel->discounted_price            = $baseRoomPrice;
+        $hotel->discounted_price            = $discountedBasePrice;
         $hotel->gst_amount                  = $gstAmount;
         $hotel->total_payable               = $totalPayable;
         $hotel->display_total_payable       = $totalPayable;
