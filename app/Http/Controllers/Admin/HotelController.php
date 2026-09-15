@@ -99,23 +99,31 @@ class HotelController extends Controller
             return $b->status === 'cancelled' || in_array($b->payment_status, ['refunded', 'refund_initiated']);
         })->count();
 
-        $platformFeeCollected = round($baseHotelRevenue * 0.34, 2);
-        $ownerPayableRevenue  = round($baseHotelRevenue * 0.66, 2);
-        $ownerGstAmount       = round($ownerPayableRevenue * 0.18, 2);
+        $platformFeeBase      = round($baseHotelRevenue * 0.34, 2);
+        $platformFeeCollected = round($platformFeeBase * 1.18, 2);
+        $ownerBaseShare       = round($baseHotelRevenue * 0.66, 2);
+        $ownerGstAmount       = round($ownerBaseShare * 0.18, 2);
+        $ownerPayableRevenue  = round($ownerBaseShare + $ownerGstAmount, 2);
+        $totalGst             = round($baseHotelRevenue * 0.18, 2);
 
         return response()->json([
             'hotel'      => $hotel,
             'analytics'  => [
-                'total_revenue'          => $ownerPayableRevenue,
-                'owner_payable_revenue'  => $ownerPayableRevenue,
-                'gross_revenue'          => $totalRevenue,
+                'owner_base_share'       => $ownerBaseShare,       // ₹39.60 (66% Owner Share)
+                'owner_net_share'        => $ownerBaseShare,       // ₹39.60
+                'total_revenue'          => $ownerBaseShare,       // ₹39.60 (Hotel Revenue display)
+                'owner_payable_revenue'  => $ownerPayableRevenue,  // ₹46.73 (Net Payout)
+                'gross_revenue'          => $totalRevenue,         // ₹70.80 (Customer Paid)
                 'total_customer_paid'    => $totalRevenue,
-                'base_revenue'           => $baseHotelRevenue,
-                'platform_fee_collected' => $platformFeeCollected,
-                'owner_gst_amount'       => $ownerGstAmount,
-                'total_bookings'     => $totalBookings,
-                'confirmed_bookings' => $confirmedBookings->count(),
-                'cancelled_bookings' => $totalCancelled,
+                'base_revenue'           => $baseHotelRevenue,     // ₹60.00
+                'platform_fee_base'      => $platformFeeBase,      // ₹20.40 (34% Platform Fee)
+                'platform_fee_collected' => $platformFeeCollected, // ₹24.07
+                'owner_gst_amount'       => $ownerGstAmount,       // ₹7.13
+                'gst_amount'             => $totalGst,             // ₹10.80
+                'total_gst'              => $totalGst,
+                'total_bookings'         => $totalBookings,
+                'confirmed_bookings'     => $confirmedBookings->count(),
+                'cancelled_bookings'     => $totalCancelled,
             ],
             'visiting_customers' => $bookings->take(20),
         ]);

@@ -151,6 +151,7 @@ class OwnerController extends Controller
                 'total_customer_paid'    => $totalCustomerPaid,
                 'gross_revenue'          => $totalCustomerPaid,
                 'owner_base_share'       => $ownerBaseShare,       // Owner Base Share (e.g. ₹39.60)
+                'owner_net_share'        => $ownerBaseShare,       // Owner Net Share 66% (e.g. ₹39.60)
                 'owner_payable_revenue'  => $ownerTotalPayout,     // Owner Net Payout (e.g. ₹46.73)
                 'payable_amount'         => $ownerTotalPayout,
                 'total_earnings'         => $ownerTotalPayout,

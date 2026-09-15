@@ -552,8 +552,11 @@ class TransactionController extends Controller
         $invoiceDate   = $transaction->created_at ? $transaction->created_at->format('d M Y') : date('d M Y');
 
         $totalPayable = (float) ($transaction->total_payable ?? $transaction->total_amount ?? 0);
-        $basePrice    = $totalPayable > 0 ? round($totalPayable / 1.18, 2) : (float) ($transaction->total_amount ?? 0);
-        $gstAmount    = (float) ($transaction->gst_amount ?? round($totalPayable - $basePrice, 2));
+        $basePrice    = (float) ($transaction->total_amount > 0 ? $transaction->total_amount : ($transaction->price_per_night > 0 ? $transaction->price_per_night : ($totalPayable > 0 ? round($totalPayable / 1.18, 2) : 0)));
+        $gstAmount    = (float) ($transaction->gst_amount > 0 ? $transaction->gst_amount : round($basePrice * 0.18, 2));
+        if ($totalPayable <= 0) {
+            $totalPayable = round($basePrice + $gstAmount, 2);
+        }
 
         $isRefunded = $transaction->payment_status === 'refunded' || str_contains(strtolower($transaction->cancellation_reason ?? ''), 'refund');
         $refundId   = null;

@@ -1283,23 +1283,23 @@ async function openKycModal(id) {
             <!-- Hotel Financial Performance & Analytics Grid -->
             <div style="display:grid; grid-template-columns: repeat(5, 1fr); gap:10px; background:var(--bg-dark); padding:14px; border-radius:8px; border:1px solid var(--border); margin-bottom:16px;">
                 <div style="display:flex; flex-direction:column; justify-content:space-between; align-items:center; text-align:center; min-height:56px;">
-                    <span style="font-size:10px; color:var(--text-muted); text-transform:uppercase; font-weight:700; display:block; line-height:1.2;">Owner Net Payout</span>
-                    <h3 style="margin:0; color:var(--success); font-size:17px; font-weight:800;">₹${(analytics.owner_total_payout || analytics.owner_payable_revenue || 0).toLocaleString('en-IN')}</h3>
+                    <span style="font-size:10px; color:var(--text-muted); text-transform:uppercase; font-weight:700; display:block; line-height:1.2;">OWNER NET SHARE (66%)</span>
+                    <h3 style="margin:0; color:var(--success); font-size:17px; font-weight:800;">₹${(analytics.owner_net_share !== undefined ? analytics.owner_net_share : (analytics.owner_base_share !== undefined ? analytics.owner_base_share : (analytics.owner_total_payout || 0))).toLocaleString('en-IN')}</h3>
                 </div>
                 <div style="display:flex; flex-direction:column; justify-content:space-between; align-items:center; text-align:center; min-height:56px;">
-                    <span style="font-size:10px; color:var(--text-muted); text-transform:uppercase; font-weight:700; display:block; line-height:1.2;">Owner GST (18%)</span>
+                    <span style="font-size:10px; color:var(--text-muted); text-transform:uppercase; font-weight:700; display:block; line-height:1.2;">OWNER GST (18%)</span>
                     <h3 style="margin:0; color:#c084fc; font-size:17px; font-weight:800;">₹${(analytics.owner_gst_amount || 0).toLocaleString('en-IN')}</h3>
                 </div>
                 <div style="display:flex; flex-direction:column; justify-content:space-between; align-items:center; text-align:center; min-height:56px;">
-                    <span style="font-size:10px; color:var(--text-muted); text-transform:uppercase; font-weight:700; display:block; line-height:1.2;">Platform Collection</span>
-                    <h3 style="margin:0; color:#38bdf8; font-size:17px; font-weight:800;">₹${(analytics.platform_fee_collected || 0).toLocaleString('en-IN')}</h3>
+                    <span style="font-size:10px; color:var(--text-muted); text-transform:uppercase; font-weight:700; display:block; line-height:1.2;">PLATFORM FEE (34%)</span>
+                    <h3 style="margin:0; color:#38bdf8; font-size:17px; font-weight:800;">₹${(analytics.platform_fee_base !== undefined ? analytics.platform_fee_base : (analytics.platform_fee || 0)).toLocaleString('en-IN')}</h3>
                 </div>
                 <div style="display:flex; flex-direction:column; justify-content:space-between; align-items:center; text-align:center; min-height:56px;">
-                    <span style="font-size:10px; color:var(--text-muted); text-transform:uppercase; font-weight:700; display:block; line-height:1.2;">Confirmed Check-ins</span>
+                    <span style="font-size:10px; color:var(--text-muted); text-transform:uppercase; font-weight:700; display:block; line-height:1.2;">CONFIRMED CHECK-INS</span>
                     <h3 style="margin:0; color:#34d399; font-size:17px; font-weight:800;">${analytics.confirmed_bookings || 0}</h3>
                 </div>
                 <div style="display:flex; flex-direction:column; justify-content:space-between; align-items:center; text-align:center; min-height:56px;">
-                    <span style="font-size:10px; color:var(--text-muted); text-transform:uppercase; font-weight:700; display:block; line-height:1.2;">Cancelled / Refunded</span>
+                    <span style="font-size:10px; color:var(--text-muted); text-transform:uppercase; font-weight:700; display:block; line-height:1.2;">CANCELLED / REFUNDED</span>
                     <h3 style="margin:0; color:#f43f5e; font-size:17px; font-weight:800;">${analytics.cancelled_bookings || 0}</h3>
                 </div>
             </div>

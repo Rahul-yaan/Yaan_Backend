@@ -108,7 +108,7 @@ class DashboardController extends Controller
             'today_orders'           => $todayBookings,
             'today_order'            => (string) $todayBookings,
 
-            // Financial Summary Keys
+            // Financial Summary Keys (Base = ₹60.00, Customer Paid = ₹70.80, 66% Owner Share = ₹39.60, 34% Platform Fee = ₹20.40, GST = ₹10.80)
             'total_amount'           => number_format($grossCustomerPaid, 2, '.', ''), // Total Paid by Customer (₹70.80)
             'base_amount'            => number_format($baseRoomAmount, 2, '.', ''),    // Base room price (₹60.00)
             'total_revenue'          => number_format($grossCustomerPaid, 2, '.', ''),
@@ -116,14 +116,14 @@ class DashboardController extends Controller
             'total_payable'          => number_format($grossCustomerPaid, 2, '.', ''),
             'total_discount_applied' => $totalDiscountApplied,
 
-            'platform_fee'           => number_format($platformFeeCollected, 2, '.', ''), // Platform Total Collection (₹24.07)
-            'platform_fee_collected' => number_format($platformFeeCollected, 2, '.', ''),
+            'platform_fee'           => number_format($platformFeeBase, 2, '.', ''),      // 34% Platform Base Fee (₹20.40)
+            'platform_fee_collected' => number_format($platformFeeCollected, 2, '.', ''), // ₹24.07
             'platform_fee_base'      => number_format($platformFeeBase, 2, '.', ''),      // Base 34% Fee (₹20.40)
             'platform_fee_gst'       => number_format($platformGstAmount, 2, '.', ''),   // Platform GST 18% (₹3.67)
             'admin_platform_fee'     => number_format($platformFeeCollected, 2, '.', ''),
 
-            'payable_amount'         => number_format($ownerTotalPayout, 2, '.', ''),     // Owner Total Net Payout (₹46.73)
-            'total_payableamount'    => number_format($ownerTotalPayout, 2, '.', ''),
+            'payable_amount'         => number_format($ownerBaseShare, 2, '.', ''),        // Owner Base Share 66% (₹39.60)
+            'total_payableamount'    => number_format($ownerBaseShare, 2, '.', ''),        // Mobile App vendor field alias
             'owner_payable_revenue'  => number_format($ownerTotalPayout, 2, '.', ''),
             'owner_net_share'        => number_format($ownerBaseShare, 2, '.', ''),        // Owner Base Share 66% (₹39.60)
             'owner_total_payout'     => number_format($ownerTotalPayout, 2, '.', ''),
@@ -190,13 +190,17 @@ class DashboardController extends Controller
                 'total_paid_by_customer' => $grossCustomerPaid,
                 'customer_gst_total'     => $totalGst,
             ],
-            // Top-level aliases for direct property mapping (used by Android DashBoardModel)
+            // Top-level aliases for direct property mapping (used by Android / Flutter Owner App)
             'total_amount'           => number_format($grossCustomerPaid, 2, '.', ''),      // Total Customer Paid (e.g. "70.80")
             'total_payable'          => number_format($grossCustomerPaid, 2, '.', ''),
             'total_customer_paid'    => number_format($grossCustomerPaid, 2, '.', ''),
-            'platform_fee'           => number_format($platformFeeCollected, 2, '.', ''),   // Platform Fee Collection (e.g. "24.07")
-            'payable_amount'         => number_format($ownerTotalPayout, 2, '.', ''),       // Owner Net Payout (e.g. "46.73")
-            'total_payableamount'    => number_format($ownerTotalPayout, 2, '.', ''),       // Android Vendor field alias
+            'platform_fee'           => number_format($platformFeeBase, 2, '.', ''),          // Base 34% Platform Fee (e.g. "20.40")
+            'platform_fee_base'      => number_format($platformFeeBase, 2, '.', ''),
+            'platform_fee_collected' => number_format($platformFeeCollected, 2, '.', ''),
+            'payable_amount'         => number_format($ownerBaseShare, 2, '.', ''),         // Base 66% Owner Share (e.g. "39.60")
+            'total_payableamount'    => number_format($ownerBaseShare, 2, '.', ''),         // Android Vendor field alias
+            'owner_net_share'        => number_format($ownerBaseShare, 2, '.', ''),
+            'owner_total_payout'     => number_format($ownerTotalPayout, 2, '.', ''),
             'gst_amount'             => number_format($totalGst, 2, '.', ''),              // Total GST (e.g. "10.80")
             'total_gst'              => number_format($totalGst, 2, '.', ''),              // Android Vendor field alias
             'total_order'            => (string) $totalBookings,
