@@ -266,7 +266,7 @@ async function loadDashboardData() {
         if (document.getElementById('stat-gross-volume')) {
             document.getElementById('stat-gross-volume').textContent = `₹${(m.total_revenue || 0).toLocaleString('en-IN')}`;
         }
-        document.getElementById('stat-bookings').textContent = m.confirmed_bookings ?? m.total_bookings ?? 0;
+        document.getElementById('stat-bookings').textContent = m.today_active_bookings ?? m.active_bookings ?? 0;
         if (document.getElementById('stat-goal-percentage')) {
             document.getElementById('stat-goal-percentage').textContent = `${g.goal_percentage || 0}%`;
         }
@@ -283,7 +283,8 @@ async function loadDashboardData() {
 
         // Render Target Goal Widget
         if (document.getElementById('goal-current-revenue')) {
-            document.getElementById('goal-current-revenue').textContent = `₹${(g.current_month_revenue || 0).toLocaleString('en-IN')}`;
+            const currentRev = (g.current_month_revenue !== undefined && g.current_month_revenue > 0) ? g.current_month_revenue : ((m.platform_revenue !== undefined ? m.platform_revenue : m.admin_platform_revenue) || 0);
+            document.getElementById('goal-current-revenue').textContent = `₹${currentRev.toLocaleString('en-IN')}`;
             document.getElementById('goal-target-amount').textContent = `₹${(g.target_goal || 500000).toLocaleString('en-IN')}`;
             document.getElementById('goal-progress-text').textContent = `${g.goal_percentage || 0}%`;
             document.getElementById('goal-remaining-amount').textContent = `₹${(g.remaining_goal || 0).toLocaleString('en-IN')}`;
@@ -574,9 +575,17 @@ async function populateHotelCitiesDropdown(hotels) {
 function getHotelImageUrl(imgObj) {
     if (!imgObj) return null;
     let path = typeof imgObj === 'string' ? imgObj : (imgObj.url || imgObj.image_path);
+    if (!path || typeof path !== 'string') return null;
+    path = path.trim();
     if (!path) return null;
-    if (path.startsWith('data:') || path.startsWith('http://') || path.startsWith('https://')) return path;
-    const clean = path.replace(/^\/?storage\//, '').replace(/^\//, '');
+    if (path.startsWith('data:')) return path;
+
+    let clean = path;
+    if (clean.match(/^https?:\/\/[^\/]+\/(.*)$/i)) {
+        clean = clean.replace(/^https?:\/\/[^\/]+\//i, '');
+    }
+    clean = clean.replace(/^\/?storage\//i, '').replace(/^\//, '');
+    if (!clean) return null;
     return `${STORAGE_BASE}/${clean}`;
 }
 
@@ -647,9 +656,12 @@ function handleCardImageFallback(imgElem, hotelId) {
         const labelBadge = card ? card.querySelector('.photo-label-badge') : null;
         if (labelBadge) labelBadge.textContent = photos[currentIndex].label || 'Hotel Photo';
     } else {
-        imgElem.style.display = 'none';
-        const placeholder = document.getElementById(`card-img-placeholder-${hotelId}`);
-        if (placeholder) placeholder.style.setProperty('display', 'flex', 'important');
+        const fallbackUrl = 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1000&q=80';
+        if (imgElem.src !== fallbackUrl) {
+            imgElem.src = fallbackUrl;
+            const labelBadge = card ? card.querySelector('.photo-label-badge') : null;
+            if (labelBadge) labelBadge.textContent = 'Hotel Photo';
+        }
     }
 }
 
@@ -1226,9 +1238,16 @@ async function openKycModal(id) {
         const getImgUrl = (path) => {
             if (!path) return null;
             if (typeof path === 'object') path = path.url || path.image_path || '';
+            if (!path || typeof path !== 'string') return null;
+            path = path.trim();
             if (!path) return null;
-            if (path.startsWith('data:') || path.startsWith('http://') || path.startsWith('https://')) return path;
-            const clean = path.replace(/^\/?storage\//, '').replace(/^\//, '');
+            if (path.startsWith('data:')) return path;
+            let clean = path;
+            if (clean.match(/^https?:\/\/[^\/]+\/(.*)$/i)) {
+                clean = clean.replace(/^https?:\/\/[^\/]+\//i, '');
+            }
+            clean = clean.replace(/^\/?storage\//i, '').replace(/^\//, '');
+            if (!clean) return null;
             return `${STORAGE_BASE}/${clean}`;
         };
         const businessProof = getImgUrl(profile.business_proof);
@@ -1374,7 +1393,7 @@ async function openKycModal(id) {
                         <strong style="display:block; margin-bottom:4px;">${doc.label}</strong>
                         ${doc.url ? `
                             <a href="${doc.url}" target="_blank">
-                                <img src="${doc.url}" style="width:100%; height:90px; object-fit:cover; border-radius:4px;" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'200\' height=\'120\'><rect width=\'200\' height=\'120\' fill=\'%231e293b\'/><text x=\'50%\' y=\'50%\' dominant-baseline=\'middle\' text-anchor=\'middle\' fill=\'%2394a3b8\' font-size=\'12\' font-family=\'sans-serif\' font-weight=\'bold\'>📄 View Document</text></svg>';">
+                                <img src="${doc.url}" style="width:100%; height:90px; object-fit:cover; border-radius:4px;" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22200%22%20height%3D%22120%22%3E%3Crect%20width%3D%22200%22%20height%3D%22120%22%20fill%3D%22%231e293b%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20fill%3D%22%2338bdf8%22%20font-size%3D%2212%22%20font-family%3D%22sans-serif%22%20font-weight%3D%22bold%22%3E%F0%9F%93%84%20View%20Document%3C%2Ftext%3E%3C%2Fsvg%3E';">
                             </a>
                         ` : `<div style="height:90px; display:flex; align-items:center; justify-content:center; color:var(--text-muted); background:rgba(255,255,255,0.03); border-radius:4px;">Not Uploaded</div>`}
                     </div>
@@ -2218,12 +2237,9 @@ async function openInvoiceModal(txnId) {
                 <!-- Summary Breakdown -->
                 <div style="display:grid; grid-template-columns:1.2fr 1fr; gap:16px; margin-bottom:16px;">
                     <div style="background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0; font-size:12px; display:flex; flex-direction:column; gap:4px; color:#334155;">
-                        <h4 style="margin:0 0 6px 0; font-size:13px; color:#7c3aed;"><i class="fa-solid fa-shield-halved"></i> Payment Metadata</h4>
-                        <div><strong>Payment Method:</strong> ${pay.payment_method}</div>
-                        <div><strong>Transaction ID:</strong> <span style="font-family:monospace; color:#059669; font-weight:700;">${pay.display_transaction_id}</span></div>
-                        ${pay.razorpay_order_id ? `<div><strong>Razorpay Order ID:</strong> <span style="font-family:monospace;">${pay.razorpay_order_id}</span></div>` : ''}
-                        ${pay.razorpay_payment_id ? `<div><strong>Razorpay Payment ID:</strong> <span style="font-family:monospace;">${pay.razorpay_payment_id}</span></div>` : ''}
-                        <div><strong>Region Timestamp:</strong> ${pay.region_time}</div>
+                        <h4 style="margin:0 0 6px 0; font-size:13px; color:#7c3aed;"><i class="fa-solid fa-shield-halved"></i> Payment & Audit Identifier</h4>
+                        <div><strong>Method:</strong> ${pay.payment_method || 'Razorpay / Online'}</div>
+                        <div><strong>Date/Time:</strong> ${pay.region_time || 'N/A'}</div>
                         ${pay.is_refunded || pay.status === 'REFUNDED' ? `
                             <div style="background:#fef2f2; border:1px solid #fca5a5; padding:8px 10px; border-radius:6px; margin-top:6px; color:#991b1b;">
                                 <div style="font-weight:700; font-size:12px; margin-bottom:2px;">

@@ -26,17 +26,36 @@ class HotelImage extends Model
 
     public function getUrlAttribute()
     {
+        $fallbackUrl = 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1000&q=80';
+
         if (empty($this->image_path)) {
-            return null;
+            return $fallbackUrl;
         }
-        if (str_starts_with($this->image_path, 'data:') || str_starts_with($this->image_path, 'http://') || str_starts_with($this->image_path, 'https://')) {
+        if (str_starts_with($this->image_path, 'data:')) {
             return $this->image_path;
         }
-        $cleanPath = ltrim(str_replace('\\', '/', $this->image_path), '/');
+
+        $cleanPath = str_replace('\\', '/', $this->image_path);
+        if (preg_match('#^https?://[^/]+/(.*)$#i', $cleanPath, $matches)) {
+            $cleanPath = $matches[1];
+        }
+        $cleanPath = ltrim($cleanPath, '/');
         if (str_starts_with($cleanPath, 'storage/')) {
             $cleanPath = substr($cleanPath, 8);
         }
-        return asset('storage/' . ltrim($cleanPath, '/'));
+        $cleanPath = ltrim($cleanPath, '/');
+
+        if (empty($cleanPath)) {
+            return $fallbackUrl;
+        }
+
+        try {
+            if (\Illuminate\Support\Facades\Storage::disk('public')->exists($cleanPath)) {
+                return url('storage/' . $cleanPath);
+            }
+        } catch (\Throwable $e) {}
+
+        return $fallbackUrl;
     }
 
     public function hotel()

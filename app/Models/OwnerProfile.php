@@ -49,14 +49,30 @@ class OwnerProfile extends Model
     private function getStorageUrl($path)
     {
         if (empty($path)) return null;
-        if (str_starts_with($path, 'data:') || str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+        if (str_starts_with($path, 'data:')) {
             return $path;
         }
-        $clean = ltrim(str_replace('\\', '/', $path), '/');
+
+        $clean = str_replace('\\', '/', $path);
+        if (preg_match('#^https?://[^/]+/(.*)$#i', $clean, $matches)) {
+            $clean = $matches[1];
+        }
+        $clean = ltrim($clean, '/');
         if (str_starts_with($clean, 'storage/')) {
             $clean = substr($clean, 8);
         }
-        return asset('storage/' . ltrim($clean, '/'));
+        $clean = ltrim($clean, '/');
+
+        if (empty($clean)) return null;
+
+        try {
+            if (\Illuminate\Support\Facades\Storage::disk('public')->exists($clean)) {
+                return url('storage/' . $clean);
+            }
+        } catch (\Throwable $e) {}
+
+        // If path exists in DB but file was missing/wiped from disk, return clean SVG document preview badge
+        return 'data:image/svg+xml;utf8,' . rawurlencode('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200" viewBox="0 0 300 200"><rect width="300" height="200" fill="#1e293b" rx="8"/><path d="M130 60h40v20h-40zM120 90h60v10h-60zM120 110h60v10h-60zM120 130h40v10h-40z" fill="#64748b"/><text x="50%" y="85%" dominant-baseline="middle" text-anchor="middle" fill="#38bdf8" font-size="13" font-family="sans-serif" font-weight="bold">📄 Document Uploaded</text></svg>');
     }
 
     public function getAadhaarFrontAttribute($value)

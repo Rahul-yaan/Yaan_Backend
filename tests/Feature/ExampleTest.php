@@ -14,7 +14,7 @@ class ExampleTest extends TestCase
     {
         $response = $this->get('/');
 
-        // API-only application, root URL returns 404
-        $response->assertStatus(404);
+        // Root URL serves Admin Dashboard UI
+        $response->assertStatus(200);
     }
 }

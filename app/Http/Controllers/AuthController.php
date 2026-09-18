@@ -77,6 +77,18 @@ class AuthController extends Controller
             : Hash::make('temp_' . uniqid());
 
         if ($existingUser) {
+            // Prevent cross-app role mismatch registration
+            if ($existingUser->role !== $role) {
+                $msg = $existingUser->role === 'owner'
+                    ? "This mobile number is already registered as a Hotel Owner account. It cannot be used to register a Customer account."
+                    : "This mobile number is already registered as a Customer account. It cannot be used to register a Hotel Owner account.";
+
+                return response()->json([
+                    'error'   => 'Role restriction error.',
+                    'message' => $msg,
+                ], 422);
+            }
+
             // Update existing record for seamless re-registration & OTP verification
             $existingUser->update([
                 'name'        => $name,
@@ -151,6 +163,22 @@ class AuthController extends Controller
             return response()->json([
                 'error' => 'User account not found. Please register first.',
             ], 404);
+        }
+
+        // Verify role isolation if role parameter is supplied
+        if ($request->filled('role')) {
+            $rawRole = strtolower($request->input('role'));
+            $requestedRole = in_array($rawRole, ['owner', 'hotel_owner', 'hotelowner']) ? 'owner' : 'user';
+            if ($user->role !== 'admin' && $user->role !== $requestedRole) {
+                $msg = $user->role === 'owner'
+                    ? "This mobile number is registered as a Hotel Owner account. Please log in using the Hotel Owner App."
+                    : "This mobile number is registered as a Customer account. Please log in using the Customer App.";
+
+                return response()->json([
+                    'error'   => 'Role restriction error.',
+                    'message' => $msg,
+                ], 422);
+            }
         }
 
         // Update password if provided
@@ -293,9 +321,22 @@ class AuthController extends Controller
             $role = 'admin';
         }
 
-        if (!$user || ($hasRoleInput && !empty($request->input('role')) && $user->role !== $role) || !Hash::check($password, $user->password)) {
+        // Prevent cross-app role mismatch login
+        if ($user && $user->role !== 'admin' && $hasRoleInput && !empty($request->input('role')) && $user->role !== $role) {
+            $msg = $user->role === 'owner'
+                ? "This mobile number is registered as a Hotel Owner account. Please log in using the Hotel Owner App."
+                : "This mobile number is registered as a Customer account. Please log in using the Customer App.";
+
             return response()->json([
-                'error' => 'Invalid credentials or role.',
+                'error'   => 'Role restriction error.',
+                'message' => $msg,
+            ], 401);
+        }
+
+        if (!$user || !Hash::check($password, $user->password)) {
+            return response()->json([
+                'error'   => 'Invalid credentials or role.',
+                'message' => 'Invalid credentials or role.',
             ], 401);
         }
 

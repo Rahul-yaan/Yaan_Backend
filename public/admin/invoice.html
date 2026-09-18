@@ -516,10 +516,6 @@
                     <div class="grid-2" style="margin-top:24px;">
                         <div class="info-box" style="font-size:12px;">
                             <h3><i class="fa-solid fa-shield-halved"></i> Payment & Audit Identifier</h3>
-                            <div>Transaction ID: <strong class="font-mono">${pay.display_transaction_id || pay.transaction_id || 'N/A'}</strong></div>
-                            ${pay.temp_transaction_id ? `<div>Temp Txn ID: <strong class="font-mono">${pay.temp_transaction_id}</strong></div>` : ''}
-                            ${pay.razorpay_order_id ? `<div>Razorpay Order ID: <strong class="font-mono">${pay.razorpay_order_id}</strong></div>` : ''}
-                            ${pay.razorpay_payment_id ? `<div>Razorpay Payment ID: <strong class="font-mono">${pay.razorpay_payment_id}</strong></div>` : ''}
                             <div>Method: <strong>${pay.payment_method || 'Razorpay / Online'}</strong></div>
                             <div>Date/Time: <strong>${pay.region_time || 'N/A'}</strong></div>
                         </div>

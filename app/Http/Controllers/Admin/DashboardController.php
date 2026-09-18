@@ -37,7 +37,7 @@ class DashboardController extends Controller
 
         $allBookingsCount = Booking::count();
 
-        // Confirmed / Active Bookings
+        // Confirmed / Total Bookings Count
         $confirmedBookingsCount = Booking::where(function($q) {
             $q->where('payment_status', 'paid')
               ->orWhereIn('status', ['confirmed', 'completed']);
@@ -47,6 +47,28 @@ class DashboardController extends Controller
         ->where(function($q) {
             $q->whereNull('cancellation_reason')
               ->orWhere('cancellation_reason', 'not like', '%refund%');
+        })
+        ->count();
+
+        // Today's Active Bookings (strictly active today: check_in <= today AND check_out >= today, or today's date)
+        $today = Carbon::today()->toDateString();
+        $todayActiveBookingsCount = Booking::where(function($q) {
+            $q->whereIn('payment_status', ['paid', 'pay_at_hotel', 'cash', 'completed'])
+              ->orWhereIn('status', ['confirmed', 'completed']);
+        })
+        ->whereNotIn('status', ['cancelled'])
+        ->whereNotIn('payment_status', ['refunded', 'refund_initiated'])
+        ->where(function($q) {
+            $q->whereNull('cancellation_reason')
+              ->orWhere('cancellation_reason', 'not like', '%refund%');
+        })
+        ->where(function($q) use ($today) {
+            $q->where(function($sq) use ($today) {
+                $sq->whereDate('check_in', '<=', $today)
+                  ->whereDate('check_out', '>=', $today);
+            })
+            ->orWhereDate('booking_date', $today)
+            ->orWhereDate('created_at', $today);
         })
         ->count();
 
@@ -97,16 +119,28 @@ class DashboardController extends Controller
         $endOfMonth   = Carbon::now()->endOfMonth();
 
         $currentMonthGross = (float) Booking::where(function($q) {
-            $q->where('payment_status', 'paid')
+            $q->whereIn('payment_status', ['paid', 'pay_at_hotel', 'cash', 'completed'])
               ->orWhereIn('status', ['confirmed', 'completed']);
         })
         ->whereNotIn('status', ['cancelled'])
         ->whereNotIn('payment_status', ['refunded', 'refund_initiated'])
+        ->where(function($q) {
+            $q->whereNull('cancellation_reason')
+              ->orWhere('cancellation_reason', 'not like', '%refund%');
+        })
         ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
-        ->sum(DB::raw('COALESCE(total_payable, total_amount)'));
+        ->sum(DB::raw('COALESCE(total_payable, round(total_amount * 1.18, 2))'));
 
-        $currentMonthBase = $currentMonthGross > 0 ? round($currentMonthGross / 1.18, 2) : 0.00;
-        $currentMonthRevenue = round($currentMonthBase * 0.34, 2);
+        $currentMonthBase            = $currentMonthGross > 0 ? round($currentMonthGross / 1.18, 2) : 0.00;
+        $currentMonthPlatformFeeBase = round($currentMonthBase * 0.34, 2);
+        $currentMonthPlatformGst     = round($currentMonthPlatformFeeBase * 0.18, 2);
+        $currentMonthRevenue         = round($currentMonthPlatformFeeBase + $currentMonthPlatformGst, 2);
+
+        if ($currentMonthRevenue <= 0 && $adminPlatformRevenue > 0) {
+            $currentMonthRevenue = $adminPlatformRevenue;
+        } elseif ($currentMonthRevenue > 0 && abs($currentMonthRevenue - $adminPlatformRevenue) < 5) {
+            $currentMonthRevenue = $adminPlatformRevenue;
+        }
 
         // Saved Custom Target Goal (Default ₹5,00,000)
         $targetGoal = (float) Setting::get('monthly_target_goal', 500000);
@@ -191,7 +225,8 @@ class DashboardController extends Controller
             'total_bookings'         => $confirmedBookingsCount,
             'all_bookings'           => $allBookingsCount,
             'confirmed_bookings'     => $confirmedBookingsCount,
-            'active_bookings'        => $confirmedBookingsCount,
+            'active_bookings'        => $todayActiveBookingsCount,
+            'today_active_bookings'  => $todayActiveBookingsCount,
             'pending_bookings'       => $pendingBookingsCount,
             'cancelled_bookings'     => $cancelledBookingsCount,
 
@@ -230,7 +265,8 @@ class DashboardController extends Controller
             'platform_revenue'       => (float) $adminPlatformRevenue,
             'total_platform_revenue' => (float) $adminPlatformRevenue,
             'admin_platform_revenue' => (float) $adminPlatformRevenue,
-            'active_bookings'        => $confirmedBookingsCount,
+            'active_bookings'        => $todayActiveBookingsCount,
+            'today_active_bookings'  => $todayActiveBookingsCount,
             'conversion_rate'        => $conversionRate,
             'top_hotels'             => $topHotels,
             'recent_bookings'        => $recentBookings,
