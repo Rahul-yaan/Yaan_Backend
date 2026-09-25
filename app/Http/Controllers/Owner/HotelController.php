@@ -60,8 +60,6 @@ class HotelController extends Controller
             16 => "Showers",
             17 => "Laundry Services",
             18 => "Seating Areas",
-            19 => "Men",
-            20 => "Women",
         ];
 
         $resolvedIds = [];
@@ -78,16 +76,24 @@ class HotelController extends Controller
 
             if (is_numeric($item) && (int)$item > 0) {
                 $id = (int)$item;
+                if ($id === 19 || $id === 20) {
+                    continue;
+                }
                 $amenity = Amenity::find($id);
-                if ($amenity) {
+                if ($amenity && !in_array(strtolower($amenity->name), ['men', 'women'])) {
                     $resolvedIds[] = $amenity->id;
                 } elseif (isset($idToNameMap[$id])) {
                     $name = $idToNameMap[$id];
-                    $amenity = Amenity::firstOrCreate(['name' => $name]);
-                    $resolvedIds[] = $amenity->id;
+                    if (!in_array(strtolower($name), ['men', 'women'])) {
+                        $amenity = Amenity::firstOrCreate(['name' => $name]);
+                        $resolvedIds[] = $amenity->id;
+                    }
                 }
             } elseif (is_string($item) && !empty(trim($item))) {
                 $name = trim($item);
+                if (in_array(strtolower($name), ['men', 'women'])) {
+                    continue;
+                }
                 $amenity = Amenity::firstOrCreate(['name' => $name]);
                 $resolvedIds[] = $amenity->id;
             }
@@ -463,14 +469,32 @@ class HotelController extends Controller
         if (!empty($rawImages) && is_array($rawImages)) {
             foreach ($rawImages as $imgStr) {
                 if (is_string($imgStr) && !empty(trim($imgStr))) {
+                    $imgStr = trim($imgStr);
                     $isPrimary = !$hasPrimary;
                     if ($isPrimary) {
                         \Illuminate\Support\Facades\DB::statement("UPDATE hotel_images SET is_primary = false WHERE hotel_id = ?", [$hotel->id]);
                         $hasPrimary = true;
                     }
+
+                    $b64 = str_starts_with($imgStr, 'data:') ? $imgStr : null;
+                    $cleanPath = $imgStr;
+                    if ($b64) {
+                        $ext = 'jpg';
+                        if (preg_match('/^data:image\/(\w+);base64,/', $imgStr, $m)) {
+                            $ext = $m[1] === 'jpeg' ? 'jpg' : $m[1];
+                        }
+                        $fileName = 'hotel_' . $hotel->id . '_' . uniqid() . '.' . $ext;
+                        $cleanPath = 'hotels/' . $fileName;
+                        try {
+                            $raw = substr($imgStr, strpos($imgStr, ',') + 1);
+                            Storage::disk('public')->put($cleanPath, base64_decode($raw));
+                        } catch (\Throwable $e) {}
+                    }
+
                     $image = HotelImage::create([
                         'hotel_id'   => $hotel->id,
-                        'image_path' => trim($imgStr),
+                        'image_path' => $cleanPath,
+                        'image_data' => $b64,
                         'is_primary' => $isPrimary,
                     ]);
                     $uploaded[] = $image;
@@ -492,9 +516,19 @@ class HotelController extends Controller
                 \Illuminate\Support\Facades\DB::statement("UPDATE hotel_images SET is_primary = false WHERE hotel_id = ?", [$hotel->id]);
             }
 
+            $b64Data = null;
+            try {
+                $realPath = $file->getRealPath();
+                if ($realPath && file_exists($realPath)) {
+                    $mime = $file->getClientMimeType() ?: 'image/jpeg';
+                    $b64Data = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($realPath));
+                }
+            } catch (\Throwable $e) {}
+
             $image = HotelImage::create([
                 'hotel_id'   => $hotel->id,
                 'image_path' => $path,
+                'image_data' => $b64Data,
                 'is_primary' => $isPrimary,
             ]);
 

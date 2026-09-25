@@ -53,45 +53,41 @@ class Hotel extends Model
 
     public function primaryImage()
     {
-        return $this->hasOne(HotelImage::class)->whereRaw('is_primary IS TRUE');
+        return $this->hasOne(HotelImage::class)
+            ->whereRaw('is_primary IS TRUE')
+            ->where('image_path', 'NOT LIKE', '%kyc_docs%');
     }
 
     public function getPrimaryImageAttribute()
     {
         if ($this->relationLoaded('primaryImage') && $this->getRelation('primaryImage') !== null) {
-            return $this->getRelation('primaryImage');
+            $rel = $this->getRelation('primaryImage');
+            if ($rel && !str_contains($rel->image_path ?? '', 'kyc_docs/')) {
+                return $rel;
+            }
         }
 
         if ($this->relationLoaded('images') && $this->images->isNotEmpty()) {
-            $primary = $this->images->firstWhere('is_primary', true);
-            $img = $primary ?? $this->images->first();
-            $this->setRelation('primaryImage', $img);
-            return $img;
+            $validImages = $this->images->filter(function ($img) {
+                return !str_contains($img->image_path ?? '', 'kyc_docs/');
+            });
+            if ($validImages->isNotEmpty()) {
+                $primary = $validImages->firstWhere('is_primary', true);
+                $img = $primary ?? $validImages->first();
+                $this->setRelation('primaryImage', $img);
+                return $img;
+            }
         }
 
-        $img = $this->images()->whereRaw('is_primary IS TRUE')->first()
-            ?? $this->images()->first();
+        $img = $this->images()
+            ->where('image_path', 'NOT LIKE', '%kyc_docs%')
+            ->whereRaw('is_primary IS TRUE')
+            ->first()
+            ?? $this->images()->where('image_path', 'NOT LIKE', '%kyc_docs%')->first();
 
         if ($img) {
             $this->setRelation('primaryImage', $img);
             return $img;
-        }
-
-        // Check owner profile for uploaded documents if hotel_images table has no entries
-        if ($this->relationLoaded('owner') && $this->owner && $this->owner->ownerProfile) {
-            $profile = $this->owner->ownerProfile;
-            $photoPath = $profile->business_proof ?? $profile->aadhaar_front ?? $profile->gst_image ?? null;
-            if ($photoPath) {
-                try {
-                    $img = HotelImage::create([
-                        'hotel_id'   => $this->id,
-                        'image_path' => $photoPath,
-                        'is_primary' => true,
-                    ]);
-                    $this->setRelation('primaryImage', $img);
-                    return $img;
-                } catch (\Throwable $e) {}
-            }
         }
 
         // Fallback default high quality hotel image URL
@@ -127,25 +123,19 @@ class Hotel extends Model
     {
         try {
             $images = $this->relationLoaded('images') ? $this->images : $this->images()->get();
-            if ($images->isNotEmpty()) {
-                $hasPrimary = $images->contains(function ($img) {
+            $validImages = $images->filter(function ($img) {
+                return !str_contains($img->image_path ?? '', 'kyc_docs/');
+            });
+
+            if ($validImages->isNotEmpty()) {
+                $hasPrimary = $validImages->contains(function ($img) {
                     return (bool) $img->is_primary;
                 });
 
                 if (!$hasPrimary) {
-                    $first = $images->first();
+                    $first = $validImages->first();
                     $first->is_primary = true;
                     $first->save();
-                }
-            } elseif ($this->owner && $this->owner->ownerProfile) {
-                $profile = $this->owner->ownerProfile;
-                $photoPath = $profile->business_proof ?? $profile->aadhaar_front ?? $profile->gst_image ?? null;
-                if ($photoPath) {
-                    HotelImage::create([
-                        'hotel_id'   => $this->id,
-                        'image_path' => $photoPath,
-                        'is_primary' => true,
-                    ]);
                 }
             }
             $this->load(['images', 'primaryImage']);
@@ -179,7 +169,8 @@ class Hotel extends Model
 
     public function amenities()
     {
-        return $this->belongsToMany(Amenity::class, 'hotel_amenities');
+        return $this->belongsToMany(Amenity::class, 'hotel_amenities')
+                    ->whereNotIn(\Illuminate\Support\Facades\DB::raw('LOWER(amenities.name)'), ['men', 'women']);
     }
 
     public function bookings()

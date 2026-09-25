@@ -28,8 +28,6 @@ class AmenitySeeder extends Seeder
             16 => "Showers",
             17 => "Laundry Services",
             18 => "Seating Areas",
-            19 => "Men",
-            20 => "Women",
         ];
 
         foreach ($amenities as $id => $name) {
@@ -38,5 +36,10 @@ class AmenitySeeder extends Seeder
                 ['name' => $name]
             );
         }
+
+        // Permanently purge legacy 'Men' and 'Women' amenities from database
+        Amenity::whereIn(\Illuminate\Support\Facades\DB::raw('LOWER(name)'), ['men', 'women'])
+            ->orWhereIn('id', [19, 20])
+            ->delete();
     }
 }

@@ -194,12 +194,33 @@ class HotelController extends Controller
     public function uploadImage(Request $request, $id)
     {
         $hotel = Hotel::findOrFail($id);
+        $b64Data = null;
 
         if ($request->hasFile('image')) {
             $file = $request->file('image');
             $path = $file->store('hotels', 'public');
+            try {
+                $realPath = $file->getRealPath();
+                if ($realPath && file_exists($realPath)) {
+                    $mime = $file->getClientMimeType() ?: 'image/jpeg';
+                    $b64Data = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($realPath));
+                }
+            } catch (\Throwable $e) {}
         } elseif ($request->has('image_url') && !empty($request->image_url)) {
-            $path = $request->image_url;
+            $path = trim($request->image_url);
+            if (str_starts_with($path, 'data:')) {
+                $b64Data = $path;
+                $ext = 'jpg';
+                if (preg_match('/^data:image\/(\w+);base64,/', $path, $m)) {
+                    $ext = $m[1] === 'jpeg' ? 'jpg' : $m[1];
+                }
+                $fileName = 'hotel_' . $hotel->id . '_' . uniqid() . '.' . $ext;
+                $path = 'hotels/' . $fileName;
+                try {
+                    $raw = substr($b64Data, strpos($b64Data, ',') + 1);
+                    \Illuminate\Support\Facades\Storage::disk('public')->put($path, base64_decode($raw));
+                } catch (\Throwable $e) {}
+            }
         } else {
             return response()->json(['error' => 'No image provided.'], 422);
         }
@@ -209,6 +230,7 @@ class HotelController extends Controller
         $image = \App\Models\HotelImage::create([
             'hotel_id'   => $hotel->id,
             'image_path' => $path,
+            'image_data' => $b64Data,
             'is_primary' => !$hasPrimary,
         ]);
 

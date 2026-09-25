@@ -579,12 +579,9 @@ function getHotelImageUrl(imgObj) {
     path = path.trim();
     if (!path) return null;
     if (path.startsWith('data:')) return path;
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
 
-    let clean = path;
-    if (clean.match(/^https?:\/\/[^\/]+\/(.*)$/i)) {
-        clean = clean.replace(/^https?:\/\/[^\/]+\//i, '');
-    }
-    clean = clean.replace(/^\/?storage\//i, '').replace(/^\//, '');
+    const clean = path.replace(/^\/?storage\//i, '').replace(/^\//, '');
     if (!clean) return null;
     return `${STORAGE_BASE}/${clean}`;
 }
@@ -592,47 +589,51 @@ function getHotelImageUrl(imgObj) {
 function getHotelPhotosOnly(hotel) {
     const images = [];
 
-    // Check owner registration / profile photo FIRST so that it is guaranteed to show
-    const profile = (hotel.owner && (hotel.owner.owner_profile || hotel.owner.ownerProfile))
-        ? (hotel.owner.owner_profile || hotel.owner.ownerProfile)
-        : null;
-
-    if (profile) {
-        const registrationPhoto = profile.business_proof || profile.aadhaar_front || profile.gst_image || profile.pan_card;
-        const proofUrl = getHotelImageUrl(registrationPhoto);
-        if (proofUrl) {
-            images.push({ id: null, url: proofUrl, label: 'Registration Photo' });
-        }
-    }
-
+    // Real hotel property photos from hotel.images
     if (hotel.images && hotel.images.length > 0) {
         hotel.images.forEach(img => {
+            const rawPath = typeof img === 'string' ? img : (img.image_path || img.url || '');
+            if (rawPath && typeof rawPath === 'string' && rawPath.includes('kyc_docs/')) {
+                return; // Exclude legacy KYC documents
+            }
             const url = getHotelImageUrl(img);
             if (url && !images.some(i => i.url === url)) {
-                images.push({ id: img.id, url: url, label: 'Hotel Photo' });
+                images.push({ 
+                    id: img.id || null, 
+                    url: url, 
+                    label: img.is_primary ? 'Primary Photo' : 'Hotel Photo' 
+                });
             }
         });
     }
 
     if (hotel.primary_image) {
-        const url = getHotelImageUrl(hotel.primary_image);
-        if (url && !images.some(i => i.url === url)) {
-            images.unshift({ id: hotel.primary_image.id, url: url, label: 'Primary Photo' });
+        const rawPath = typeof hotel.primary_image === 'string' ? hotel.primary_image : (hotel.primary_image.image_path || hotel.primary_image.url || '');
+        if (!rawPath || !rawPath.includes('kyc_docs/')) {
+            const url = getHotelImageUrl(hotel.primary_image);
+            if (url && !images.some(i => i.url === url)) {
+                images.unshift({ 
+                    id: hotel.primary_image.id || null, 
+                    url: url, 
+                    label: 'Primary Photo' 
+                });
+            }
         }
     }
 
-    // Sort valid inline base64 data URIs first (100% working images)
+    // If still no property photos, add high quality default hotel photo
+    if (images.length === 0) {
+        images.push({
+            id: null,
+            url: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1000&q=80',
+            label: 'Hotel Photo'
+        });
+    }
+
+    // Sort: Primary Photo first
     images.sort((a, b) => {
-        const aIsBase64 = a.url && a.url.startsWith('data:');
-        const bIsBase64 = b.url && b.url.startsWith('data:');
-        if (aIsBase64 && !bIsBase64) return -1;
-        if (!aIsBase64 && bIsBase64) return 1;
-
-        const aIsReg = a.label === 'Registration Photo';
-        const bIsReg = b.label === 'Registration Photo';
-        if (aIsReg && !bIsReg) return -1;
-        if (!aIsReg && bIsReg) return 1;
-
+        if (a.label === 'Primary Photo' && b.label !== 'Primary Photo') return -1;
+        if (a.label !== 'Primary Photo' && b.label === 'Primary Photo') return 1;
         return 0;
     });
 
@@ -855,7 +856,7 @@ async function openHotelDetailsModal(id) {
                         ${hotelPhotos.map(img => `
                             <div class="photo-card-item" style="position:relative; height:130px; border-radius:8px; overflow:hidden; background:#0f172a; border:1px solid var(--border);">
                                 <a href="${img.url}" target="_blank">
-                                    <img src="${img.url}" alt="${img.label}" style="width:100%; height:100%; object-fit:cover;" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'300\' height=\'200\'><rect width=\'300\' height=\'200\' fill=\'%230f172a\'/><text x=\'50%\' y=\'50%\' dominant-baseline=\'middle\' text-anchor=\'middle\' fill=\'%2338bdf8\' font-size=\'13\' font-family=\'sans-serif\' font-weight=\'bold\'>🏨 Hotel Photo</text></svg>';">
+                                    <img src="${img.url}" alt="${img.label}" style="width:100%; height:100%; object-fit:cover;" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1000&q=80';">
                                 </a>
                                 <span style="position:absolute; bottom:6px; left:6px; background:rgba(0,0,0,0.85); color:#38bdf8; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:700;">
                                     ${img.label}
@@ -1059,7 +1060,7 @@ async function uploadAdminHotelPhoto(hotelId, input) {
     try {
         const res = await fetch(`${API_BASE}/admin/hotels/${hotelId}/images`, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` },
+            headers: { 'Authorization': `Bearer ${authToken}` },
             body: formData
         });
         const data = await res.json();
@@ -1242,11 +1243,8 @@ async function openKycModal(id) {
             path = path.trim();
             if (!path) return null;
             if (path.startsWith('data:')) return path;
-            let clean = path;
-            if (clean.match(/^https?:\/\/[^\/]+\/(.*)$/i)) {
-                clean = clean.replace(/^https?:\/\/[^\/]+\//i, '');
-            }
-            clean = clean.replace(/^\/?storage\//i, '').replace(/^\//, '');
+            if (path.startsWith('http://') || path.startsWith('https://')) return path;
+            const clean = path.replace(/^\/?storage\//i, '').replace(/^\//, '');
             if (!clean) return null;
             return `${STORAGE_BASE}/${clean}`;
         };

@@ -213,12 +213,23 @@ class ProfileController extends Controller
             if ($request->hasFile($field)) {
                 $file = $request->file($field);
                 $path = $file->store('kyc_docs', 'public');
-                $data[$field] = $path;
+
+                $b64 = null;
+                try {
+                    $realPath = $file->getRealPath();
+                    if ($realPath && file_exists($realPath)) {
+                        $mime = $file->getClientMimeType() ?: 'image/jpeg';
+                        $b64 = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($realPath));
+                    }
+                } catch (\Throwable $e) {}
+
+                // Store persistent base64 in owner_profiles so documents survive Render disk wipes
+                $data[$field] = $b64 ?? $path;
             } elseif ($request->filled($field) && is_string($request->input($field))) {
                 $val = trim($request->input($field));
                 if (str_starts_with($val, 'data:image/') || str_starts_with($val, 'data:application/')) {
-                    $savedPath = $this->saveBase64Document($val, $field, $user->id);
-                    $data[$field] = $savedPath ?? $val;
+                    $this->saveBase64Document($val, $field, $user->id);
+                    $data[$field] = $val;
                 } else {
                     $data[$field] = $val;
                 }
@@ -290,16 +301,6 @@ class ProfileController extends Controller
                 $hotelUpdate['available_rooms'] = (int) $rooms;
             }
             $targetHotel->update($hotelUpdate);
-        }
-
-        // Automatically attach registration/profile photo as hotel image
-        $uploadedPhoto = $data['business_proof'] ?? $data['aadhaar_front'] ?? $data['gst_image'] ?? null;
-        if ($uploadedPhoto && $targetHotel) {
-            \App\Models\HotelImage::create([
-                'hotel_id'   => $targetHotel->id,
-                'image_path' => $uploadedPhoto,
-                'is_primary' => true,
-            ]);
         }
 
         if ($targetHotel) {

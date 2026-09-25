@@ -22,6 +22,9 @@ RUN docker-php-ext-install pdo pdo_mysql pdo_pgsql mbstring exif pcntl bcmath gd
 # Enable Apache rewrite module
 RUN a2enmod rewrite
 
+# Configure PHP upload limits and memory
+RUN echo "upload_max_filesize = 32M\npost_max_size = 35M\nmemory_limit = 256M" > /usr/local/etc/php/conf.d/uploads.ini
+
 # Get latest Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
