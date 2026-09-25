@@ -22,6 +22,14 @@ class HotelController extends Controller
             ->with(['primaryImage', 'amenities'])
             ->get();
 
+        foreach ($hotels as $hotel) {
+            if (empty($hotel->yaan_id)) {
+                $hotel->yaan_id = Hotel::generateUniqueYaanId();
+                $hotel->qr_code_url = 'https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=' . urlencode($hotel->yaan_id);
+                $hotel->save();
+            }
+        }
+
         return response()->json(['hotels' => $hotels]);
     }
 
@@ -560,6 +568,59 @@ class HotelController extends Controller
             'message' => 'Images uploaded successfully.',
             'images'  => $hotel->images()->get(),
             'hotel'   => $hotel->load(['images', 'primaryImage', 'amenities']),
+        ]);
+    }
+
+    // ============================================================
+    // 6. GET HOTEL YAAN ID & QR CODE FOR OWNER APP
+    //    URL:    GET /api/owner/hotels/{id}/qr-code
+    //    URL:    GET /api/owner/qr-code
+    //    Header: Authorization: Bearer YOUR_TOKEN
+    // ============================================================
+    public function getQrCode(Request $request, $id = null)
+    {
+        $query = Hotel::where('owner_id', $request->user()->id);
+
+        if (!empty($id)) {
+            $query->where('id', $id);
+        }
+
+        $hotel = $query->with(['primaryImage', 'amenities'])->first();
+
+        if (!$hotel) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'No hotel found for this account. Please register your hotel first.',
+            ], 404);
+        }
+
+        if (empty($hotel->yaan_id)) {
+            $hotel->yaan_id = Hotel::generateUniqueYaanId();
+            $hotel->qr_code_url = 'https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=' . urlencode($hotel->yaan_id);
+            $hotel->save();
+        }
+
+        $qrImageUrl = $hotel->qr_code_url ?: ('https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=' . urlencode($hotel->yaan_id));
+
+        return response()->json([
+            'status'          => 'success',
+            'hotel_id'        => $hotel->id,
+            'hotel_name'      => $hotel->name,
+            'yaan_id'         => $hotel->yaan_id,
+            'hotel_code'      => $hotel->yaan_id,
+            'city'            => $hotel->city,
+            'address'         => $hotel->address,
+            'status_state'    => $hotel->status,
+            'qr_code_url'     => $qrImageUrl,
+            'qr_payload'      => $hotel->qr_code_payload,
+            'poster_title'    => 'Scan & Book on Yaan App',
+            'poster_subtitle' => 'Instant Truck Parking & Rest Room Booking',
+            'hotel'           => $hotel,
+            'instructions'    => [
+                '1. Download and print this QR poster standee.',
+                '2. Place this poster at your Hotel Reception or Entry Gate.',
+                '3. Drivers can scan this QR code using their Yaan User App for instant spot booking.'
+            ],
         ]);
     }
 }

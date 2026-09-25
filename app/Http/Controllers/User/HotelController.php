@@ -263,4 +263,148 @@ class HotelController extends Controller
         $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
         return $earthRadius * $c;
     }
+
+    /**
+     * ============================================================
+     * SCAN & SPOT BOOKING VERIFICATION API
+     * URL: POST /api/hotels/scan-qr
+     * URL: GET  /api/hotels/scan/{code}
+     * URL: GET  /api/hotels/verify-qr?code=...
+     * ============================================================
+     */
+    public function scanQr(Request $request, $code = null)
+    {
+        $rawInput = trim((string)($code ?? $request->input('code') ?? $request->input('hotel_code') ?? $request->input('yaan_id') ?? $request->input('id') ?? ''));
+
+        if (empty($rawInput)) {
+            return response()->json([
+                'status'     => 'invalid_request',
+                'registered' => false,
+                'can_book'   => false,
+                'message'    => 'Please provide a valid Hotel QR code or YAAN ID.',
+            ], 422);
+        }
+
+        // Support URL input (e.g. https://yaan.app/hotel/YAAN-H0001)
+        if (str_contains($rawInput, '/')) {
+            $parts = explode('/', rtrim($rawInput, '/'));
+            $rawInput = end($parts);
+        }
+
+        // Support JSON input scanned directly from QR code
+        if (str_starts_with($rawInput, '{') && str_ends_with($rawInput, '}')) {
+            $decoded = json_decode($rawInput, true);
+            if (is_array($decoded)) {
+                $rawInput = $decoded['yaan_id'] ?? $decoded['hotel_code'] ?? $decoded['code'] ?? $decoded['hotel_id'] ?? $rawInput;
+            }
+        }
+
+        $cleanCode = trim((string)$rawInput);
+
+        // 1. Check if hotel exists in our database
+        $hotel = Hotel::where('yaan_id', $cleanCode)
+            ->orWhere('id', is_numeric($cleanCode) ? (int)$cleanCode : 0)
+            ->with(['images', 'primaryImage', 'amenities', 'reviews.user:id,name,email', 'owner.ownerProfile'])
+            ->first();
+
+        if (!$hotel) {
+            return response()->json([
+                'status'     => 'not_found',
+                'registered' => false,
+                'can_book'   => false,
+                'searched_code' => $cleanCode,
+                'message'    => 'This hotel is not registered with Yaan company. Spot booking is not available for this location.',
+            ], 404);
+        }
+
+        // Ensure primary image exists
+        $hotel->ensurePrimaryImageExists();
+
+        // 2. Check if hotel status is active / approved
+        if (!in_array($hotel->status, ['active', 'approved'])) {
+            return response()->json([
+                'status'     => 'inactive_hotel',
+                'registered' => true,
+                'can_book'   => false,
+                'hotel_id'   => $hotel->id,
+                'hotel_name' => $hotel->name,
+                'yaan_id'    => $hotel->yaan_id,
+                'hotel_code' => $hotel->yaan_id,
+                'message'    => 'This hotel is registered with Yaan, but is currently undergoing verification or is temporarily inactive.',
+            ], 403);
+        }
+
+        // 3. Check if Owner is KYC Approved
+        $owner = $hotel->owner;
+        $ownerProfile = $owner ? $owner->ownerProfile : null;
+        $isOwnerApproved = $owner && $owner->is_verified && $ownerProfile && $ownerProfile->status === 'approved';
+
+        if (!$isOwnerApproved) {
+            return response()->json([
+                'status'     => 'kyc_pending',
+                'registered' => true,
+                'can_book'   => false,
+                'hotel_id'   => $hotel->id,
+                'hotel_name' => $hotel->name,
+                'yaan_id'    => $hotel->yaan_id,
+                'hotel_code' => $hotel->yaan_id,
+                'message'    => 'Hotel partner KYC verification is in progress. Please contact hotel reception.',
+            ], 403);
+        }
+
+        // 4. Check available rooms / parking slots for TODAY
+        $today = \Carbon\Carbon::today()->toDateString();
+        $todayBooked = \App\Models\Booking::where('hotel_id', $hotel->id)
+            ->whereIn('status', ['pending', 'confirmed'])
+            ->whereDate('booking_date', $today)
+            ->count();
+
+        $availableRooms = max(0, $hotel->total_rooms - $todayBooked);
+
+        if ($availableRooms < 1) {
+            return response()->json([
+                'status'          => 'fully_booked',
+                'registered'      => true,
+                'can_book'        => false,
+                'hotel_id'        => $hotel->id,
+                'hotel_name'      => $hotel->name,
+                'yaan_id'         => $hotel->yaan_id,
+                'hotel_code'      => $hotel->yaan_id,
+                'available_rooms' => 0,
+                'message'         => 'Hotel is registered with Yaan, but all parking slots and rooms are fully booked for today.',
+            ], 400);
+        }
+
+        // 5. Attach active discounts, pricing, and amenities
+        $this->attachActiveDiscountInfo($hotel);
+        $hotel->available_rooms = $availableRooms;
+
+        if ($hotel->amenities->isEmpty()) {
+            $defaultNames = ['Wi-Fi', 'Air Conditioning', 'Free Parking'];
+            $defaultIds = [];
+            foreach ($defaultNames as $dName) {
+                $d = \App\Models\Amenity::firstOrCreate(['name' => $dName]);
+                $defaultIds[] = $d->id;
+            }
+            $hotel->amenities()->syncWithoutDetaching($defaultIds);
+            $hotel->load('amenities');
+        }
+        $hotel->amenity_names = $hotel->amenities->pluck('name')->toArray();
+
+        return response()->json([
+            'status'          => 'verified',
+            'registered'      => true,
+            'can_book'        => true,
+            'booking_context' => 'spot_booking',
+            'booking_date'    => $today,
+            'check_in'        => $today,
+            'check_out'       => \Carbon\Carbon::today()->addDay()->toDateString(),
+            'hotel_id'        => $hotel->id,
+            'hotel_name'      => $hotel->name,
+            'yaan_id'         => $hotel->yaan_id,
+            'hotel_code'      => $hotel->yaan_id,
+            'hotel'           => $hotel,
+            'message'         => 'Hotel verified successfully! You can proceed with spot booking.',
+        ], 200);
+    }
 }

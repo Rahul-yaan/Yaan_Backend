@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 class Hotel extends Model
 {
     protected $fillable = [
+        'yaan_id',
+        'qr_code_url',
         'owner_id',
         'name',
         'description',
@@ -35,11 +37,50 @@ class Hotel extends Model
     ];
 
     protected $appends = [
+        'hotel_code',
+        'qr_code_payload',
         'primary_image',
         'image_url',
         'image',
         'primary_image_url',
     ];
+
+    protected static function booted()
+    {
+        static::creating(function ($hotel) {
+            if (empty($hotel->yaan_id)) {
+                $hotel->yaan_id = self::generateUniqueYaanId();
+            }
+            if (empty($hotel->qr_code_url)) {
+                $hotel->qr_code_url = 'https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=' . urlencode($hotel->yaan_id);
+            }
+        });
+    }
+
+    public static function generateUniqueYaanId()
+    {
+        do {
+            $code = 'YAAN-H' . str_pad((string) rand(1, 9999), 4, '0', STR_PAD_LEFT);
+        } while (self::where('yaan_id', $code)->exists());
+
+        return $code;
+    }
+
+    public function getHotelCodeAttribute()
+    {
+        return $this->yaan_id;
+    }
+
+    public function getQrCodePayloadAttribute()
+    {
+        return json_encode([
+            'company'    => 'Yaan',
+            'type'       => 'hotel_spot_booking',
+            'hotel_id'   => $this->id,
+            'yaan_id'    => $this->yaan_id,
+            'hotel_code' => $this->yaan_id,
+        ]);
+    }
 
     public function owner()
     {

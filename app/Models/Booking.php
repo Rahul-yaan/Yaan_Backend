@@ -32,6 +32,7 @@ class Booking extends Model
         'promotion_applied',
         'gst_amount',
         'total_payable',
+        'booking_type',
     ];
 
     protected $casts = [

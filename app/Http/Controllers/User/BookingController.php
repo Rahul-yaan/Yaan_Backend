@@ -126,6 +126,7 @@ class BookingController extends Controller
             
             'status'           => $isOfflinePayment ? 'confirmed' : 'pending',
             'payment_status'   => $isOfflinePayment ? 'pay_at_hotel' : 'pending',
+            'booking_type'     => $request->input('booking_type', $request->input('type', 'app_search')),
         ]);
 
         // Decrease available rooms

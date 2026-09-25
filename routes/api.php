@@ -111,8 +111,12 @@ Route::middleware('throttle:60,1')->group(function () {
     Route::get('/pages/{slug?}',        [\App\Http\Controllers\LegalController::class, 'getPageBySlug']);
     Route::get('/page/{slug?}',         [\App\Http\Controllers\LegalController::class, 'getPageBySlug']);
     Route::get('/legal/{slug?}',        [\App\Http\Controllers\LegalController::class, 'getPageBySlug']);
-    Route::get('/cms/{slug?}',          [\App\Http\Controllers\LegalController::class, 'getPageBySlug']);
     Route::get('/get-page/{slug?}',     [\App\Http\Controllers\LegalController::class, 'getPageBySlug']);
+
+    // QR Code Spot Booking Verification APIs (Public & Pre-Login)
+    Route::match(['get', 'post'], '/hotels/scan-qr',   [\App\Http\Controllers\User\HotelController::class, 'scanQr']);
+    Route::match(['get', 'post'], '/hotels/verify-qr', [\App\Http\Controllers\User\HotelController::class, 'scanQr']);
+    Route::get('/hotels/scan/{code}',                  [\App\Http\Controllers\User\HotelController::class, 'scanQr']);
 });
 
 // Razorpay Webhook — Verified by HMAC signature in controller
@@ -239,6 +243,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/hotels/search',           [App\Http\Controllers\User\HotelController::class, 'search']);
         Route::get('/hotels/{id}/reviews',     [App\Http\Controllers\User\ReviewController::class, 'index']);
         Route::get('/hotels/{id}',             [App\Http\Controllers\User\HotelController::class, 'show']);
+        Route::match(['get', 'post'], '/hotels/scan-qr',   [App\Http\Controllers\User\HotelController::class, 'scanQr']);
+        Route::match(['get', 'post'], '/hotels/verify-qr', [App\Http\Controllers\User\HotelController::class, 'scanQr']);
         Route::post('/bookings',               [App\Http\Controllers\User\BookingController::class, 'store']);
         Route::get('/bookings/my',             [App\Http\Controllers\User\BookingController::class, 'myBookings']);
         Route::post('/bookings/{id}/cancel',   [App\Http\Controllers\User\BookingController::class, 'cancel']);
@@ -253,6 +259,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/hotels/{id}',         [App\Http\Controllers\Owner\HotelController::class, 'update']);
         Route::delete('/hotels/{id}',      [App\Http\Controllers\Owner\HotelController::class, 'destroy']);
         Route::post('/hotels/{id}/images', [App\Http\Controllers\Owner\HotelController::class, 'uploadImages']);
+        Route::get('/qr-code',             [App\Http\Controllers\Owner\HotelController::class, 'getQrCode']);
+        Route::get('/hotels/qr-code',      [App\Http\Controllers\Owner\HotelController::class, 'getQrCode']);
+        Route::get('/hotels/{id}/qr-code', [App\Http\Controllers\Owner\HotelController::class, 'getQrCode']);
         Route::get('/dashboard',           [App\Http\Controllers\Owner\DashboardController::class, 'index']);
         Route::get('/bookings',            [App\Http\Controllers\Owner\BookingController::class, 'index']);
         Route::get('/bookings/{id}',       [App\Http\Controllers\Owner\BookingController::class, 'show']);

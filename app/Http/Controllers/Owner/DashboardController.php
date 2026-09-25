@@ -212,6 +212,14 @@ class DashboardController extends Controller
             'admin_message'          => $rejectionReason ?? $kycMessage,
             'notification'           => $dashNotification,
             'notification_bar'       => $dashNotification,
+            // Hotel Yaan ID & QR Code details for Owner App display & download
+            'hotel_id'               => $targetHotel ? $targetHotel->id : null,
+            'hotel_name'             => $targetHotel ? $targetHotel->name : null,
+            'yaan_id'                => $targetHotel ? $targetHotel->yaan_id : null,
+            'hotel_code'             => $targetHotel ? $targetHotel->yaan_id : null,
+            'qr_code_url'            => $targetHotel ? $targetHotel->qr_code_url : null,
+            'qr_code_payload'        => $targetHotel ? $targetHotel->qr_code_payload : null,
+            'hotel'                  => $targetHotel,
         ]);
     }
 }
