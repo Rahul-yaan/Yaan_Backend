@@ -243,8 +243,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/hotels/search',           [App\Http\Controllers\User\HotelController::class, 'search']);
         Route::get('/hotels/{id}/reviews',     [App\Http\Controllers\User\ReviewController::class, 'index']);
         Route::get('/hotels/{id}',             [App\Http\Controllers\User\HotelController::class, 'show']);
-        Route::match(['get', 'post'], '/hotels/scan-qr',   [App\Http\Controllers\User\HotelController::class, 'scanQr']);
-        Route::match(['get', 'post'], '/hotels/verify-qr', [App\Http\Controllers\User\HotelController::class, 'scanQr']);
         Route::post('/bookings',               [App\Http\Controllers\User\BookingController::class, 'store']);
         Route::get('/bookings/my',             [App\Http\Controllers\User\BookingController::class, 'myBookings']);
         Route::post('/bookings/{id}/cancel',   [App\Http\Controllers\User\BookingController::class, 'cancel']);
