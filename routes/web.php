@@ -14,6 +14,50 @@ Route::get('/reset-password', function () {
     return view('reset_password');
 });
 
+// Legacy Android/Vendor API endpoints fallback
+Route::match(['get', 'post'], '/api.php', function () {
+    $amenities = \App\Models\Amenity::whereNotIn(\Illuminate\Support\Facades\DB::raw('LOWER(name)'), ['men', 'women'])
+        ->orderBy('id', 'asc')
+        ->get();
+
+    $jsonData = $amenities->map(function ($a) {
+        return [
+            'amenitie_id'     => (string) $a->id,
+            'amenitie_name'   => $a->name,
+            'imageurl'        => '',
+            'amenitie_status' => '1',
+        ];
+    })->values();
+
+    return response()->json([
+        'status'    => 'success',
+        'data'      => $amenities,
+        'amenities' => $amenities,
+        'JSON_DATA' => $jsonData,
+    ]);
+});
+Route::match(['get', 'post'], '/admin/api.php', function () {
+    $amenities = \App\Models\Amenity::whereNotIn(\Illuminate\Support\Facades\DB::raw('LOWER(name)'), ['men', 'women'])
+        ->orderBy('id', 'asc')
+        ->get();
+
+    $jsonData = $amenities->map(function ($a) {
+        return [
+            'amenitie_id'     => (string) $a->id,
+            'amenitie_name'   => $a->name,
+            'imageurl'        => '',
+            'amenitie_status' => '1',
+        ];
+    })->values();
+
+    return response()->json([
+        'status'    => 'success',
+        'data'      => $amenities,
+        'amenities' => $amenities,
+        'JSON_DATA' => $jsonData,
+    ]);
+});
+
 // Terms & Conditions and Privacy Policy Public Web Pages
 // Customer App
 Route::get('/terms-and-conditions', [\App\Http\Controllers\LegalController::class, 'termsView']);

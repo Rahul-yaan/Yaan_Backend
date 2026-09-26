@@ -125,6 +125,50 @@ Route::post('/webhooks/razorpay', [App\Http\Controllers\RazorpayWebhookControlle
 // Public Banners & Offers API for Mobile Apps (User App / Hotel Owner App)
 Route::get('/banners', [App\Http\Controllers\BannerController::class, 'index']);
 
+// Public Amenities API for Mobile Apps (User App / Hotel Owner App)
+Route::match(['get', 'post'], '/amenities', function () {
+    $amenities = \App\Models\Amenity::whereNotIn(\Illuminate\Support\Facades\DB::raw('LOWER(name)'), ['men', 'women'])
+        ->orderBy('id', 'asc')
+        ->get();
+
+    $jsonData = $amenities->map(function ($a) {
+        return [
+            'amenitie_id'     => (string) $a->id,
+            'amenitie_name'   => $a->name,
+            'imageurl'        => '',
+            'amenitie_status' => '1',
+        ];
+    })->values();
+
+    return response()->json([
+        'status'    => 'success',
+        'data'      => $amenities,
+        'amenities' => $amenities,
+        'JSON_DATA' => $jsonData,
+    ]);
+});
+Route::match(['get', 'post'], '/get_all_amenities', function () {
+    $amenities = \App\Models\Amenity::whereNotIn(\Illuminate\Support\Facades\DB::raw('LOWER(name)'), ['men', 'women'])
+        ->orderBy('id', 'asc')
+        ->get();
+
+    $jsonData = $amenities->map(function ($a) {
+        return [
+            'amenitie_id'     => (string) $a->id,
+            'amenitie_name'   => $a->name,
+            'imageurl'        => '',
+            'amenitie_status' => '1',
+        ];
+    })->values();
+
+    return response()->json([
+        'status'    => 'success',
+        'data'      => $amenities,
+        'amenities' => $amenities,
+        'JSON_DATA' => $jsonData,
+    ]);
+});
+
 // Public Storage / Media file serving endpoint with automatic DB restoration & smart fallback
 Route::get('/media/{path}', function ($path) {
     $fullPath = storage_path('app/public/' . $path);
