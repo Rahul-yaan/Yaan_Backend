@@ -49,3 +49,8 @@ services:
         value: yaan.smt@gmail.com
       - key: MAIL_FROM_NAME
         value: Yaan
+
+      - key: RAZORPAY_KEY_ID
+        value: rzp_test_TJg3E5sTryKc0U
+      - key: RAZORPAY_KEY_SECRET
+        value: ceSTST8dB7d8yRG5sO_SecretHere
