@@ -10,6 +10,20 @@ use Illuminate\Support\Facades\Log;
 class RazorpayWebhookController extends Controller
 {
     /**
+     * Webhook endpoint health check for GET / browser requests.
+     */
+    public function status()
+    {
+        return response()->json([
+            'status'            => 'active',
+            'endpoint'          => 'Razorpay Webhook Listener',
+            'message'           => 'This endpoint is active and listening for Razorpay webhook POST events.',
+            'supported_methods' => ['POST'],
+            'timestamp'         => now()->toIso8601String(),
+        ]);
+    }
+
+    /**
      * Handle incoming Razorpay webhooks.
      * Webhook URL: POST /api/webhooks/razorpay
      */

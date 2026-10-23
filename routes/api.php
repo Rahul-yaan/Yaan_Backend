@@ -121,6 +121,7 @@ Route::middleware('throttle:60,1')->group(function () {
 
 // Razorpay Webhook — Verified by HMAC signature in controller
 Route::post('/webhooks/razorpay', [App\Http\Controllers\RazorpayWebhookController::class, 'handleWebhook']);
+Route::get('/webhooks/razorpay',  [App\Http\Controllers\RazorpayWebhookController::class, 'status']);
 
 // Public Banners & Offers API for Mobile Apps (User App / Hotel Owner App)
 Route::get('/banners', [App\Http\Controllers\BannerController::class, 'index']);
