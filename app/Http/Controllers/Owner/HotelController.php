@@ -297,6 +297,7 @@ class HotelController extends Controller
             }
 
             $this->processUploadedImages($request, $existingHotel);
+            $this->syncOwnerProfileKycIfProvided($request, $request->user());
 
             return response()->json([
                 'message' => 'Hotel details updated successfully.',
@@ -327,6 +328,7 @@ class HotelController extends Controller
 
         // Process any uploaded images sent during hotel creation
         $this->processUploadedImages($request, $hotel);
+        $this->syncOwnerProfileKycIfProvided($request, $request->user());
 
         return response()->json([
             'message' => 'Hotel added successfully.',
@@ -622,5 +624,105 @@ class HotelController extends Controller
                 '3. Drivers can scan this QR code using their Yaan User App for instant spot booking.'
             ],
         ]);
+    }
+
+    /**
+     * Synchronize OwnerProfile KYC details and documents if submitted with hotel payload.
+     */
+    private function syncOwnerProfileKycIfProvided(Request $request, $user)
+    {
+        $hasKycData = $request->hasAny([
+            'aadhaar_number', 'aadhaar_no', 'aadhar_number', 'aadhar',
+            'pan_number', 'pan_card_number', 'pan_no', 'pan',
+            'bank_name', 'account_number', 'bank_account_number', 'ifsc_code', 'ifsc',
+            'business_proof', 'aadhaar_front', 'aadhaar_back', 'pan_card', 'fssai_license', 'gst_image',
+            'fssai_number', 'gst_number'
+        ]);
+
+        if (!$hasKycData) {
+            return;
+        }
+
+        $profile = \App\Models\OwnerProfile::firstOrCreate(['user_id' => $user->id]);
+
+        $aadhaarInput = $request->input('aadhaar_number') ?? $request->input('aadhaar_no') ?? $request->input('aadhar_number') ?? $request->input('aadhar');
+        if (!empty($aadhaarInput)) {
+            $cleanAadhaar = preg_replace('/[^0-9]/', '', (string)$aadhaarInput);
+            if (strlen($cleanAadhaar) === 12 && !in_array($cleanAadhaar[0], ['0', '1'])) {
+                $profile->aadhaar_number = $cleanAadhaar;
+            }
+        }
+
+        $panInput = $request->input('pan_number') ?? $request->input('pan_card_number') ?? $request->input('pan_no') ?? $request->input('pan');
+        if (!empty($panInput)) {
+            $cleanPan = strtoupper(preg_replace('/[^a-zA-Z0-9]/', '', (string)$panInput));
+            if (preg_match('/^[A-Z]{5}[0-9]{4}[A-Z]$/', $cleanPan)) {
+                $profile->pan_number = $cleanPan;
+            }
+        }
+
+        $bankName = $request->input('bank_name');
+        if (!empty($bankName)) {
+            $profile->bank_name = trim((string)$bankName);
+        }
+
+        $accountInput = $request->input('account_number') ?? $request->input('bank_account_number') ?? $request->input('bank_account_no');
+        if (!empty($accountInput)) {
+            $cleanAccount = preg_replace('/[^0-9]/', '', (string)$accountInput);
+            if (strlen($cleanAccount) >= 9 && strlen($cleanAccount) <= 18) {
+                $profile->account_number = $cleanAccount;
+            }
+        }
+
+        $ifscInput = $request->input('ifsc_code') ?? $request->input('ifsc') ?? $request->input('ifsc_number');
+        if (!empty($ifscInput)) {
+            $cleanIfsc = strtoupper(preg_replace('/[^a-zA-Z0-9]/', '', (string)$ifscInput));
+            if (preg_match('/^[A-Z]{4}0[A-Z0-9]{6}$/', $cleanIfsc)) {
+                $profile->ifsc_code = $cleanIfsc;
+            }
+        }
+
+        $fssaiInput = $request->input('fssai_number') ?? $request->input('fssai_no');
+        if (!empty($fssaiInput)) {
+            $cleanFssai = preg_replace('/[^0-9]/', '', (string)$fssaiInput);
+            if (strlen($cleanFssai) === 14) {
+                $profile->fssai_number = $cleanFssai;
+            }
+        }
+
+        $gstInput = $request->input('gst_number') ?? $request->input('gst_no') ?? $request->input('gstin');
+        if (!empty($gstInput)) {
+            $cleanGst = strtoupper(preg_replace('/[^a-zA-Z0-9]/', '', (string)$gstInput));
+            if (preg_match('/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/', $cleanGst)) {
+                $profile->gst_number = $cleanGst;
+            }
+        }
+
+        // Process KYC documents
+        $docKeys = ['business_proof', 'aadhaar_front', 'aadhaar_back', 'pan_card', 'fssai_license', 'gst_image'];
+        foreach ($docKeys as $field) {
+            if ($request->hasFile($field)) {
+                $file = $request->file($field);
+                if ($file->isValid()) {
+                    $path = $file->store('kyc_docs', 'public');
+                    $b64 = null;
+                    try {
+                        $rp = $file->getRealPath();
+                        if ($rp && file_exists($rp)) {
+                            $mime = $file->getClientMimeType() ?: 'image/jpeg';
+                            $b64 = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($rp));
+                        }
+                    } catch (\Throwable $e) {}
+                    $profile->{$field} = $b64 ?? $path;
+                }
+            } elseif ($request->filled($field) && is_string($request->input($field))) {
+                $val = trim((string)$request->input($field));
+                if (str_starts_with($val, 'data:image/') || str_starts_with($val, 'data:application/pdf') || str_starts_with($val, 'http://') || str_starts_with($val, 'https://')) {
+                    $profile->{$field} = $val;
+                }
+            }
+        }
+
+        $profile->save();
     }
 }
