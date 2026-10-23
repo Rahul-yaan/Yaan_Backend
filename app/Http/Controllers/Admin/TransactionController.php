@@ -250,7 +250,7 @@ class TransactionController extends Controller
         return response()->json([
             'transaction' => $transaction,
             'razorpay' => [
-                'key_id'          => env('RAZORPAY_KEY_ID'),
+                'key_id'          => config('services.razorpay.key_id') ?? env('RAZORPAY_KEY_ID'),
                 'order_id'        => $transaction->razorpay_order_id,
                 'payment_id'      => $transaction->razorpay_payment_id,
                 'amount_in_paise' => (int) round(($transaction->total_payable ?? $transaction->total_amount) * 100),

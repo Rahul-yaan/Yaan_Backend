@@ -268,10 +268,11 @@ class BookingController extends Controller
             ->firstOrFail();
 
         // Verify signature
+        $secret = config('services.razorpay.key_secret') ?? env('RAZORPAY_KEY_SECRET');
         $generatedSignature = hash_hmac(
             'sha256',
             $request->razorpay_order_id . '|' . $request->razorpay_payment_id,
-            env('RAZORPAY_KEY_SECRET')
+            $secret
         );
 
         if ($generatedSignature === $request->razorpay_signature) {
