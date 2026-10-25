@@ -10,6 +10,22 @@ Route::get('/', function () {
     ]);
 });
 
+Route::get('/ping', function () {
+    return response()->json([
+        'status' => 'ok',
+        'message' => 'Yaan Backend is awake',
+        'timestamp' => now()->toIso8601String()
+    ]);
+});
+
+Route::get('/health', function () {
+    return response()->json([
+        'status' => 'ok',
+        'service' => 'yaan-backend',
+        'timestamp' => now()->toIso8601String()
+    ]);
+});
+
 Route::get('/reset-password', function () {
     return view('reset_password');
 });

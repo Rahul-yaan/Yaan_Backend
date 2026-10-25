@@ -243,6 +243,7 @@ class HotelController extends Controller
         $hotel->base_price                  = $basePrice;
         $hotel->price_per_night             = $basePrice;
         $hotel->price                       = $basePrice;
+        $hotel->display_price               = $discountedBasePrice;
         $hotel->discount_amount             = $discountAmount;
         $hotel->discounted_price            = $discountedBasePrice;
         $hotel->gst_amount                  = $gstAmount;

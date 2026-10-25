@@ -180,7 +180,10 @@ function switchTab(tabId, event) {
     if (tabId === 'transactions') loadTransactionsData();
     if (tabId === 'users') loadUsersData();
     if (tabId === 'reviews') loadReviewsData();
-    if (tabId === 'banners') loadBannersData();
+    if (tabId === 'banners') {
+        loadBannersData();
+        loadSupportPhoneSetting();
+    }
 }
 
 function toggleDrawer() {
@@ -2255,7 +2258,26 @@ async function openInvoiceModal(txnId) {
                         ${price.promotion_applied > 0 ? `<div style="display:flex; justify-content:space-between; color:#059669;"><span>Discount:</span> <strong>-₹${(price.promotion_applied).toFixed(2)}</strong></div>` : ''}
                         <div style="display:flex; justify-content:space-between;"><span>GST (18%):</span> <strong>₹${(price.gst_amount || 0).toFixed(2)}</strong></div>
                         <hr style="border:0; border-top:1px solid #cbd5e1; margin:4px 0;">
-                        <div style="display:flex; justify-content:space-between; font-size:16px; color:#0f172a; font-weight:800;"><span>Total Payable:</span> <strong>₹${(price.total_payable || 0).toFixed(2)}</strong></div>
+                        <div style="display:flex; justify-content:space-between; font-size:16px; color:#0f172a; font-weight:800;"><span>Total Customer Paid:</span> <strong>₹${(price.total_payable || 0).toFixed(2)}</strong></div>
+
+                        <!-- Hotel Owner Settlement (66% Owner Share & 34% Platform Fee) -->
+                        <div style="background:#f0fdf4; padding:10px; border-radius:6px; border:1px solid #86efac; margin-top:6px; font-size:12px; color:#166534; display:flex; flex-direction:column; gap:4px;">
+                            <div style="font-weight:700; color:#15803d; font-size:12px; border-bottom:1px dashed #86efac; padding-bottom:4px; margin-bottom:2px;">
+                                <i class="fa-solid fa-hotel"></i> Hotel Owner Settlement Breakdown
+                            </div>
+                            <div style="display:flex; justify-content:space-between;">
+                                <span>Owner Net Share (66%):</span>
+                                <strong style="color:#166534;">₹${(price.owner_net_share !== undefined ? price.owner_net_share : ((price.discounted_base || price.subtotal || 0) * 0.66)).toFixed(2)}</strong>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; font-size:11px; color:#15803d;">
+                                <span>Owner GST (18%):</span>
+                                <span>₹${(price.owner_gst !== undefined ? price.owner_gst : ((price.gst_amount || 0) * 0.66)).toFixed(2)}</span>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; font-size:11px; color:#1e40af; border-top:1px dashed #bbf7d0; padding-top:3px; margin-top:2px;">
+                                <span>Platform Fee (34%):</span>
+                                <span>₹${(price.platform_fee_base !== undefined ? price.platform_fee_base : ((price.discounted_base || price.subtotal || 0) * 0.34)).toFixed(2)}</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -2886,6 +2908,50 @@ async function deleteBanner(id) {
         loadBannersData();
     } catch (err) {
         showToast(err.message, 'danger');
+    }
+}
+
+// ----------------------------------------------------
+// 8.1 CUSTOMER SUPPORT & WHATSAPP PHONE CONFIGURATION
+// ----------------------------------------------------
+async function loadSupportPhoneSetting() {
+    const input = document.getElementById('setting-support-phone');
+    if (!input) return;
+    try {
+        const res = await fetch(`${API_BASE}/admin/settings`, { headers: getHeaders() });
+        if (res.ok) {
+            const data = await res.json();
+            const phone = data.settings?.support_phone || data.data?.support_phone || '+91 7777991598';
+            input.value = phone;
+        }
+    } catch (e) {
+        console.error('Failed to load support phone:', e);
+    }
+}
+
+async function saveSupportPhoneSetting() {
+    const input = document.getElementById('setting-support-phone');
+    if (!input) return;
+    const phone = input.value.trim();
+    if (!phone) {
+        showToast('Please enter a valid phone or WhatsApp number', 'danger');
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API_BASE}/admin/settings`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ key: 'support_phone', value: phone }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Failed to save support number');
+        showToast(data.message || 'Support contact number updated successfully!', 'success');
+        if (data.settings?.support_phone) {
+            input.value = data.settings.support_phone;
+        }
+    } catch (e) {
+        showToast(e.message || 'Failed to update support number', 'danger');
     }
 }
 

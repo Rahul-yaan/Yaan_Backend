@@ -494,8 +494,24 @@
                             <span class="font-mono">₹${(price.gst_amount || 0).toLocaleString('en-IN')}</span>
                         </div>
                         <div class="pricing-row total">
-                            <span>Total Payable</span>
+                            <span>Total Payable (Customer)</span>
                             <span class="font-mono">₹${(price.total_payable || 0).toLocaleString('en-IN')}</span>
+                        </div>
+
+                        <!-- Hotel Owner Settlement (66% Owner Share & 34% Platform Fee) -->
+                        <div style="margin-top:14px; padding-top:10px; border-top:1px dashed var(--border-dark); font-size:12px;">
+                            <div class="pricing-row" style="color:var(--success); font-weight:700;">
+                                <span><i class="fa-solid fa-hotel"></i> Hotel Owner Payout (66% Net)</span>
+                                <span class="font-mono">₹${(price.owner_net_share !== undefined ? price.owner_net_share : ((price.discounted_base || price.subtotal || 0) * 0.66)).toFixed(2)}</span>
+                            </div>
+                            <div class="pricing-row" style="color:var(--text-secondary); font-size:11px;">
+                                <span>Owner GST (18%)</span>
+                                <span class="font-mono">₹${(price.owner_gst !== undefined ? price.owner_gst : ((price.gst_amount || 0) * 0.66)).toFixed(2)}</span>
+                            </div>
+                            <div class="pricing-row" style="color:var(--info); font-size:11px;">
+                                <span>Platform Fee (34% Net)</span>
+                                <span class="font-mono">₹${(price.platform_fee_base !== undefined ? price.platform_fee_base : ((price.discounted_base || price.subtotal || 0) * 0.34)).toFixed(2)}</span>
+                            </div>
                         </div>
                     </div>
 

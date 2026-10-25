@@ -70,27 +70,31 @@ class BookingController extends Controller
 
         $price = (float) $hotel->price_per_night;
 
-        // Discount calculation support (e.g. 5% discount or active offer banner)
+        // Discount calculation support (e.g. coupon code, discount percentage, or promo banner)
         $discountPct = (float) $request->input('discount_percentage', 0);
         $discountAmount = (float) $request->input('discount_amount', $request->input('promotion_applied', 0));
+        $promoCode = trim((string) ($request->input('discount_code') ?? $request->input('promo_code') ?? ''));
 
-        // Automatic fallback: If no explicit discount is passed, check active user banner discounts!
-        if ($discountPct <= 0 && $discountAmount <= 0) {
-            $activeBanner = \App\Models\Banner::whereRaw('is_active IS TRUE')
+        // If coupon code is provided, look up in active admin banners/offers
+        if (!empty($promoCode)) {
+            $banner = \App\Models\Banner::where('is_active', true)
                 ->whereIn('target_audience', ['user', 'all'])
                 ->where(function($q) {
                     $q->whereNull('expires_at')->orWhere('expires_at', '>=', now());
                 })
-                ->where('discount_percentage', '>', 0)
+                ->where(function($q) use ($promoCode) {
+                    $q->where('discount_code', $promoCode)
+                      ->orWhere('title', 'like', "%{$promoCode}%");
+                })
                 ->latest()
                 ->first();
 
-            if ($activeBanner) {
-                $discountPct = (float) $activeBanner->discount_percentage;
+            if ($banner && $banner->discount_percentage > 0) {
+                $discountPct = (float) $banner->discount_percentage;
             }
         }
 
-        if ($discountPct > 0 && $discountAmount <= 0) {
+        if ($discountPct > 0) {
             $discountAmount = round($price * ($discountPct / 100), 2);
         }
 

@@ -899,10 +899,14 @@ class LegalController extends Controller
     {
         $baseUrl = config('app.url', 'https://yaan-backend.onrender.com');
 
+        $supportPhone = \App\Models\Setting::get('support_phone', '+91 7777991598');
+
         return response()->json([
             'success' => true,
             'status' => true,
             'app_name' => 'Yaan',
+            'support_phone' => $supportPhone,
+            'phone' => $supportPhone,
             'support_email' => 'support@yaanapp.com',
             'info_email' => 'info@yaanapp.com',
             'address' => 'Bharuch, Gujarat, India',

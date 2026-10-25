@@ -552,11 +552,27 @@ class TransactionController extends Controller
         $invoiceDate   = $transaction->created_at ? $transaction->created_at->format('d M Y') : date('d M Y');
 
         $totalPayable = (float) ($transaction->total_payable ?? $transaction->total_amount ?? 0);
-        $basePrice    = (float) ($transaction->total_amount > 0 ? $transaction->total_amount : ($transaction->price_per_night > 0 ? $transaction->price_per_night : ($totalPayable > 0 ? round($totalPayable / 1.18, 2) : 0)));
-        $gstAmount    = (float) ($transaction->gst_amount > 0 ? $transaction->gst_amount : round($basePrice * 0.18, 2));
-        if ($totalPayable <= 0) {
-            $totalPayable = round($basePrice + $gstAmount, 2);
+        $promoApplied = (float) ($transaction->promotion_applied ?? 0);
+        $originalBase = (float) ($transaction->price_per_night > 0 
+            ? $transaction->price_per_night 
+            : (($transaction->total_amount > 0 ? $transaction->total_amount : 0) + $promoApplied));
+        if ($originalBase <= 0 && $totalPayable > 0) {
+            $originalBase = round(($totalPayable / 1.18) + $promoApplied, 2);
         }
+        $discountedBase = max(0, $originalBase - $promoApplied);
+        $gstAmount    = (float) ($transaction->gst_amount > 0 ? $transaction->gst_amount : round($discountedBase * 0.18, 2));
+        if ($totalPayable <= 0) {
+            $totalPayable = round($discountedBase + $gstAmount, 2);
+        }
+
+        // Owner 66% Share & Platform 34% Fee Breakdown
+        $ownerNetShare   = round($discountedBase * 0.66, 2);
+        $platformFeeBase = round($discountedBase * 0.34, 2);
+        $ownerGst        = round($gstAmount * 0.66, 2);
+        if ($ownerGst <= 0 && $ownerNetShare > 0) {
+            $ownerGst = round($ownerNetShare * 0.18, 2);
+        }
+        $platformFeeGst  = round($gstAmount - $ownerGst, 2);
 
         $isRefunded = $transaction->payment_status === 'refunded' || str_contains(strtolower($transaction->cancellation_reason ?? ''), 'refund');
         $refundId   = null;
@@ -732,11 +748,17 @@ class TransactionController extends Controller
                     'cancellation_reason'    => $transaction->cancellation_reason,
                 ],
                 'pricing' => [
-                    'price_per_night'   => $basePrice,
-                    'subtotal'          => (float) $transaction->total_amount,
-                    'promotion_applied' => (float) ($transaction->promotion_applied ?? 0.00),
+                    'price_per_night'   => $originalBase,
+                    'subtotal'          => $originalBase,
+                    'discounted_base'   => $discountedBase,
+                    'promotion_applied' => $promoApplied,
                     'gst_amount'        => $gstAmount,
                     'total_payable'     => $totalPayable,
+                    'owner_net_share'   => $ownerNetShare,
+                    'owner_gst'         => $ownerGst,
+                    'owner_total_payout'=> round($ownerNetShare + $ownerGst, 2),
+                    'platform_fee_base' => $platformFeeBase,
+                    'platform_fee_gst'  => $platformFeeGst,
                     'currency'          => 'INR',
                 ],
                 'all_customer_sales'     => $allCustomerSales,

@@ -6,6 +6,25 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ForgotPasswordController;
 
 // ============================================================
+// ULTRA-FAST KEEP-ALIVE & HEALTH CHECK (For Render Anti-Sleep)
+// ============================================================
+Route::get('/ping', function () {
+    return response()->json([
+        'status' => 'ok',
+        'message' => 'Yaan backend is active',
+        'timestamp' => now()->toIso8601String(),
+    ]);
+});
+
+Route::get('/health', function () {
+    return response()->json([
+        'status' => 'ok',
+        'service' => 'yaan-backend',
+        'timestamp' => now()->toIso8601String(),
+    ]);
+});
+
+// ============================================================
 // PUBLIC ROUTES — no token needed
 // ============================================================
 
@@ -125,6 +144,7 @@ Route::get('/webhooks/razorpay',  [App\Http\Controllers\RazorpayWebhookControlle
 
 // Public Banners & Offers API for Mobile Apps (User App / Hotel Owner App)
 Route::get('/banners', [App\Http\Controllers\BannerController::class, 'index']);
+Route::get('/notifications', [App\Http\Controllers\NotificationController::class, 'index']);
 
 // Public Amenities API for Mobile Apps (User App / Hotel Owner App)
 Route::match(['get', 'post'], '/amenities', function () {
@@ -363,6 +383,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/banners/{id}',        [App\Http\Controllers\Admin\BannerController::class, 'update']);
         Route::put('/banners/{id}/status', [App\Http\Controllers\Admin\BannerController::class, 'toggleStatus']);
         Route::delete('/banners/{id}',     [App\Http\Controllers\Admin\BannerController::class, 'destroy']);
+
+        // App Master Settings & Support Phone Configuration
+        Route::get('/settings',            [App\Http\Controllers\Admin\SettingController::class, 'index']);
+        Route::post('/settings',           [App\Http\Controllers\Admin\SettingController::class, 'update']);
+        Route::put('/settings',            [App\Http\Controllers\Admin\SettingController::class, 'update']);
     });
 
 });

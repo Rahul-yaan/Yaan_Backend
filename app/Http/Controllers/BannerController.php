@@ -17,7 +17,7 @@ class BannerController extends Controller
     {
         $target = strtolower($request->query('target') ?? $request->query('audience') ?? '');
 
-        $query = Banner::whereRaw('is_active IS TRUE')
+        $query = Banner::where('is_active', true)
             ->where(function($q) {
                 $q->whereNull('expires_at')
                   ->orWhere('expires_at', '>=', now());
@@ -31,10 +31,13 @@ class BannerController extends Controller
 
         $banners = $query->latest()->get();
 
+        $supportPhone = \App\Models\Setting::get('support_phone', '+91 7777991598');
+
         return response()->json([
-            'success' => true,
-            'banners' => $banners,
-            'data'    => $banners, // Supports both 'banners' and 'data' keys for client parsing
+            'success'       => true,
+            'banners'       => $banners,
+            'data'          => $banners, // Supports both 'banners' and 'data' keys for client parsing
+            'support_phone' => $supportPhone,
         ]);
     }
 }
