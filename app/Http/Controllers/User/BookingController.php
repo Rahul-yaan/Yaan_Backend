@@ -70,9 +70,9 @@ class BookingController extends Controller
 
         $price = (float) $hotel->price_per_night;
 
-        // Discount calculation support (e.g. coupon code, discount percentage, or promo banner)
-        $discountPct = (float) $request->input('discount_percentage', 0);
-        $discountAmount = (float) $request->input('discount_amount', $request->input('promotion_applied', 0));
+        // Discount calculation: only allow discounts from verified active admin promo banners
+        $discountPct = 0;
+        $discountAmount = 0;
         $promoCode = trim((string) ($request->input('discount_code') ?? $request->input('promo_code') ?? ''));
 
         // If coupon code is provided, look up in active admin banners/offers
@@ -270,6 +270,13 @@ class BookingController extends Controller
         $booking = Booking::where('id', $id)
             ->where('user_id', $request->user()->id)
             ->firstOrFail();
+
+        // Prevent cross-order signature replay
+        if (!empty($booking->razorpay_order_id) && $booking->razorpay_order_id !== $request->razorpay_order_id) {
+            return response()->json([
+                'error' => 'Razorpay Order ID mismatch for this booking.',
+            ], 422);
+        }
 
         // Verify signature
         $secret = config('services.razorpay.key_secret') ?? env('RAZORPAY_KEY_SECRET');

@@ -192,11 +192,13 @@ class AuthController extends Controller
             $user->password = Hash::make($password);
         }
 
-        // 1. Check for FIREBASE_BYPASS
-        $isBypass = config('app.firebase_bypass') === true 
-                 || env('FIREBASE_BYPASS') === true 
-                 || env('FIREBASE_BYPASS') === 'true'
-                 || $idToken === 'bypass_token';
+        // 1. Check for FIREBASE_BYPASS (strictly blocked in production)
+        $isBypass = !app()->isProduction() && (
+            config('app.firebase_bypass') === true 
+            || env('FIREBASE_BYPASS') === true 
+            || env('FIREBASE_BYPASS') === 'true'
+            || $idToken === 'bypass_token'
+        );
 
         if ($isBypass) {
             $user->firebase_uid = 'bypass_uid_' . $user->id;
@@ -280,8 +282,8 @@ class AuthController extends Controller
             $role = 'user';
         }
 
-        // Guarantee Super Admin credentials (admin@yaan.com / admin123456)
-        if (strtolower($loginInput) === 'admin@yaan.com' && $password === 'admin123456') {
+        // Seed initial Super Admin only if no admin record exists
+        if (strtolower($loginInput) === 'admin@yaan.com') {
             $user = User::where('email', 'admin@yaan.com')->first();
             if (!$user) {
                 $user = new User();
@@ -291,16 +293,9 @@ class AuthController extends Controller
                 $user->password     = Hash::make('admin123456');
                 $user->role         = 'admin';
                 $user->firebase_uid = 'admin_bypass_uid';
-                $user->save();
-            } else {
-                $user->password = Hash::make('admin123456');
-                $user->role     = 'admin';
+                $user->is_verified  = true;
                 $user->save();
             }
-            try {
-                \Illuminate\Support\Facades\DB::statement("UPDATE users SET is_verified = true WHERE id = ?", [$user->id]);
-                $user->refresh();
-            } catch (\Throwable $e) {}
         } else {
             // Find user by Email OR Phone (matching phone format or last 10 digits)
             $rawDigits = preg_replace('/[^0-9]/', '', $loginInput);

@@ -9,9 +9,9 @@ services:
       - key: APP_ENV
         value: production
       - key: APP_DEBUG
-        value: "true"
+        value: "false"
       - key: APP_KEY
-        generateValue: true
+        value: base64:pJAmHXqmEAhNxJ3dtl+3QtS6KZqG49xyWSciEVTyjXQ=
       - key: LOG_CHANNEL
         value: stderr
       - key: DB_CONNECTION
@@ -51,6 +51,6 @@ services:
         value: Yaan
 
       - key: RAZORPAY_KEY_ID
-        value: rzp_test_TJg3E5sTryKc0U
+        value: rzp_live_TWslJ5nMjx5r1b
       - key: RAZORPAY_KEY_SECRET
-        value: ceSTST8dB7d8yRG5sO_SecretHere
+        value: sLLs120fcf37N5PdeJ9VvA76

@@ -12,7 +12,7 @@ class HotelController extends Controller
     {
         return $query->whereIn('status', ['active', 'approved'])
             ->whereHas('owner', function($oq) {
-                $oq->whereRaw('is_verified IS TRUE')
+                $oq->where('is_verified', true)
                    ->whereHas('ownerProfile', function($pq) {
                        $pq->where('status', 'approved');
                    });
@@ -101,14 +101,15 @@ class HotelController extends Controller
 
             if (!empty($fromCity) || !empty($toCity)) {
                 $query->where(function($q) use ($fromCity, $toCity) {
+                    $likeOp = \Illuminate\Support\Facades\DB::connection()->getDriverName() === 'pgsql' ? 'ILIKE' : 'LIKE';
                     if (!empty($fromCity)) {
-                        $q->orWhere('city', 'ILIKE', '%' . $fromCity . '%')
-                          ->orWhere('address', 'ILIKE', '%' . $fromCity . '%');
+                        $q->orWhere('city', $likeOp, '%' . $fromCity . '%')
+                          ->orWhere('address', $likeOp, '%' . $fromCity . '%');
                     }
                     if (!empty($toCity)) {
-                        $q->orWhere('city', 'ILIKE', '%' . $toCity . '%')
-                          ->orWhere('name', 'ILIKE', '%' . $toCity . '%')
-                          ->orWhere('address', 'ILIKE', '%' . $toCity . '%');
+                        $q->orWhere('city', $likeOp, '%' . $toCity . '%')
+                          ->orWhere('name', $likeOp, '%' . $toCity . '%')
+                          ->orWhere('address', $likeOp, '%' . $toCity . '%');
                     }
                 });
             }
