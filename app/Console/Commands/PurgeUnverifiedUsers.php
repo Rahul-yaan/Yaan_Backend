@@ -8,17 +8,34 @@ use Illuminate\Console\Command;
 class PurgeUnverifiedUsers extends Command
 {
     protected $signature   = 'users:purge-unverified';
-    protected $description = 'Delete unverified user accounts older than 24 hours';
+    protected $description = 'Safely delete abandoned unverified user and owner accounts older than 24 hours';
 
     public function handle(): void
     {
-        $deleted = User::where('role', 'user')
-            ->where(function($q) {
-                $q->whereRaw('(is_verified IS FALSE OR is_verified IS NULL)');
-            })
-            ->where('created_at', '<', now()->subHours(24))
-            ->delete();
+        $cutoff = now()->subHours(24)->toDateTimeString();
 
-        $this->info("Purged {$deleted} unverified user(s).");
+        $abandonedUsers = User::whereIn('role', ['user', 'owner'])
+            ->where(function ($q) {
+                $q->where('is_verified', false)
+                  ->orWhereNull('is_verified');
+            })
+            ->where(function ($q) {
+                $q->whereNull('firebase_uid')
+                  ->orWhere('firebase_uid', '');
+            })
+            ->where('created_at', '<', $cutoff)
+            ->whereDoesntHave('bookings')
+            ->whereDoesntHave('hotels')
+            ->whereDoesntHave('ownerProfile')
+            ->get();
+
+        $count = 0;
+        foreach ($abandonedUsers as $user) {
+            $user->tokens()->delete();
+            $user->delete();
+            $count++;
+        }
+
+        $this->info("Purged {$count} abandoned unverified user(s).");
     }
 }

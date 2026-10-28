@@ -394,19 +394,26 @@ class HotelController extends Controller
         $updateData = $request->only([
             'name', 'description', 'city', 'address',
             'latitude', 'longitude', 'price_per_night',
-            'discount_price', 'total_rooms', 'status',
+            'discount_price', 'total_rooms',
         ]);
+
+        // Security Fix (2.4): Ignore status change unless hotel was already approved, active, or inactive
+        if ($request->has('status')) {
+            if (in_array($hotel->status, ['approved', 'active', 'inactive'], true)) {
+                $requestedStatus = strtolower(trim($request->input('status')));
+                if (in_array($requestedStatus, ['active', 'inactive'], true)) {
+                    $updateData['status'] = $requestedStatus;
+                }
+            }
+        }
 
         if (!empty($wheelPricingCheck['wheel_matrix'])) {
             $updateData['wheel_prices'] = $wheelPricingCheck['wheel_matrix'];
         }
 
         if (isset($updateData['total_rooms'])) {
-            $today = \Carbon\Carbon::today()->toDateString();
-            $todayBookingsCount = $hotel->bookings()
-                ->whereIn('status', ['pending', 'confirmed'])
-                ->whereDate('booking_date', $today)
-                ->count();
+            $today = \App\Support\BusinessDate::today();
+            $todayBookingsCount = \App\Models\Booking::holdingSlot($hotel->id, $today)->count();
             $updateData['available_rooms'] = max(0, (int)$updateData['total_rooms'] - $todayBookingsCount);
         }
 
@@ -435,6 +442,14 @@ class HotelController extends Controller
         $hotel = Hotel::where('id', $id)
             ->where('owner_id', $request->user()->id)
             ->firstOrFail();
+
+        // Data Safety Fix (2.1): Disallow deleting a hotel that has booking records
+        if ($hotel->bookings()->exists()) {
+            return response()->json([
+                'error'   => 'This hotel has bookings, so it cannot be deleted. Set it to inactive to stop new bookings.',
+                'message' => 'This hotel has bookings, so it cannot be deleted. Set it to inactive to stop new bookings.',
+            ], 422);
+        }
 
         // Delete images from storage
         foreach ($hotel->images as $image) {

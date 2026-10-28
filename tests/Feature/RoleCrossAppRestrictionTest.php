@@ -31,6 +31,12 @@ class RoleCrossAppRestrictionTest extends TestCase
             'role'  => 'user',
         ]);
 
+        // Complete verification for customer account
+        User::where('phone', '8780215229')->update([
+            'is_verified'  => true,
+            'firebase_uid' => 'fb_cust_verified_1',
+        ]);
+
         // 2. Attempt to register in Hotel Owner App with same phone number
         $registerOwnerResponse = $this->postJson('/api/register', [
             'name'     => 'Owner Impostor',
@@ -59,6 +65,12 @@ class RoleCrossAppRestrictionTest extends TestCase
             'phone'    => '8780215229',
             'role'     => 'user',
             'password' => 'password123',
+        ]);
+
+        // Mark as verified
+        User::where('phone', '8780215229')->update([
+            'is_verified'  => true,
+            'firebase_uid' => 'fb_cust_verified_2',
         ]);
 
         // 2. Attempt to register with +91 prefix in Owner App
@@ -123,6 +135,12 @@ class RoleCrossAppRestrictionTest extends TestCase
         $this->assertDatabaseHas('users', [
             'phone' => '9876543210',
             'role'  => 'owner',
+        ]);
+
+        // Mark owner as verified
+        User::where('phone', '9876543210')->update([
+            'is_verified'  => true,
+            'firebase_uid' => 'fb_owner_verified_1',
         ]);
 
         // 2. Attempt to register in Customer App with same phone

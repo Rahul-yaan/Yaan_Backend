@@ -32,5 +32,10 @@ if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
     php artisan db:seed --class=AmenitySeeder --force || echo "Amenity seeder completed."
 fi
 
+# Start Laravel background scheduler
+echo "Starting Laravel scheduler..."
+runuser -u www-data -- php artisan schedule:work 2>&1 \
+  | grep --line-buffered -v "No scheduled commands are ready to run" &
+
 echo "Starting Apache server on port ${PORT}..."
 exec "$@"

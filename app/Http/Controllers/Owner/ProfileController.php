@@ -110,6 +110,17 @@ class ProfileController extends Controller
         // --- C. Phone Validation (10-digit Indian Mobile) ---
         $rawPhone = preg_replace('/[^0-9]/', '', $phoneInput);
         $phone10 = strlen($rawPhone) >= 10 ? substr($rawPhone, -10) : $rawPhone;
+        $userRaw = preg_replace('/[^0-9]/', '', (string)$user->phone);
+        $user10  = strlen($userRaw) >= 10 ? substr($userRaw, -10) : $userRaw;
+
+        // Security Fix (1.10): Phone is read-only after verification
+        if ($request->filled('phone') && !empty($user10) && $phone10 !== $user10) {
+            return response()->json([
+                'error'   => 'Phone number cannot be changed directly.',
+                'message' => 'Phone number cannot be changed without OTP verification.',
+            ], 422);
+        }
+
         if (empty($phone10) || !preg_match('/^[6-9][0-9]{9}$/', $phone10)) {
             $errors['phone'] = ['Please enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9.'];
         }
@@ -243,9 +254,8 @@ class ProfileController extends Controller
             ], 422);
         }
 
-        // 2. Update user name and phone
+        // 2. Update user name (phone is strictly read-only after verification)
         $user->name = $ownerName;
-        $user->phone = $phone10;
         $user->save();
 
         // 3. Assemble validated clean profile data
@@ -265,7 +275,7 @@ class ProfileController extends Controller
             'gst_number'     => !empty($cleanGst) ? $cleanGst : null,
         ];
 
-        // 4. Handle file uploads (supporting multipart UploadedFile, Base64 strings, and preserving existing files)
+        // 4. Handle KYC file uploads securely to private disk
         $fileFields = [
             'business_proof', 'aadhaar_front', 'aadhaar_back',
             'pan_card', 'fssai_license', 'gst_image',
@@ -274,24 +284,21 @@ class ProfileController extends Controller
         foreach ($fileFields as $field) {
             if ($request->hasFile($field)) {
                 $file = $request->file($field);
-                $path = $file->store('kyc_docs', 'public');
-
-                $b64 = null;
                 try {
-                    $realPath = $file->getRealPath();
-                    if ($realPath && file_exists($realPath)) {
-                        $mime = $file->getClientMimeType() ?: 'image/jpeg';
-                        $b64 = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($realPath));
+                    $path = \App\Support\SafeUpload::storeKycDocument($file);
+                    if ($path) {
+                        $data[$field] = $path;
                     }
                 } catch (\Throwable $e) {}
-
-                // Store persistent base64 in owner_profiles so documents survive Render disk wipes
-                $data[$field] = $b64 ?? $path;
             } elseif ($request->filled($field) && is_string($request->input($field))) {
                 $val = trim($request->input($field));
-                if (str_starts_with($val, 'data:image/') || str_starts_with($val, 'data:application/')) {
-                    $this->saveBase64Document($val, $field, $user->id);
-                    $data[$field] = $val;
+                if (str_starts_with($val, 'data:')) {
+                    try {
+                        $path = \App\Support\SafeUpload::storeKycDocument($val);
+                        if ($path) {
+                            $data[$field] = $path;
+                        }
+                    } catch (\Throwable $e) {}
                 } elseif (str_starts_with($val, 'http://') || str_starts_with($val, 'https://') || str_starts_with($val, 'kyc_docs/')) {
                     $data[$field] = $val;
                 }

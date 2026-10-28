@@ -7,6 +7,21 @@ let currentOwners = [];
 let currentTxnTypeFilter = '';
 let currentTransactions = [];
 
+function esc(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function jsArg(str) {
+    if (str === null || str === undefined) return "''";
+    return JSON.stringify(String(str)).replace(/'/g, "\\'");
+}
+
 function formatDateClean(dateStr) {
     if (!dateStr) return 'N/A';
     try {
@@ -45,8 +60,8 @@ async function handleLogin(event) {
     const passElem = document.getElementById('login-password');
     const roleElem = document.getElementById('login-role');
 
-    const email = emailElem ? emailElem.value.trim() : 'admin@yaan.com';
-    const password = passElem ? passElem.value : 'admin123456';
+    const email = emailElem ? emailElem.value.trim() : '';
+    const password = passElem ? passElem.value : '';
     const role = (roleElem && roleElem.value) ? roleElem.value : 'admin';
 
     const errorBanner = document.getElementById('login-error');
@@ -1881,8 +1896,9 @@ async function loadTransactionsData() {
 
         tbody.innerHTML = currentTransactions.map(t => {
             const isConfirmed = t.is_confirmed || t.payment_status === 'paid' || t.status === 'confirmed' || t.status === 'completed';
-            const isRefunded = t.payment_status === 'refunded' || (t.cancellation_reason && t.cancellation_reason.toLowerCase().includes('refund'));
-            const isCancelled = t.status === 'cancelled' || isRefunded || t.payment_status === 'failed';
+            const isRefundPending = t.payment_status === 'refund_pending';
+            const isRefunded = t.payment_status === 'refunded' || t.payment_status === 'refund_initiated' || (t.cancellation_reason && t.cancellation_reason.toLowerCase().includes('refund'));
+            const isCancelled = t.status === 'cancelled' || isRefunded || isRefundPending || t.payment_status === 'failed';
             const isTemp = !isConfirmed && !isCancelled;
             const displayTxnId = t.display_transaction_id || t.transaction_id || t.temp_transaction_id || `TMP-${t.razorpay_order_id || t.id}`;
             const regionTime = t.region_time_formatted || (t.created_at ? new Date(t.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' IST' : 'N/A');
@@ -1898,6 +1914,10 @@ async function loadTransactionsData() {
                 typeBadgeClass = 'confirmed';
                 typeBadgeIcon = 'fa-circle-check';
                 typeBadgeText = 'CONFIRMED';
+            } else if (isRefundPending) {
+                typeBadgeClass = 'warning';
+                typeBadgeIcon = 'fa-clock-rotate-left';
+                typeBadgeText = 'REFUND PENDING';
             } else if (isRefunded) {
                 typeBadgeClass = 'failed';
                 typeBadgeIcon = 'fa-arrow-rotate-left';
@@ -1911,7 +1931,10 @@ async function loadTransactionsData() {
             let statusBadgeClass = 'pending';
             let statusText = t.status || 'pending';
 
-            if (isRefunded) {
+            if (isRefundPending) {
+                statusBadgeClass = 'warning';
+                statusText = 'REFUND PENDING';
+            } else if (isRefunded) {
                 statusBadgeClass = 'failed';
                 statusText = 'REFUNDED VIA RAZORPAY';
             } else if (isConfirmed) {
@@ -1933,6 +1956,8 @@ async function loadTransactionsData() {
                 reasonText = 'Money Deducted? Click Live Sync to check Razorpay status';
             }
 
+            const canRefund = (isConfirmed && !isRefunded) || isRefundPending;
+
             return `
                 <tr class="${isTemp ? 'temp-txn-row' : (isConfirmed ? 'confirmed-txn-row' : (isRefunded ? 'refunded-txn-row' : ''))}">
                     <td><strong>#${t.id}</strong></td>
@@ -1943,28 +1968,28 @@ async function loadTransactionsData() {
                         </span>
                     </td>
                     <td>
-                        <div style="font-family: monospace; font-weight: 700; color: ${isConfirmed ? '#10b981' : (isRefunded ? '#a855f7' : '#f59e0b')}; font-size:12px;">
-                            ${displayTxnId}
+                        <div style="font-family: monospace; font-weight: 700; color: ${isConfirmed ? '#10b981' : (isRefundPending ? '#eab308' : (isRefunded ? '#a855f7' : '#f59e0b'))}; font-size:12px;">
+                            ${esc(displayTxnId)}
                         </div>
-                        ${t.razorpay_order_id ? `<small style="font-size:10px; color:var(--text-muted);">Order: ${t.razorpay_order_id}</small>` : ''}
+                        ${t.razorpay_order_id ? `<small style="font-size:10px; color:var(--text-muted);">Order: ${esc(t.razorpay_order_id)}</small>` : ''}
                     </td>
                     <td>
-                        <strong>${userName}</strong><br>
-                        <small class="text-muted"><i class="fa-solid fa-phone" style="font-size:10px;"></i> ${userContact}</small>
+                        <strong>${esc(userName)}</strong><br>
+                        <small class="text-muted"><i class="fa-solid fa-phone" style="font-size:10px;"></i> ${esc(userContact)}</small>
                     </td>
                     <td>
-                        <div style="font-size:12px; font-weight:600;">${regionTime}</div>
+                        <div style="font-size:12px; font-weight:600;">${esc(regionTime)}</div>
                         ${isRefunded && t.refund_time_formatted ? `
                             <div style="font-size:11px; color:#c084fc; font-weight:700; margin-top:2px;" title="Exact Razorpay Refund Timestamp">
-                                <i class="fa-solid fa-arrow-rotate-left"></i> Refunded: ${t.refund_time_formatted}
+                                <i class="fa-solid fa-arrow-rotate-left"></i> Refunded: ${esc(t.refund_time_formatted)}
                             </div>
                         ` : ''}
-                        <small class="text-muted" style="font-size:10px;">Hotel: ${t.hotel ? t.hotel.name : 'N/A'}</small>
+                        <small class="text-muted" style="font-size:10px;">Hotel: ${esc(t.hotel ? t.hotel.name : 'N/A')}</small>
                     </td>
                     <td>
                         <span class="pay-method-pill">
                             <i class="fa-solid ${t.payment_method === 'Razorpay' || t.razorpay_order_id ? 'fa-shield-halved' : 'fa-credit-card'}"></i>
-                            ${t.payment_method || 'Razorpay / Online'}
+                            ${esc(t.payment_method || 'Razorpay / Online')}
                         </span>
                     </td>
                     <td>
@@ -1974,10 +1999,10 @@ async function loadTransactionsData() {
                         <span class="badge ${statusBadgeClass}">${statusText}</span>
                         ${isRefunded && t.refund_time_formatted ? `
                             <div style="font-size:11px; color:#e9d5ff; font-weight:700; margin-top:3px;">
-                                <i class="fa-solid fa-clock"></i> Refunded At: ${t.refund_time_formatted}
+                                <i class="fa-solid fa-clock"></i> Refunded At: ${esc(t.refund_time_formatted)}
                             </div>
                         ` : ''}
-                        ${reasonText ? `<div style="font-size:11px; color:#fca5a5; margin-top:3px; max-width:200px; line-height:1.2;"><i class="fa-solid fa-circle-info"></i> ${reasonText}</div>` : ''}
+                        ${reasonText ? `<div style="font-size:11px; color:#fca5a5; margin-top:3px; max-width:200px; line-height:1.2;"><i class="fa-solid fa-circle-info"></i> ${esc(reasonText)}</div>` : ''}
                     </td>
                     <td>
                         <div style="display:flex; flex-direction:column; gap:4px;">
@@ -1990,7 +2015,7 @@ async function loadTransactionsData() {
                             <button class="btn-sm" style="background:#0284c7; color:#fff;" onclick="verifyRazorpayStatus(${t.id})" title="Verify Live Status with Razorpay API">
                                 <i class="fa-solid fa-rotate"></i> Live Sync
                             </button>
-                            ${isConfirmed && !isRefunded ? `
+                            ${canRefund ? `
                                 <button class="btn-sm" style="background:#e11d48; color:#fff;" onclick="refundTransactionDirect(${t.id})" title="Issue Refund to Customer via Razorpay API">
                                     <i class="fa-solid fa-arrow-rotate-left"></i> Refund Txn
                                 </button>
@@ -2024,38 +2049,44 @@ async function openTransactionModal(txnId) {
         const t = data.transaction || {};
         const r = data.razorpay || {};
         const isConfirmed = t.is_confirmed || t.payment_status === 'paid' || t.status === 'confirmed' || t.status === 'completed';
+        const isRefundPending = t.payment_status === 'refund_pending';
         const isRefunded = t.payment_status === 'refunded' || t.payment_status === 'refund_initiated' || (t.cancellation_reason && t.cancellation_reason.toLowerCase().includes('refund'));
         const displayTxnId = t.display_transaction_id || t.transaction_id || t.temp_transaction_id || `TMP-${t.razorpay_order_id || t.id}`;
         const regionTime = t.region_time_formatted || (t.created_at ? new Date(t.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' IST' : 'N/A');
         const userObj = t.user || {};
         const hotelObj = t.hotel || {};
 
+        let modalBadgeClass = isConfirmed ? 'confirmed' : (isRefundPending ? 'warning' : (isRefunded ? 'failed' : 'pending'));
+        let modalBadgeText = isConfirmed ? 'CONFIRMED PAYMENT' : (isRefundPending ? 'REFUND PENDING' : (isRefunded ? 'REFUNDED' : 'TEMPORARY / CANCELLED'));
+
         let gatewayJsonHtml = '';
         if (t.gateway_response) {
             try {
                 const parsed = JSON.parse(t.gateway_response);
-                gatewayJsonHtml = `<pre style="background:#0f172a; padding:10px; border-radius:6px; font-size:11px; max-height:150px; overflow:auto; color:#38bdf8;">${JSON.stringify(parsed, null, 2)}</pre>`;
+                gatewayJsonHtml = `<pre style="background:#0f172a; padding:10px; border-radius:6px; font-size:11px; max-height:150px; overflow:auto; color:#38bdf8;">${esc(JSON.stringify(parsed, null, 2))}</pre>`;
             } catch (e) {
-                gatewayJsonHtml = `<div style="font-size:12px; color:var(--text-muted);">${t.gateway_response}</div>`;
+                gatewayJsonHtml = `<div style="font-size:12px; color:var(--text-muted);">${esc(t.gateway_response)}</div>`;
             }
         }
+
+        const canRefund = (isConfirmed && !isRefunded) || isRefundPending;
 
         modalBody.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
                 <div>
                     <h4 style="margin:0; font-size:18px;">
                         Transaction #${t.id} 
-                        <span class="badge ${isConfirmed ? 'confirmed' : 'pending'}" style="margin-left:8px;">
-                            ${isConfirmed ? 'CONFIRMED PAYMENT' : 'TEMPORARY / CANCELLED'}
+                        <span class="badge ${modalBadgeClass}" style="margin-left:8px;">
+                            ${modalBadgeText}
                         </span>
                     </h4>
-                    <div style="font-size:13px; font-weight:700; color:${isConfirmed ? '#10b981' : '#f59e0b'}; font-family:monospace; margin-top:4px;">
-                        ${displayTxnId}
+                    <div style="font-size:13px; font-weight:700; color:${isConfirmed ? '#10b981' : (isRefundPending ? '#eab308' : '#f59e0b')}; font-family:monospace; margin-top:4px;">
+                        ${esc(displayTxnId)}
                     </div>
                 </div>
                 <div style="text-align:right;">
                     <div style="font-size:22px; font-weight:700; color:var(--text-primary);">₹${t.total_payable || t.total_amount || 0}</div>
-                    <div style="font-size:11px; color:var(--text-muted);">${t.payment_method || 'Online Payment'}</div>
+                    <div style="font-size:11px; color:var(--text-muted);">${esc(t.payment_method || 'Online Payment')}</div>
                 </div>
             </div>
 
@@ -2063,18 +2094,18 @@ async function openTransactionModal(txnId) {
                 <div style="background:var(--bg-dark); padding:12px; border-radius:8px; border:1px solid var(--border);">
                     <h5 style="margin:0 0 6px 0; font-size:13px; color:var(--primary);"><i class="fa-solid fa-user"></i> Customer Info</h5>
                     <div style="font-size:12px; display:flex; flex-direction:column; gap:3px;">
-                        <div><strong>Name:</strong> ${userObj.name || 'N/A'}</div>
-                        <div><strong>Email:</strong> ${userObj.email || 'N/A'}</div>
-                        <div><strong>Phone:</strong> ${userObj.phone || 'N/A'}</div>
+                        <div><strong>Name:</strong> ${esc(userObj.name || 'N/A')}</div>
+                        <div><strong>Email:</strong> ${esc(userObj.email || 'N/A')}</div>
+                        <div><strong>Phone:</strong> ${esc(userObj.phone || 'N/A')}</div>
                     </div>
                 </div>
 
                 <div style="background:var(--bg-dark); padding:12px; border-radius:8px; border:1px solid var(--border);">
                     <h5 style="margin:0 0 6px 0; font-size:13px; color:var(--primary);"><i class="fa-solid fa-hotel"></i> Hotel & Booking Info</h5>
                     <div style="font-size:12px; display:flex; flex-direction:column; gap:3px;">
-                        <div><strong>Hotel:</strong> ${hotelObj.name || 'N/A'} (${hotelObj.city || ''})</div>
-                        <div><strong>Dates:</strong> ${t.check_in || ''} to ${t.check_out || ''}</div>
-                        <div><strong>Truck No:</strong> ${t.truck_no || 'N/A'} (${t.truck_type || ''})</div>
+                        <div><strong>Hotel:</strong> ${esc(hotelObj.name || 'N/A')} (${esc(hotelObj.city || '')})</div>
+                        <div><strong>Dates:</strong> ${esc(t.check_in || '')} to ${esc(t.check_out || '')}</div>
+                        <div><strong>Truck No:</strong> ${esc(t.truck_no || 'N/A')} (${esc(t.truck_type || '')})</div>
                     </div>
                 </div>
             </div>
@@ -2082,17 +2113,17 @@ async function openTransactionModal(txnId) {
             <div style="background:var(--bg-dark); padding:12px; border-radius:8px; border:1px solid var(--border); margin-bottom:16px;">
                 <h5 style="margin:0 0 8px 0; font-size:13px; color:var(--info);"><i class="fa-solid fa-clock"></i> Timestamps & Region Time</h5>
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:12px;">
-                    <div><strong>Booking Created (IST):</strong> ${regionTime}</div>
-                    <div><strong>Server Timestamp:</strong> ${t.created_at || 'N/A'}</div>
+                    <div><strong>Booking Created (IST):</strong> ${esc(regionTime)}</div>
+                    <div><strong>Server Timestamp:</strong> ${esc(t.created_at || 'N/A')}</div>
                     ${t.refund_time_formatted ? `
                         <div style="grid-column: span 2; color:#c084fc; font-weight:700; margin-top:4px; padding-top:4px; border-top:1px dashed var(--border);">
-                            <i class="fa-solid fa-arrow-rotate-left"></i> <strong>Razorpay Refund Date & Time:</strong> ${t.refund_time_formatted}
+                            <i class="fa-solid fa-arrow-rotate-left"></i> <strong>Razorpay Refund Date & Time:</strong> ${esc(t.refund_time_formatted)}
                         </div>
                     ` : ''}
                 </div>
                 ${t.cancellation_reason ? `
                     <div style="margin-top:8px; padding:8px; background:rgba(239, 68, 68, 0.15); border:1px solid var(--danger); border-radius:6px; font-size:12px; color:#fca5a5;">
-                        <i class="fa-solid fa-circle-exclamation"></i> <strong>Cancellation / Failure Reason:</strong> ${t.cancellation_reason}
+                        <i class="fa-solid fa-circle-exclamation"></i> <strong>Cancellation / Failure Reason:</strong> ${esc(t.cancellation_reason)}
                     </div>
                 ` : ''}
             </div>
@@ -2100,9 +2131,9 @@ async function openTransactionModal(txnId) {
             <div style="background:var(--bg-dark); padding:12px; border-radius:8px; border:1px solid var(--border); margin-bottom:16px;">
                 <h5 style="margin:0 0 8px 0; font-size:13px; color:#a855f7;"><i class="fa-solid fa-shield-halved"></i> Razorpay Integration Metadata</h5>
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:12px;">
-                    <div><strong>Razorpay Order ID:</strong> ${r.order_id || t.razorpay_order_id || 'N/A'}</div>
-                    <div><strong>Razorpay Payment ID:</strong> ${r.payment_id || t.razorpay_payment_id || 'N/A'}</div>
-                    <div><strong>Razorpay Key ID:</strong> ${r.key_id ? r.key_id.substring(0, 10) + '...' : 'Configured'}</div>
+                    <div><strong>Razorpay Order ID:</strong> ${esc(r.order_id || t.razorpay_order_id || 'N/A')}</div>
+                    <div><strong>Razorpay Payment ID:</strong> ${esc(r.payment_id || t.razorpay_payment_id || 'N/A')}</div>
+                    <div><strong>Razorpay Key ID:</strong> ${r.key_id ? esc(r.key_id.substring(0, 10)) + '...' : 'Configured'}</div>
                     <div><strong>Amount in Paise:</strong> ${r.amount_in_paise || ((t.total_payable || 0) * 100)} paise</div>
                 </div>
                 ${gatewayJsonHtml ? `<div style="margin-top:10px;"><strong style="font-size:11px;">Razorpay Gateway Raw Response:</strong>${gatewayJsonHtml}</div>` : ''}
@@ -2115,11 +2146,11 @@ async function openTransactionModal(txnId) {
                 <button class="btn-sm" style="background:#0284c7; color:#fff; padding:8px 14px;" onclick="verifyRazorpayStatus(${t.id})">
                     <i class="fa-solid fa-rotate"></i> Sync Live Razorpay Status
                 </button>
-                ${isConfirmed && !isRefunded ? `
+                ${canRefund ? `
                     <button class="btn-sm" style="padding:8px 14px; background:#e11d48; color:#fff;" onclick="refundTransactionDirect(${t.id}); closeTransactionModal();">
                         <i class="fa-solid fa-arrow-rotate-left"></i> Issue Razorpay Refund
                     </button>
-                ` : (!isConfirmed ? `
+                ` : (!isConfirmed && !isRefundPending ? `
                     <button class="btn-sm btn-success" style="padding:8px 14px;" onclick="updateTransactionStatus(${t.id}, 'confirmed'); closeTransactionModal();">
                         <i class="fa-solid fa-check"></i> Mark as Confirmed
                     </button>

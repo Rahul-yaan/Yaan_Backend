@@ -5,9 +5,12 @@ namespace App\Http\Controllers\User;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Models\Hotel;
+use App\Models\Banner;
+use App\Support\BusinessDate;
 use Illuminate\Http\Request;
-use Carbon\Carbon;
-use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Razorpay\Api\Api;
 
 class BookingController extends Controller
 {
@@ -18,186 +21,203 @@ class BookingController extends Controller
     // ============================================================
     public function store(Request $request)
     {
+        $todayIndia = BusinessDate::today();
+
         $request->validate([
             'hotel_id'         => 'required|exists:hotels,id',
-            'booking_date'     => 'required|date|after_or_equal:today',
+            'booking_date'     => 'required|date|after_or_equal:' . $todayIndia,
             'truck_type'       => 'required|string',
             'truck_no'         => 'required|string',
-            'logistics_name'   => 'required|string',
-            'logistics_number' => 'required|string',
-            'payment_method'   => 'required|string',
+            'logistics_name'   => 'nullable|string|max:100',
+            'logistics_number' => 'nullable|string|max:20',
+            'payment_method'   => 'nullable|string',
+            'discount_code'    => 'nullable|string',
+            'promo_code'       => 'nullable|string',
         ]);
 
-        // Support alternative field aliases for truck_no (e.g. truck_number, vehicle_no, registration_no)
-        $rawTruckNo = trim((string) ($request->input('truck_no') ?? $request->input('truck_number') ?? $request->input('vehicle_no') ?? $request->input('vehicle_number') ?? $request->input('registration_no')));
+        $bookingDate = $request->booking_date;
 
-        $hasIllegalChars = !empty($rawTruckNo) && !preg_match('/^[a-zA-Z0-9\s\.\-]+$/', $rawTruckNo);
-
-        // Normalize vehicle registration number: convert to uppercase and strip spaces/hyphens/dots
-        $cleanTruckNo = preg_replace('/[^A-Z0-9]/', '', strtoupper($rawTruckNo));
-
-        // Indian Vehicle Registration Number regex pattern (State RTO series + Bharat BH series)
-        $vehicleRegex = '/^([A-Z]{2}[0-9]{1,2}[A-Z]{0,3}[0-9]{1,4}|[0-9]{2}BH[0-9]{1,4}[A-Z]{1,2})$/';
-
-        if ($hasIllegalChars || empty($cleanTruckNo) || !preg_match($vehicleRegex, $cleanTruckNo)) {
+        // Clean & validate Indian vehicle number format
+        $cleanTruckNo = strtoupper(preg_replace('/[^a-zA-Z0-9]/', '', (string)$request->truck_no));
+        if (strlen($cleanTruckNo) < 6 || strlen($cleanTruckNo) > 13) {
             return response()->json([
-                'message' => 'The given data was invalid.',
-                'errors'  => [
-                    'truck_no' => ['Enter a valid vehicle registration number, for example GJ16AB7888 or GJ16A7888.']
-                ]
+                'error'   => 'Validation failed.',
+                'message' => 'Please enter a valid vehicle registration number (e.g., GJ16AB7888 or BH series).',
             ], 422);
         }
-
-        $hotel = Hotel::where('id', $request->hotel_id)
-            ->where(function($q) {
-                $q->where('status', 'approved')->orWhere('status', 'active');
-            })
-            ->firstOrFail();
-
-        // Check date-specific availability
-        $bookedForDate = Booking::where('hotel_id', $hotel->id)
-            ->whereIn('status', ['pending', 'confirmed'])
-            ->whereDate('booking_date', $request->booking_date)
-            ->count();
-
-        $availableForDate = max(0, $hotel->total_rooms - $bookedForDate);
-
-        if ($availableForDate < 1) {
-            return response()->json([
-                'error' => 'No parking slots available for the selected date.',
-            ], 422);
-        }
-
-        $price = (float) $hotel->price_per_night;
-
-        // Discount calculation: only allow discounts from verified active admin promo banners
-        $discountPct = 0;
-        $discountAmount = 0;
-        $promoCode = trim((string) ($request->input('discount_code') ?? $request->input('promo_code') ?? ''));
-
-        // If coupon code is provided, look up in active admin banners/offers
-        if (!empty($promoCode)) {
-            $banner = \App\Models\Banner::where('is_active', true)
-                ->whereIn('target_audience', ['user', 'all'])
-                ->where(function($q) {
-                    $q->whereNull('expires_at')->orWhere('expires_at', '>=', now());
-                })
-                ->where(function($q) use ($promoCode) {
-                    $q->where('discount_code', $promoCode)
-                      ->orWhere('title', 'like', "%{$promoCode}%");
-                })
-                ->latest()
-                ->first();
-
-            if ($banner && $banner->discount_percentage > 0) {
-                $discountPct = (float) $banner->discount_percentage;
-            }
-        }
-
-        if ($discountPct > 0) {
-            $discountAmount = round($price * ($discountPct / 100), 2);
-        }
-
-        $discountedBasePrice = max(0, $price - $discountAmount);
-        $gstAmount = round($discountedBasePrice * 0.18, 2);
-        $totalPayable = round($discountedBasePrice + $gstAmount, 2);
 
         $rawPayment = strtolower(trim($request->payment_method ?? 'online'));
-        $isOfflinePayment = in_array($rawPayment, ['cash', 'pay_at_hotel', 'pay at hotel', 'offline']);
+        $isOfflinePayment = in_array($rawPayment, ['cash', 'pay_at_hotel', 'pay at hotel', 'offline'], true);
         $isOnlinePayment = !$isOfflinePayment;
 
-        $tempTxnId = 'TMP-' . strtoupper(\Illuminate\Support\Str::random(8)) . '-' . time();
+        // Anti-fraud: Limit Pay at Hotel bookings to at most 5 per customer per date
+        if ($isOfflinePayment) {
+            $userPayAtHotelCount = Booking::where('user_id', $request->user()->id)
+                ->whereDate('booking_date', $bookingDate)
+                ->where('payment_method', 'pay_at_hotel')
+                ->where('status', '!=', 'cancelled')
+                ->count();
 
-        $booking = Booking::create([
-            'user_id'             => $request->user()->id,
-            'hotel_id'            => $request->hotel_id,
-            'booking_date'        => $request->booking_date,
-            'check_in'            => $request->booking_date,
-            'check_out'           => \Carbon\Carbon::parse($request->booking_date)->addDay()->toDateString(),
-            'total_nights'        => 1,
-            'truck_type'          => $request->truck_type,
-            'truck_no'            => $cleanTruckNo,
-            'logistics_name'      => $request->logistics_name,
-            'logistics_number'    => $request->logistics_number,
-            'payment_method'      => $isOnlinePayment ? 'Online Payment' : $request->payment_method,
-            'temp_transaction_id' => $tempTxnId,
-            
-            'price_per_night'  => $price,
-            'total_amount'     => $discountedBasePrice,
-            'promotion_applied'=> $discountAmount,
-            'gst_amount'       => $gstAmount,
-            'total_payable'    => $totalPayable,
-            
-            'status'           => $isOfflinePayment ? 'confirmed' : 'pending',
-            'payment_status'   => $isOfflinePayment ? 'pay_at_hotel' : 'pending',
-            'booking_type'     => $request->input('booking_type', $request->input('type', 'app_search')),
-        ]);
-
-        // Decrease available rooms
-        $hotel->decrement('available_rooms');
-
-        $razorpayOrderId = null;
-
-        // Generate Razorpay Order if Online Payment
-        if ($isOnlinePayment) {
-            $razorpayKeyId = config('services.razorpay.key_id') ?? env('RAZORPAY_KEY_ID');
-            $razorpayKeySecret = config('services.razorpay.key_secret') ?? env('RAZORPAY_KEY_SECRET');
-
-            try {
-                $response = Http::withBasicAuth($razorpayKeyId, $razorpayKeySecret)
-                    ->post('https://api.razorpay.com/v1/orders', [
-                        'amount'   => (int) round($totalPayable * 100), // in paise
-                        'currency' => 'INR',
-                        'receipt'  => 'booking_' . $booking->id,
-                    ]);
-
-                if ($response->successful()) {
-                    $razorpayOrderId = $response->json('id');
-                    $booking->razorpay_order_id = $razorpayOrderId;
-                    $booking->save();
-                } else {
-                    $errorDesc = $response->json('error.description') ?? 'Authentication failed';
-                    \Illuminate\Support\Facades\Log::error('Razorpay Order Creation Failed', [
-                        'status' => $response->status(),
-                        'body'   => $response->body(),
-                    ]);
-
-                    // Rollback room decrement & delete pending booking
-                    $hotel->increment('available_rooms');
-                    $booking->delete();
-
-                    return response()->json([
-                        'error'   => 'Razorpay Error: ' . $errorDesc,
-                        'message' => 'Your Razorpay Key ID or Secret is invalid. Please update RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in server environment.',
-                    ], 400);
-                }
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::error('Razorpay Order Exception: ' . $e->getMessage());
-
-                $hotel->increment('available_rooms');
-                $booking->delete();
-
+            if ($userPayAtHotelCount >= 5) {
                 return response()->json([
-                    'error'   => 'Razorpay Exception',
-                    'message' => $e->getMessage(),
-                ], 400);
+                    'error'   => 'Booking limit reached.',
+                    'message' => 'You have reached the maximum limit of 5 Pay at Hotel bookings for this date.',
+                ], 422);
             }
         }
 
-        return response()->json([
-            'success'           => true,
-            'is_online'         => $isOnlinePayment,
-            'message'           => 'Booking created successfully. Proceed to payment.',
-            'booking'           => $booking->load('hotel'),
-            'order_id'          => $booking->razorpay_order_id,
-            'razorpay_order_id' => $booking->razorpay_order_id,
-            'key'               => config('services.razorpay.key_id') ?? env('RAZORPAY_KEY_ID'),
-            'razorpay_key_id'   => config('services.razorpay.key_id') ?? env('RAZORPAY_KEY_ID'),
-            'amount'            => (int) round($totalPayable * 100),
-            'amount_in_paise'   => (int) round($totalPayable * 100),
-            'amount_in_rupees'  => (float) $totalPayable,
-            'currency'          => 'INR',
-        ], 201);
+        return DB::transaction(function () use ($request, $bookingDate, $cleanTruckNo, $isOfflinePayment, $isOnlinePayment) {
+            /** @var Hotel $hotel */
+            $hotel = Hotel::where('id', $request->hotel_id)->lockForUpdate()->first();
+
+            // Hotel must exist and be bookable (approved hotel, verified owner with approved profile)
+            if (!$hotel || !in_array($hotel->status, ['active', 'approved'], true)) {
+                return response()->json([
+                    'error'   => 'Hotel not available.',
+                    'message' => 'This hotel is currently undergoing verification or is inactive.',
+                ], 422);
+            }
+
+            $owner = $hotel->owner;
+            $ownerProfile = $owner ? $owner->ownerProfile : null;
+            $isOwnerApproved = $owner && $owner->is_verified && $ownerProfile && $ownerProfile->status === 'approved';
+
+            if (!$isOwnerApproved) {
+                return response()->json([
+                    'error'   => 'Hotel partner KYC pending.',
+                    'message' => 'This hotel partner KYC verification is in progress. Booking cannot be accepted.',
+                ], 422);
+            }
+
+            // Accurate slot calculation dynamically from active holding bookings
+            $holdingCount = Booking::holdingSlot($hotel->id, $bookingDate)->count();
+            $availableForDate = max(0, $hotel->total_rooms - $holdingCount);
+
+            if ($availableForDate < 1) {
+                return response()->json([
+                    'error'   => 'No slots available.',
+                    'message' => 'No parking slots available for the selected date.',
+                ], 422);
+            }
+
+            $price = (float) $hotel->price_per_night;
+
+            // Discount calculation: only exact promo coupon match or active automatic offer
+            $discountPct = 0;
+            $bannerId = null;
+            $appliedCode = null;
+
+            $promoCode = trim((string) ($request->input('discount_code') ?? $request->input('promo_code') ?? ''));
+            if (!empty($promoCode)) {
+                $coupon = Banner::findActiveCoupon($promoCode, 'user');
+                if ($coupon) {
+                    $discountPct = (float) $coupon->discount_percentage;
+                    $bannerId    = $coupon->id;
+                    $appliedCode = $coupon->discount_code;
+                }
+            }
+
+            // Fallback to active automatic offer if no coupon code provided
+            if ($discountPct <= 0) {
+                $autoOffer = Banner::activeAutoOffer('user');
+                if ($autoOffer) {
+                    $discountPct = (float) $autoOffer->discount_percentage;
+                    $bannerId    = $autoOffer->id;
+                    $appliedCode = $autoOffer->discount_code;
+                }
+            }
+
+            $discountAmount = $discountPct > 0 ? round($price * ($discountPct / 100), 2) : 0;
+            $discountedBasePrice = max(0, $price - $discountAmount);
+            $gstAmount = round($discountedBasePrice * 0.18, 2);
+            $totalPayable = round($discountedBasePrice + $gstAmount, 2);
+
+            $tempTxnId = 'TMP-' . strtoupper(Str::random(8)) . '-' . time();
+            $nextDay = BusinessDate::nextDay($bookingDate);
+
+            $booking = Booking::create([
+                'user_id'             => $request->user()->id,
+                'hotel_id'            => $hotel->id,
+                'banner_id'           => $bannerId,
+                'discount_code'       => $appliedCode,
+                'booking_date'        => $bookingDate,
+                'check_in'            => $bookingDate,
+                'check_out'           => $nextDay,
+                'total_nights'        => 1,
+                'truck_type'          => $request->truck_type,
+                'truck_no'            => $cleanTruckNo,
+                'logistics_name'      => $request->logistics_name,
+                'logistics_number'    => $request->logistics_number,
+                'guests'              => 1,
+                'price_per_night'     => $price,
+                'total_amount'        => $totalPayable,
+                'status'              => $isOfflinePayment ? 'confirmed' : 'pending',
+                'payment_status'      => 'pending',
+                'payment_method'      => $isOfflinePayment ? 'pay_at_hotel' : 'online',
+                'promotion_applied'   => $discountAmount,
+                'gst_amount'          => $gstAmount,
+                'total_payable'       => $totalPayable,
+                'temp_transaction_id' => $tempTxnId,
+                'booking_type'        => $request->booking_type ?? 'app_booking',
+            ]);
+
+            // Recompute available rooms for hotel
+            $hotel->refreshAvailableRooms($bookingDate);
+
+            // Pay at Hotel: Instant confirmation
+            if ($isOfflinePayment) {
+                return response()->json([
+                    'success'  => true,
+                    'message'  => 'Booking confirmed successfully. Please pay upon arrival at the hotel.',
+                    'booking'  => $booking->load('hotel'),
+                    'order_id' => null,
+                    'amount'   => (int) round($totalPayable * 100),
+                ], 201);
+            }
+
+            // Online Payment: Generate Razorpay Order
+            $orderId = 'order_' . Str::random(14);
+            $razorpayKeyId = config('services.razorpay.key_id') ?? env('RAZORPAY_KEY_ID');
+            $razorpaySecret = config('services.razorpay.key_secret') ?? env('RAZORPAY_KEY_SECRET');
+
+            if (!empty($razorpayKeyId) && !empty($razorpaySecret) && !str_starts_with($razorpayKeyId, 'your_')) {
+                try {
+                    $api = new Api($razorpayKeyId, $razorpaySecret);
+                    $order = $api->order->create([
+                        'receipt'  => (string) $booking->id,
+                        'amount'   => (int) round($totalPayable * 100),
+                        'currency' => 'INR',
+                        'notes'    => [
+                            'booking_id' => (string) $booking->id,
+                            'hotel_name' => $hotel->name,
+                            'truck_no'   => $cleanTruckNo,
+                        ],
+                    ]);
+                    $orderId = $order['id'];
+                } catch (\Throwable $e) {
+                    \Log::error('Razorpay order creation error: ' . $e->getMessage());
+                }
+            }
+
+            $booking->update([
+                'razorpay_order_id' => $orderId,
+            ]);
+
+            return response()->json([
+                'success'                => true,
+                'message'                => 'Booking created successfully. Proceed to payment.',
+                'booking'                => $booking->load('hotel'),
+                'order_id'               => $orderId,
+                'razorpay_order_id'      => $orderId,
+                'key'                    => $razorpayKeyId,
+                'razorpay_key_id'        => $razorpayKeyId,
+                'amount'                 => (int) round($totalPayable * 100),
+                'amount_in_paise'        => (int) round($totalPayable * 100),
+                'amount_in_rupees'       => (float) $totalPayable,
+                'currency'               => 'INR',
+                'payment_timeout_seconds'=> Booking::PENDING_HOLD_MINUTES * 60, // 900 seconds
+            ], 201);
+        });
     }
 
     // ============================================================
@@ -228,28 +248,59 @@ class BookingController extends Controller
 
         if ($booking->status === 'cancelled') {
             return response()->json([
-                'error' => 'Booking is already cancelled.',
+                'error'   => 'Booking is already cancelled.',
+                'message' => 'Booking is already cancelled.',
             ], 422);
         }
 
         if ($booking->status === 'completed') {
             return response()->json([
-                'error' => 'Cannot cancel a completed booking.',
+                'error'   => 'Cannot cancel a completed booking.',
+                'message' => 'Cannot cancel a completed booking.',
             ], 422);
         }
 
-        $reason = $request->input('cancellation_reason') ?? $request->input('reason') ?? 'User cancelled payment / Internet slow';
+        // Confirmed bookings whose date has passed cannot be cancelled
+        $todayIndia = BusinessDate::today();
+        if ($booking->status === 'confirmed' && $booking->booking_date && $booking->booking_date->toDateString() < $todayIndia) {
+            return response()->json([
+                'error'   => 'Cannot cancel a booking whose date has passed.',
+                'message' => 'Cannot cancel a booking whose date has passed.',
+            ], 422);
+        }
+
+        $reason = $request->input('cancellation_reason') ?? $request->input('reason') ?? 'User cancelled booking';
+
+        // Check if payment was made online
+        $isPaid = in_array($booking->payment_status, ['paid', 'authorized'], true);
+
+        if ($isPaid) {
+            $booking->update([
+                'status'              => 'cancelled',
+                'payment_status'      => Booking::REFUND_PENDING,
+                'cancellation_reason' => 'Cancelled by customer after payment (waiting for admin approval to return the money). Customer reason: ' . $reason,
+            ]);
+
+            $booking->hotel->refreshAvailableRooms($booking->booking_date ? $booking->booking_date->toDateString() : null);
+
+            return response()->json([
+                'message'        => 'Booking cancelled successfully. Your refund request is pending admin approval and will be processed within 5-7 business days.',
+                'refund_pending' => true,
+                'booking'        => $booking,
+            ]);
+        }
 
         $booking->update([
             'status'              => 'cancelled',
             'cancellation_reason' => $reason,
         ]);
 
-        // Restore available rooms
-        $booking->hotel->increment('available_rooms');
+        $booking->hotel->refreshAvailableRooms($booking->booking_date ? $booking->booking_date->toDateString() : null);
 
         return response()->json([
-            'message' => 'Booking cancelled successfully.',
+            'message'        => 'Booking cancelled successfully.',
+            'refund_pending' => false,
+            'booking'        => $booking,
         ]);
     }
 
@@ -264,7 +315,6 @@ class BookingController extends Controller
             'razorpay_payment_id' => 'required|string',
             'razorpay_order_id'   => 'required|string',
             'razorpay_signature'  => 'required|string',
-            'transaction_id'      => 'nullable|string',
         ]);
 
         $booking = Booking::where('id', $id)
@@ -274,35 +324,48 @@ class BookingController extends Controller
         // Prevent cross-order signature replay
         if (!empty($booking->razorpay_order_id) && $booking->razorpay_order_id !== $request->razorpay_order_id) {
             return response()->json([
-                'error' => 'Razorpay Order ID mismatch for this booking.',
+                'error'   => 'Razorpay Order ID mismatch for this booking.',
+                'message' => 'Razorpay Order ID mismatch for this booking.',
             ], 422);
         }
 
-        // Verify signature
+        // Verify cryptographic HMAC signature
         $secret = config('services.razorpay.key_secret') ?? env('RAZORPAY_KEY_SECRET');
-        $generatedSignature = hash_hmac(
+        $expectedSignature = hash_hmac(
             'sha256',
             $request->razorpay_order_id . '|' . $request->razorpay_payment_id,
             $secret
         );
 
-        if ($generatedSignature === $request->razorpay_signature) {
-            $transactionId = $request->input('transaction_id') ?? $request->razorpay_payment_id;
-            $booking->update([
-                'payment_status' => 'paid',
-                'razorpay_payment_id' => $request->razorpay_payment_id,
-                'transaction_id' => $transactionId,
-                'status' => 'confirmed'
-            ]);
-
+        if (!hash_equals($expectedSignature, $request->razorpay_signature)) {
             return response()->json([
-                'message' => 'Payment verified successfully',
-                'booking' => $booking
-            ]);
+                'error'   => 'Payment verification failed.',
+                'message' => 'Payment verification failed.',
+            ], 400);
+        }
+
+        // Delegate to atomic slot allocation
+        $confirmed = $booking->recordPayment($request->razorpay_payment_id, [
+            'gateway_response' => [
+                'razorpay_payment_id' => $request->razorpay_payment_id,
+                'razorpay_order_id'   => $request->razorpay_order_id,
+            ],
+        ]);
+
+        if (!$confirmed) {
+            return response()->json([
+                'success'        => false,
+                'refund_pending' => true,
+                'error'          => 'Payment succeeded, but your slot hold expired and the room was taken. A refund has been initiated.',
+                'message'        => 'Payment succeeded, but your slot hold expired and the room was taken. A refund has been initiated and will be processed within 5-7 business days.',
+                'booking'        => $booking->fresh(),
+            ], 409);
         }
 
         return response()->json([
-            'error' => 'Payment verification failed'
-        ], 400);
+            'success' => true,
+            'message' => 'Payment verified successfully.',
+            'booking' => $booking->fresh()->load('hotel'),
+        ]);
     }
 }

@@ -367,6 +367,16 @@
             return localStorage.getItem('yaan_admin_token') || sessionStorage.getItem('yaan_admin_token') || '';
         }
 
+        function esc(str) {
+            if (str === null || str === undefined) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
         async function loadInvoice() {
             const params = new URLSearchParams(window.location.search);
             const txnId = params.get('id');
@@ -414,18 +424,18 @@
                         <div>
                             <div class="logo-title">
                                 <i class="fa-solid fa-hotel"></i>
-                                <h1>${comp.name || 'Yaan Platform'}</h1>
+                                <h1>${esc(comp.name || 'Yaan Platform')}</h1>
                             </div>
                             <div class="company-info">
-                                <div>${comp.address || 'Tech Hub, Corporate Towers'}</div>
-                                <div>${comp.city || 'Bangalore, India'} • Email: ${comp.email || 'support@yaan.com'}</div>
-                                <div><strong>GSTIN:</strong> ${comp.gstin || '29AAAAA0000A1Z5'}</div>
+                                <div>${esc(comp.address || 'Tech Hub, Corporate Towers')}</div>
+                                <div>${esc(comp.city || 'Bangalore, India')} • Email: ${esc(comp.email || 'support@yaan.com')}</div>
+                                <div><strong>GSTIN:</strong> ${esc(comp.gstin || '29AAAAA0000A1Z5')}</div>
                             </div>
                         </div>
                         <div class="invoice-meta">
-                            <span class="status-badge ${badgeClass}">${pay.is_refunded || pay.status === 'REFUNDED' ? 'REFUNDED (RAZORPAY)' : pay.status}</span>
-                            <div class="invoice-number">${inv.invoice_number || 'INV-000000'}</div>
-                            <div style="font-size:12px; color:var(--text-muted);">Date: <strong>${inv.invoice_date || 'N/A'}</strong></div>
+                            <span class="status-badge ${badgeClass}">${pay.is_refunded || pay.status === 'REFUNDED' ? 'REFUNDED (RAZORPAY)' : esc(pay.status)}</span>
+                            <div class="invoice-number">${esc(inv.invoice_number || 'INV-000000')}</div>
+                            <div style="font-size:12px; color:var(--text-muted);">Date: <strong>${esc(inv.invoice_date || 'N/A')}</strong></div>
                         </div>
                     </div>
 
@@ -434,23 +444,23 @@
                     <div class="grid-2">
                         <div class="info-box">
                             <h3><i class="fa-solid fa-user"></i> Billed To (Customer)</h3>
-                            <div><strong>${cust.name || 'Guest User'}</strong></div>
-                            <div>Email: ${cust.email || 'N/A'}</div>
-                            <div>Phone: ${cust.phone || 'N/A'}</div>
+                            <div><strong>${esc(cust.name || 'Guest User')}</strong></div>
+                            <div>Email: ${esc(cust.email || 'N/A')}</div>
+                            <div>Phone: ${esc(cust.phone || 'N/A')}</div>
                         </div>
                         <div class="info-box">
                             <h3><i class="fa-solid fa-building-user"></i> Hotel & Stay Details</h3>
-                            <div><strong>${hotel.name || 'N/A'}</strong> (${hotel.city || 'N/A'})</div>
-                            <div>${hotel.address || 'N/A'}</div>
-                            <div>Check-in: <strong>${stay.check_in || 'N/A'}</strong> to <strong>${stay.check_out || 'N/A'}</strong> (${stay.total_nights || 1} Night(s))</div>
+                            <div><strong>${esc(hotel.name || 'N/A')}</strong> (${esc(hotel.city || 'N/A')})</div>
+                            <div>${esc(hotel.address || 'N/A')}</div>
+                            <div>Check-in: <strong>${esc(stay.check_in || 'N/A')}</strong> to <strong>${esc(stay.check_out || 'N/A')}</strong> (${stay.total_nights || 1} Night(s))</div>
                         </div>
                     </div>
 
                     ${(logi.logistics_name !== 'N/A' || logi.truck_no !== 'N/A') ? `
                         <div class="info-box" style="margin-bottom:20px;">
                             <h3><i class="fa-solid fa-truck"></i> Logistics & Driver Info</h3>
-                            <div>Driver / Logistics: <strong>${logi.logistics_name}</strong> (${logi.logistics_number})</div>
-                            <div>Vehicle Details: <strong>${logi.truck_type}</strong> • Registration: <strong>${logi.truck_no}</strong></div>
+                            <div>Driver / Logistics: <strong>${esc(logi.logistics_name)}</strong> (${esc(logi.logistics_number)})</div>
+                            <div>Vehicle Details: <strong>${esc(logi.truck_type)}</strong> • Registration: <strong>${esc(logi.truck_no)}</strong></div>
                         </div>
                     ` : ''}
 
@@ -467,8 +477,8 @@
                             <tbody>
                                 <tr>
                                     <td>
-                                        <strong>Hotel Accommodation - ${hotel.name || 'Room Stay'}</strong><br>
-                                        <small style="color:var(--text-muted);">Check-in: ${stay.check_in} | Guests: ${stay.guests || 1}</small>
+                                        <strong>Hotel Accommodation - ${esc(hotel.name || 'Room Stay')}</strong><br>
+                                        <small style="color:var(--text-muted);">Check-in: ${esc(stay.check_in)} | Guests: ${stay.guests || 1}</small>
                                     </td>
                                     <td class="text-right font-mono">${stay.total_nights || 1}</td>
                                     <td class="text-right font-mono">₹${(price.price_per_night || 0).toLocaleString('en-IN')}</td>
@@ -518,22 +528,22 @@
                     ${pay.is_refunded || pay.status === 'REFUNDED' ? `
                         <div class="refund-callout">
                             <strong><i class="fa-solid fa-arrow-rotate-left"></i> Refund Processed via Razorpay Gateway</strong><br>
-                            ${pay.refund_id ? `<div>Razorpay Refund ID: <strong class="font-mono">${pay.refund_id}</strong></div>` : ''}
-                            ${pay.refund_time_formatted ? `<div>Timestamp: <strong>${pay.refund_time_formatted}</strong></div>` : ''}
-                            ${pay.cancellation_reason ? `<div>Notes: ${pay.cancellation_reason}</div>` : ''}
+                            ${pay.refund_id ? `<div>Razorpay Refund ID: <strong class="font-mono">${esc(pay.refund_id)}</strong></div>` : ''}
+                            ${pay.refund_time_formatted ? `<div>Timestamp: <strong>${esc(pay.refund_time_formatted)}</strong></div>` : ''}
+                            ${pay.cancellation_reason ? `<div>Notes: ${esc(pay.cancellation_reason)}</div>` : ''}
                         </div>
                     ` : (pay.status === 'CANCELLED' || pay.status === 'FAILED' ? `
                         <div class="reason-callout">
-                            <strong><i class="fa-solid fa-circle-xmark"></i> Transaction Status: ${pay.status}</strong><br>
-                            <div>Reason / Audit Notes: ${pay.cancellation_reason || 'Payment was cancelled or failed during checkout.'}</div>
+                            <strong><i class="fa-solid fa-circle-xmark"></i> Transaction Status: ${esc(pay.status)}</strong><br>
+                            <div>Reason / Audit Notes: ${esc(pay.cancellation_reason || 'Payment was cancelled or failed during checkout.')}</div>
                         </div>
                     ` : '')}
 
                     <div class="grid-2" style="margin-top:24px;">
                         <div class="info-box" style="font-size:12px;">
                             <h3><i class="fa-solid fa-shield-halved"></i> Payment & Audit Identifier</h3>
-                            <div>Method: <strong>${pay.payment_method || 'Razorpay / Online'}</strong></div>
-                            <div>Date/Time: <strong>${pay.region_time || 'N/A'}</strong></div>
+                            <div>Method: <strong>${esc(pay.payment_method || 'Razorpay / Online')}</strong></div>
+                            <div>Date/Time: <strong>${esc(pay.region_time || 'N/A')}</strong></div>
                         </div>
                     </div>
 
@@ -543,7 +553,7 @@
                     </div>
                 `;
             } catch (err) {
-                document.getElementById('loading-state').innerHTML = `<div style="color:var(--danger); font-weight:700;"><i class="fa-solid fa-circle-exclamation"></i> ${err.message || 'Error generating transaction invoice.'}</div>`;
+                document.getElementById('loading-state').innerHTML = `<div style="color:var(--danger); font-weight:700;"><i class="fa-solid fa-circle-exclamation"></i> ${esc(err.message || 'Error generating transaction invoice.')}</div>`;
             }
         }
 

@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Support\BusinessDate;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 class Hotel extends Model
 {
@@ -60,10 +62,39 @@ class Hotel extends Model
     public static function generateUniqueYaanId()
     {
         do {
-            $code = 'YAAN-H' . str_pad((string) rand(1, 9999), 4, '0', STR_PAD_LEFT);
+            $code = 'YAAN-' . strtoupper(Str::random(8));
         } while (self::where('yaan_id', $code)->exists());
 
         return $code;
+    }
+
+    /**
+     * Scope for bookable hotels (active/approved hotel, verified owner with approved KYC).
+     */
+    public function scopeBookable($query)
+    {
+        return $query->whereIn('status', ['active', 'approved'])
+            ->whereHas('owner', function ($oq) {
+                $oq->where('is_verified', true)
+                   ->whereHas('ownerProfile', function ($pq) {
+                       $pq->where('status', 'approved');
+                   });
+            });
+    }
+
+    /**
+     * Recompute available rooms for the given date (default today India time)
+     * based on active slot-holding bookings.
+     */
+    public function refreshAvailableRooms(?string $date = null): int
+    {
+        $targetDate = $date ?? BusinessDate::today();
+        $holdingCount = Booking::holdingSlot($this->id, $targetDate)->count();
+        $available = max(0, (int) $this->total_rooms - $holdingCount);
+        $this->available_rooms = $available;
+        $this->saveQuietly();
+
+        return $available;
     }
 
     public function getHotelCodeAttribute()

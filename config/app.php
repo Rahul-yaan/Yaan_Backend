@@ -124,7 +124,9 @@ return [
     ],
 
 
-    'firebase_bypass' => env('FIREBASE_BYPASS', false),  // ← ADD THIS LINE
-    'frontend_url' => env('APP_FRONTEND_URL', 'http://localhost:8000'),
+    'firebase_bypass' => filter_var(env('FIREBASE_BYPASS', false), FILTER_VALIDATE_BOOLEAN),
+    'frontend_url'    => env('APP_FRONTEND_URL', 'http://localhost:8000'),
+    'admin_email'     => env('ADMIN_EMAIL', 'admin@yaan.com'),
+    'admin_password'  => env('ADMIN_PASSWORD'),
 
 ];

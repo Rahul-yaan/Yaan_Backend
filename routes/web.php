@@ -30,6 +30,9 @@ Route::get('/reset-password', function () {
     return view('reset_password');
 });
 
+// Secure Media Serving Route
+Route::get('/media/{path}', [\App\Http\Controllers\MediaController::class, 'serve'])->where('path', '.*');
+
 // Legacy Android/Vendor API endpoints fallback
 Route::match(['get', 'post'], '/api.php', function () {
     $amenities = \App\Models\Amenity::whereNotIn(\Illuminate\Support\Facades\DB::raw('LOWER(name)'), ['men', 'women'])

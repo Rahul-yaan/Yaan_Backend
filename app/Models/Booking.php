@@ -2,13 +2,20 @@
 
 namespace App\Models;
 
+use App\Support\BusinessDate;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 class Booking extends Model
 {
+    public const REFUND_PENDING = 'refund_pending';
+    public const PENDING_HOLD_MINUTES = 15;
+
     protected $fillable = [
         'user_id',
         'hotel_id',
+        'banner_id',
+        'discount_code',
         'check_in',
         'check_out',
         'total_nights',
@@ -35,6 +42,10 @@ class Booking extends Model
         'booking_type',
     ];
 
+    protected $hidden = [
+        'gateway_response',
+    ];
+
     protected $casts = [
         'check_in'          => 'date',
         'check_out'         => 'date',
@@ -52,6 +63,101 @@ class Booking extends Model
         'region_time_formatted',
         'refund_time_formatted',
     ];
+
+    /**
+     * Scope to find bookings holding a room/slot for a specific hotel and date.
+     */
+    public function scopeHoldingSlot($query, int $hotelId, string $date)
+    {
+        $holdCutoff = now()->subMinutes(self::PENDING_HOLD_MINUTES)->toDateTimeString();
+
+        return $query->where('hotel_id', $hotelId)
+            ->whereDate('booking_date', $date)
+            ->where(function ($q) use ($holdCutoff) {
+                $q->whereIn('status', ['confirmed', 'completed'])
+                  ->orWhere(function ($pq) use ($holdCutoff) {
+                      $pq->where('status', 'pending')
+                         ->where('created_at', '>=', $holdCutoff);
+                  });
+            });
+    }
+
+    /**
+     * Safely record payment from verifyPayment, webhooks, or admin auto-sync.
+     * Guaranteed atomic with pessimistic row locking.
+     */
+    public function recordPayment(string $paymentId, array $extra = []): bool
+    {
+        return DB::transaction(function () use ($paymentId, $extra) {
+            $hotel = Hotel::where('id', $this->hotel_id)->lockForUpdate()->first();
+            /** @var Booking $booking */
+            $booking = self::where('id', $this->id)->lockForUpdate()->first();
+
+            if (!$booking || !$hotel) {
+                return false;
+            }
+
+            // Already in a terminal paid/refund state: idempotent return
+            if (in_array($booking->payment_status, ['paid', self::REFUND_PENDING, 'refunded', 'refund_initiated'], true)) {
+                if (empty($booking->razorpay_payment_id)) {
+                    $booking->razorpay_payment_id = $paymentId;
+                }
+                if (empty($booking->transaction_id) || str_starts_with($booking->transaction_id, 'TMP-')) {
+                    $booking->transaction_id = $paymentId;
+                }
+                $booking->save();
+                return in_array($booking->status, ['confirmed', 'completed'], true);
+            }
+
+            $booking->razorpay_payment_id = $paymentId;
+            $booking->transaction_id      = $paymentId;
+
+            if (!empty($extra['gateway_response'])) {
+                $booking->gateway_response = is_string($extra['gateway_response'])
+                    ? $extra['gateway_response']
+                    : json_encode($extra['gateway_response']);
+            }
+
+            // If already cancelled, set refund_pending and keep cancelled
+            if ($booking->status === 'cancelled') {
+                $booking->payment_status = self::REFUND_PENDING;
+                $booking->save();
+                return false;
+            }
+
+            // If already confirmed or completed, just mark paid
+            if (in_array($booking->status, ['confirmed', 'completed'], true)) {
+                $booking->payment_status = 'paid';
+                $booking->save();
+                return true;
+            }
+
+            // Booking is pending: check if slots are still available
+            $targetDate = $booking->booking_date ? $booking->booking_date->toDateString() : BusinessDate::today();
+            $holdingCount = self::holdingSlot($hotel->id, $targetDate)
+                ->where('id', '!=', $booking->id)
+                ->count();
+
+            if ($holdingCount < $hotel->total_rooms) {
+                // Room successfully secured
+                $booking->payment_status = 'paid';
+                $booking->status         = 'confirmed';
+                $booking->save();
+
+                $hotel->refreshAvailableRooms($targetDate);
+                return true;
+            }
+
+            // Room lost (slot hold expired and taken by someone else)
+            $booking->status              = 'cancelled';
+            $booking->payment_status      = self::REFUND_PENDING;
+            $booking->cancellation_reason = 'Payment succeeded after slot hold expired. Room capacity reached; refund pending admin approval.';
+            $booking->save();
+
+            $hotel->refreshAvailableRooms($targetDate);
+            return false;
+        });
+    }
 
     public function getDisplayTransactionIdAttribute()
     {
@@ -80,6 +186,10 @@ class Booking extends Model
 
     public function getRefundTimeFormattedAttribute()
     {
+        if ($this->payment_status === self::REFUND_PENDING) {
+            return null;
+        }
+
         $isRefunded = in_array($this->payment_status, ['refunded', 'refund_initiated']) || str_contains(strtolower($this->cancellation_reason ?? ''), 'refund');
         if (!$isRefunded) {
             return null;
@@ -124,6 +234,11 @@ class Booking extends Model
     public function hotel()
     {
         return $this->belongsTo(Hotel::class);
+    }
+
+    public function banner()
+    {
+        return $this->belongsTo(Banner::class);
     }
 
     public function statusOverrides()

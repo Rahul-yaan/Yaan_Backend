@@ -28,12 +28,15 @@ Route::get('/health', function () {
 // PUBLIC ROUTES — no token needed
 // ============================================================
 
-Route::middleware('throttle:60,1')->group(function () {
+Route::middleware('throttle:auth')->group(function () {
     Route::post('/register',        [AuthController::class, 'register']);
     Route::post('/verify-otp',      [AuthController::class, 'verifyOtp']);
     Route::post('/login',           [AuthController::class, 'login']);
     Route::post('/forgot-password', [ForgotPasswordController::class, 'sendResetLink']);
     Route::post('/reset-password',  [ForgotPasswordController::class, 'resetPassword']);
+});
+
+Route::middleware('throttle:60,1')->group(function () {
     
     // Legal & Policy APIs for Mobile Apps (User App & Hotel App)
     // Customer App
@@ -140,7 +143,9 @@ Route::middleware('throttle:60,1')->group(function () {
 
 // Razorpay Webhook — Verified by HMAC signature in controller
 Route::post('/webhooks/razorpay', [App\Http\Controllers\RazorpayWebhookController::class, 'handleWebhook']);
+Route::post('/razorpay-webhook',  [App\Http\Controllers\RazorpayWebhookController::class, 'handleWebhook']);
 Route::get('/webhooks/razorpay',  [App\Http\Controllers\RazorpayWebhookController::class, 'status']);
+Route::get('/razorpay-webhook',   [App\Http\Controllers\RazorpayWebhookController::class, 'status']);
 
 // Public Banners & Offers API for Mobile Apps (User App / Hotel Owner App)
 Route::get('/banners', [App\Http\Controllers\BannerController::class, 'index']);
@@ -190,97 +195,8 @@ Route::match(['get', 'post'], '/get_all_amenities', function () {
     ]);
 });
 
-// Public Storage / Media file serving endpoint with automatic DB restoration & smart fallback
-Route::get('/media/{path}', function ($path) {
-    $fullPath = storage_path('app/public/' . $path);
-    if (!file_exists($fullPath)) {
-        $altPath = storage_path('app/' . $path);
-        if (file_exists($altPath)) {
-            $fullPath = $altPath;
-        } else {
-            $cleanBase = basename($path);
-
-            // 1. Try to restore Hotel Image from persistent database record
-            try {
-                $hotelImg = \App\Models\HotelImage::where('image_path', $path)
-                    ->orWhere('image_path', 'LIKE', "%{$cleanBase}")
-                    ->first();
-                if ($hotelImg && !empty($hotelImg->image_data) && str_starts_with($hotelImg->image_data, 'data:')) {
-                    $raw = substr($hotelImg->image_data, strpos($hotelImg->image_data, ',') + 1);
-                    $decoded = base64_decode($raw);
-                    if ($decoded !== false) {
-                        @mkdir(dirname($fullPath), 0775, true);
-                        file_put_contents($fullPath, $decoded);
-                        $mime = mime_content_type($fullPath) ?: 'image/jpeg';
-                        return response()->file($fullPath, [
-                            'Content-Type'  => $mime,
-                            'Cache-Control' => 'public, max-age=86400',
-                        ]);
-                    }
-                }
-            } catch (\Throwable $e) {}
-
-            // 2. Try to restore Owner KYC document from persistent database record
-            try {
-                $profile = \App\Models\OwnerProfile::where(function($q) use ($cleanBase) {
-                    $q->where('business_proof', 'LIKE', "%{$cleanBase}%")
-                      ->orWhere('aadhaar_front', 'LIKE', "%{$cleanBase}%")
-                      ->orWhere('aadhaar_back', 'LIKE', "%{$cleanBase}%")
-                      ->orWhere('pan_card', 'LIKE', "%{$cleanBase}%")
-                      ->orWhere('fssai_license', 'LIKE', "%{$cleanBase}%")
-                      ->orWhere('gst_image', 'LIKE', "%{$cleanBase}%");
-                })->first();
-
-                if ($profile) {
-                    $fields = ['business_proof', 'aadhaar_front', 'aadhaar_back', 'pan_card', 'fssai_license', 'gst_image'];
-                    foreach ($fields as $f) {
-                        $val = $profile->$f;
-                        if (!empty($val) && str_starts_with($val, 'data:')) {
-                            $raw = substr($val, strpos($val, ',') + 1);
-                            $decoded = base64_decode($raw);
-                            if ($decoded !== false) {
-                                @mkdir(dirname($fullPath), 0775, true);
-                                file_put_contents($fullPath, $decoded);
-                                $mime = str_contains($val, 'pdf') ? 'application/pdf' : (mime_content_type($fullPath) ?: 'image/jpeg');
-                                return response()->file($fullPath, [
-                                    'Content-Type'  => $mime,
-                                    'Cache-Control' => 'public, max-age=86400',
-                                ]);
-                            }
-                        }
-                    }
-                }
-            } catch (\Throwable $e) {}
-
-            // 3. For hotel photos, redirect to high-resolution default hotel photo so it never breaks
-            $isDoc = preg_match('/kyc|doc|aadhaar|pan|gst|fssai|proof|pdf/i', $path);
-            if (!$isDoc) {
-                return redirect('https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1000&q=80');
-            }
-
-            // 4. For missing KYC documents, generate clean SVG preview
-            $svg = <<<SVG
-<svg xmlns="http://www.w3.org/2000/svg" width="400" height="250" viewBox="0 0 400 250">
-  <rect width="400" height="250" fill="#1e293b" rx="10"/>
-  <rect x="15" y="15" width="370" height="220" fill="none" stroke="#38bdf8" stroke-width="2" stroke-dasharray="6,6" rx="8" opacity="0.6"/>
-  <text x="200" y="105" text-anchor="middle" font-size="36">📄</text>
-  <text x="200" y="145" text-anchor="middle" fill="#f8fafc" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif" font-size="15" font-weight="700">KYC Uploaded Document</text>
-  <text x="200" y="172" text-anchor="middle" fill="#94a3b8" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif" font-size="11" font-weight="600">Document Uploaded &amp; Verified</text>
-</svg>
-SVG;
-            return response($svg, 200, [
-                'Content-Type'  => 'image/svg+xml',
-                'Cache-Control' => 'no-cache, no-store, must-revalidate',
-            ]);
-        }
-    }
-    
-    $mimeType = mime_content_type($fullPath) ?: 'application/octet-stream';
-    return response()->file($fullPath, [
-        'Content-Type' => $mimeType,
-        'Cache-Control' => 'public, max-age=86400',
-    ]);
-})->where('path', '.*');
+// Secure Public Media Endpoint: serves only validated images from public directories (hotels, avatars, banners)
+Route::get('/media/{path}', [\App\Http\Controllers\MediaController::class, 'serve'])->where('path', '.*');
 
 // ============================================================
 // PROTECTED ROUTES — token required in Authorization header
@@ -300,6 +216,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('/logout',              [AuthController::class, 'logout']);
 
+    // Google Maps API Server-Side Proxies (Rate Limited 60/min)
+    Route::middleware('throttle:60,1')->prefix('maps')->group(function () {
+        Route::get('/place-suggestions', [\App\Http\Controllers\MapsController::class, 'placeSuggestions']);
+        Route::get('/directions',        [\App\Http\Controllers\MapsController::class, 'directions']);
+    });
+
     // User routes
     Route::middleware('role:user')->group(function () {
         Route::get('/user/dashboard', function () {
@@ -308,11 +230,16 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/hotels/search',           [App\Http\Controllers\User\HotelController::class, 'search']);
         Route::get('/hotels/{id}/reviews',     [App\Http\Controllers\User\ReviewController::class, 'index']);
         Route::get('/hotels/{id}',             [App\Http\Controllers\User\HotelController::class, 'show']);
-        Route::post('/bookings',               [App\Http\Controllers\User\BookingController::class, 'store']);
-        Route::get('/bookings/my',             [App\Http\Controllers\User\BookingController::class, 'myBookings']);
-        Route::post('/bookings/{id}/cancel',   [App\Http\Controllers\User\BookingController::class, 'cancel']);
-        Route::post('/bookings/{id}/verify-payment', [App\Http\Controllers\User\BookingController::class, 'verifyPayment']);
-        Route::post('/reviews',                [App\Http\Controllers\User\ReviewController::class, 'store']);
+        Route::post('/bookings',                      [App\Http\Controllers\User\BookingController::class, 'store']);
+        Route::post('/user/bookings',                 [App\Http\Controllers\User\BookingController::class, 'store']);
+        Route::get('/bookings/my',                    [App\Http\Controllers\User\BookingController::class, 'myBookings']);
+        Route::get('/user/bookings/my',               [App\Http\Controllers\User\BookingController::class, 'myBookings']);
+        Route::post('/bookings/{id}/cancel',          [App\Http\Controllers\User\BookingController::class, 'cancel']);
+        Route::post('/user/bookings/{id}/cancel',     [App\Http\Controllers\User\BookingController::class, 'cancel']);
+        Route::post('/bookings/{id}/verify-payment',  [App\Http\Controllers\User\BookingController::class, 'verifyPayment']);
+        Route::post('/user/bookings/{id}/verify-payment', [App\Http\Controllers\User\BookingController::class, 'verifyPayment']);
+        Route::post('/reviews',                       [App\Http\Controllers\User\ReviewController::class, 'store']);
+        Route::post('/user/reviews',                  [App\Http\Controllers\User\ReviewController::class, 'store']);
     });
 
     // Owner routes

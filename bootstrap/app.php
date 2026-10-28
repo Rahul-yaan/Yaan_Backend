@@ -12,24 +12,25 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        
+        // Trust reverse proxies (Render / Cloudflare) to ensure accurate client IP detection
+        $middleware->trustProxies(at: '*');
+
         $middleware->redirectGuestsTo(fn () => null);
 
         $middleware->alias([
             'role' => \App\Http\Middleware\RoleMiddleware::class,
         ]);
-
     })
     ->withExceptions(function (Exceptions $exceptions) {
-
         $exceptions->render(function (
             \Illuminate\Validation\ValidationException $e,
             \Illuminate\Http\Request $request
         ) {
             if ($request->is('api/*')) {
                 return response()->json([
-                    'error'  => 'Validation failed.',
-                    'errors' => $e->errors(),
+                    'error'   => 'Validation failed.',
+                    'message' => 'Validation failed.',
+                    'errors'  => $e->errors(),
                 ], 422);
             }
         });
@@ -40,9 +41,9 @@ return Application::configure(basePath: dirname(__DIR__))
         ) {
             if ($request->is('api/*')) {
                 return response()->json([
-                    'error' => 'Unauthenticated. Please login first.',
+                    'error'   => 'Unauthenticated. Please login first.',
+                    'message' => 'Unauthenticated. Please login first.',
                 ], 401);
             }
         });
-
     })->create();

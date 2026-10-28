@@ -33,12 +33,11 @@ class RazorpayWebhookController extends Controller
         $signature  = $request->header('X-Razorpay-Signature');
         $secret     = config('services.razorpay.webhook_secret') ?? env('RAZORPAY_WEBHOOK_SECRET');
 
-        // Decode JSON payload
-        $data = json_decode($rawPayload, true) ?? [];
+        $data    = json_decode($rawPayload, true) ?? [];
         $eventId = $data['event_id'] ?? ($data['id'] ?? md5($rawPayload));
-        $event = $data['event'] ?? 'unknown';
+        $event   = $data['event'] ?? 'unknown';
 
-        // 1. VERIFY WEBHOOK SIGNATURE
+        // 1. VERIFY WEBHOOK SIGNATURE (No unsigned payloads stored in DB)
         $isSignatureValid = false;
         if (!empty($signature) && !empty($secret)) {
             $expectedSignature = hash_hmac('sha256', $rawPayload, $secret);
@@ -47,15 +46,6 @@ class RazorpayWebhookController extends Controller
 
         if (!$isSignatureValid) {
             Log::warning("Razorpay Webhook: Invalid Signature for Event [{$event}] ID [{$eventId}]");
-            
-            RazorpayWebhook::create([
-                'event_id'           => $eventId . '_invalid_' . time(),
-                'event'              => $event,
-                'payload'            => $rawPayload,
-                'signature_verified' => false,
-                'status'             => 'invalid_signature',
-                'error_message'      => 'HMAC SHA256 signature verification failed or secret missing.',
-            ]);
 
             return response()->json([
                 'error'   => 'Invalid webhook signature',
@@ -70,7 +60,7 @@ class RazorpayWebhookController extends Controller
 
         if ($existingWebhook) {
             Log::info("Razorpay Webhook: Duplicate event [{$eventId}] ignored (Idempotent call).");
-            
+
             return response()->json([
                 'message'  => 'Event already processed (Idempotent request)',
                 'event_id' => $eventId,
@@ -121,8 +111,8 @@ class RazorpayWebhookController extends Controller
         switch ($event) {
             case 'payment.captured':
             case 'order.paid':
-                $payment = $payload['payment']['entity'] ?? [];
-                $orderId = $payment['order_id'] ?? ($payload['order']['entity']['id'] ?? null);
+                $payment   = $payload['payment']['entity'] ?? [];
+                $orderId   = $payment['order_id'] ?? ($payload['order']['entity']['id'] ?? null);
                 $paymentId = $payment['id'] ?? null;
 
                 $booking = null;
@@ -133,21 +123,15 @@ class RazorpayWebhookController extends Controller
                     $booking = Booking::where('razorpay_payment_id', $paymentId)->first();
                 }
 
-                if ($booking) {
-                    $booking->update([
-                        'payment_status'      => 'paid',
-                        'status'              => 'confirmed',
-                        'razorpay_payment_id' => $paymentId ?? $booking->razorpay_payment_id,
-                        'transaction_id'      => $paymentId ?? $booking->transaction_id ?? $orderId,
-                        'gateway_response'    => json_encode($payload),
-                    ]);
-                    Log::info("Booking #{$booking->id} confirmed via Razorpay webhook [{$event}]");
+                if ($booking && $paymentId) {
+                    $confirmed = $booking->recordPayment($paymentId, ['gateway_response' => $payload]);
+                    Log::info("Booking #{$booking->id} processed via Razorpay webhook [{$event}], confirmed: " . ($confirmed ? 'yes' : 'no'));
                 }
                 break;
 
             case 'payment.failed':
-                $payment = $payload['payment']['entity'] ?? [];
-                $orderId = $payment['order_id'] ?? null;
+                $payment   = $payload['payment']['entity'] ?? [];
+                $orderId   = $payment['order_id'] ?? null;
                 $paymentId = $payment['id'] ?? null;
                 $errorDesc = $payment['error_description'] ?? 'Razorpay payment failed';
 
@@ -159,7 +143,8 @@ class RazorpayWebhookController extends Controller
                     $booking = Booking::where('razorpay_payment_id', $paymentId)->first();
                 }
 
-                if ($booking) {
+                // Webhooks may arrive out of order: never overwrite paid or refund statuses
+                if ($booking && !in_array($booking->payment_status, ['paid', Booking::REFUND_PENDING, 'refunded', 'refund_initiated'], true)) {
                     $booking->update([
                         'payment_status'      => 'failed',
                         'cancellation_reason' => $errorDesc,
@@ -175,7 +160,8 @@ class RazorpayWebhookController extends Controller
 
                 if ($orderId) {
                     $booking = Booking::where('razorpay_order_id', $orderId)->first();
-                    if ($booking) {
+                    // Authorized only applies to pending bookings
+                    if ($booking && $booking->status === 'pending' && $booking->payment_status === 'pending') {
                         $booking->update([
                             'payment_status'   => 'authorized',
                             'gateway_response' => json_encode($payload),
@@ -185,9 +171,9 @@ class RazorpayWebhookController extends Controller
                 break;
 
             case 'refund.processed':
-                $refund = $payload['refund']['entity'] ?? [];
+                $refund    = $payload['refund']['entity'] ?? [];
                 $paymentId = $refund['payment_id'] ?? null;
-                $refundId = $refund['id'] ?? null;
+                $refundId  = $refund['id'] ?? null;
 
                 $booking = null;
                 if ($paymentId) {

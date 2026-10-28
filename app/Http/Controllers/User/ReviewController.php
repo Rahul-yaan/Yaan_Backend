@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Review;
 use App\Models\Booking;
 use App\Models\Hotel;
+use App\Support\BusinessDate;
 use Illuminate\Http\Request;
 
 class ReviewController extends Controller
@@ -24,38 +25,49 @@ class ReviewController extends Controller
             'comment'    => 'nullable|string|max:500',
         ]);
 
+        $todayIndia = BusinessDate::today();
         $bookingId = $request->booking_id;
 
+        // Anti-fake review check:
+        // Must be completed stay, OR confirmed + paid + booking_date before today in India
+        $eligibleQuery = function ($q) use ($todayIndia) {
+            $q->where('status', 'completed')
+              ->orWhere(function ($sq) use ($todayIndia) {
+                  $sq->where('status', 'confirmed')
+                     ->where('payment_status', 'paid')
+                     ->whereDate('booking_date', '<', $todayIndia);
+              });
+        };
+
         if ($bookingId) {
-            // Check booking belongs to user
             $booking = Booking::where('id', $bookingId)
                 ->where('user_id', $request->user()->id)
                 ->where('hotel_id', $request->hotel_id)
-                ->where(function($q) {
-                    $q->whereIn('status', ['completed', 'confirmed'])
-                      ->orWhere('payment_status', 'paid');
-                })
+                ->where($eligibleQuery)
                 ->first();
 
             if (!$booking) {
                 return response()->json([
-                    'error' => 'You can only review hotels you have a confirmed or completed stay at.',
+                    'error'   => 'You can review a hotel after your stay there is complete.',
+                    'message' => 'You can review a hotel after your stay there is complete.',
                 ], 403);
             }
         } else {
-            // Auto-link latest valid booking if user has one
+            // Find most recent eligible booking
             $userBooking = Booking::where('user_id', $request->user()->id)
                 ->where('hotel_id', $request->hotel_id)
-                ->where(function($q) {
-                    $q->whereIn('status', ['completed', 'confirmed'])
-                      ->orWhere('payment_status', 'paid');
-                })
+                ->where($eligibleQuery)
                 ->latest()
                 ->first();
 
-            if ($userBooking) {
-                $bookingId = $userBooking->id;
+            if (!$userBooking) {
+                return response()->json([
+                    'error'   => 'You can review a hotel after your stay there is complete.',
+                    'message' => 'You can review a hotel after your stay there is complete.',
+                ], 403);
             }
+
+            $bookingId = $userBooking->id;
         }
 
         $review = Review::create([
@@ -92,7 +104,7 @@ class ReviewController extends Controller
     public function index($hotelId)
     {
         $reviews = Review::where('hotel_id', $hotelId)
-            ->with('user:id,name,email')
+            ->with('user:id,name')
             ->orderBy('created_at', 'desc')
             ->get();
 

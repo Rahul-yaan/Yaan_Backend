@@ -34,13 +34,13 @@ class TransactionController extends Controller
             } elseif ($type === 'refunded' || $type === 'refund') {
                 // Refunded Block: Bookings where payment was refunded or refund initiated
                 $query->where(function($q) {
-                    $q->whereIn('payment_status', ['refunded', 'refund_initiated'])
+                    $q->whereIn('payment_status', ['refunded', 'refund_initiated', Booking::REFUND_PENDING])
                       ->orWhere('cancellation_reason', 'like', '%refund%');
                 });
             } elseif ($type === 'cancelled' || $type === 'failed') {
                 // Cancelled / Failed Block: Cancelled bookings excluding refunded payments
                 $query->where('status', 'cancelled')
-                      ->whereNotIn('payment_status', ['refunded', 'refund_initiated'])
+                      ->whereNotIn('payment_status', ['refunded', 'refund_initiated', Booking::REFUND_PENDING])
                       ->where(function($q) {
                           $q->whereNull('cancellation_reason')
                             ->orWhere('cancellation_reason', 'not like', '%refund%');
@@ -83,8 +83,8 @@ class TransactionController extends Controller
         $allBookings = Booking::all();
         $confirmedBookings = $allBookings->filter(fn($b) => $b->payment_status === 'paid' && in_array($b->status, ['confirmed', 'completed']));
         $temporaryBookings = $allBookings->filter(fn($b) => $b->status === 'pending' && in_array($b->payment_status, ['pending', 'failed']));
-        $refundedBookings  = $allBookings->filter(fn($b) => in_array($b->payment_status, ['refunded', 'refund_initiated']) || str_contains(strtolower($b->cancellation_reason ?? ''), 'refund'));
-        $cancelledBookings = $allBookings->filter(fn($b) => $b->status === 'cancelled' && !in_array($b->payment_status, ['refunded', 'refund_initiated']) && !str_contains(strtolower($b->cancellation_reason ?? ''), 'refund'));
+        $refundedBookings  = $allBookings->filter(fn($b) => in_array($b->payment_status, ['refunded', 'refund_initiated', Booking::REFUND_PENDING]) || str_contains(strtolower($b->cancellation_reason ?? ''), 'refund'));
+        $cancelledBookings = $allBookings->filter(fn($b) => $b->status === 'cancelled' && !in_array($b->payment_status, ['refunded', 'refund_initiated', Booking::REFUND_PENDING]) && !str_contains(strtolower($b->cancellation_reason ?? ''), 'refund'));
 
         $metrics = [
             'total_count'       => $allBookings->count(),
@@ -127,12 +127,12 @@ class TransactionController extends Controller
                       ->whereIn('payment_status', ['pending', 'failed']);
             } elseif ($type === 'refunded' || $type === 'refund') {
                 $query->where(function($q) {
-                    $q->whereIn('payment_status', ['refunded', 'refund_initiated'])
+                    $q->whereIn('payment_status', ['refunded', 'refund_initiated', Booking::REFUND_PENDING])
                       ->orWhere('cancellation_reason', 'like', '%refund%');
                 });
             } elseif ($type === 'cancelled' || $type === 'failed') {
                 $query->where('status', 'cancelled')
-                      ->whereNotIn('payment_status', ['refunded', 'refund_initiated'])
+                      ->whereNotIn('payment_status', ['refunded', 'refund_initiated', Booking::REFUND_PENDING])
                       ->where(function($q) {
                           $q->whereNull('cancellation_reason')
                             ->orWhere('cancellation_reason', 'not like', '%refund%');
@@ -205,7 +205,7 @@ class TransactionController extends Controller
             } else {
                 foreach ($bookings as $b) {
                     $isConfirmed = $b->is_confirmed || $b->payment_status === 'paid' || in_array($b->status, ['confirmed', 'completed']);
-                    $isRefunded  = $b->payment_status === 'refunded' || str_contains(strtolower($b->cancellation_reason ?? ''), 'refund');
+                    $isRefunded  = in_array($b->payment_status, ['refunded', 'refund_initiated', Booking::REFUND_PENDING]) || str_contains(strtolower($b->cancellation_reason ?? ''), 'refund');
                     $isCancelled = $b->status === 'cancelled' || $isRefunded || $b->payment_status === 'failed';
 
                     $txnType = $isConfirmed ? 'CONFIRMED' : ($isRefunded ? 'REFUNDED' : ($isCancelled ? 'CANCELLED' : 'TEMPORARY'));
@@ -487,7 +487,7 @@ class TransactionController extends Controller
     {
         $request->validate([
             'status'              => 'required|in:pending,confirmed,completed,cancelled',
-            'payment_status'      => 'nullable|in:pending,paid,failed,refunded',
+            'payment_status'      => 'nullable|in:pending,paid,failed,refunded,refund_pending',
             'cancellation_reason' => 'required|string|min:5',
         ]);
 
@@ -796,12 +796,7 @@ class TransactionController extends Controller
                         $data = $res->json();
                         $status = $data['status'] ?? 'unknown';
                         if (in_array($status, ['captured', 'authorized'])) {
-                            $b->payment_status = 'paid';
-                            $b->status = 'confirmed';
-                            $b->transaction_id = $b->transaction_id ?? $b->razorpay_payment_id;
-                            $b->cancellation_reason = 'Auto-synced from Razorpay (Payment Captured)';
-                            $b->gateway_response = json_encode($data);
-                            $b->save();
+                            $b->recordPayment($b->razorpay_payment_id, ['gateway_response' => $data]);
                         }
                     }
                 } elseif (!empty($b->razorpay_order_id)) {
@@ -813,13 +808,7 @@ class TransactionController extends Controller
                             $latest = $items[0];
                             $status = $latest['status'] ?? 'unknown';
                             if (in_array($status, ['captured', 'authorized'])) {
-                                $b->payment_status = 'paid';
-                                $b->status = 'confirmed';
-                                $b->razorpay_payment_id = $latest['id'];
-                                $b->transaction_id = $latest['id'];
-                                $b->cancellation_reason = 'Auto-synced from Razorpay (Payment Captured)';
-                                $b->gateway_response = json_encode($latest);
-                                $b->save();
+                                $b->recordPayment($latest['id'], ['gateway_response' => $latest]);
                             }
                         }
                     }

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 class Banner extends Model
 {
@@ -29,6 +30,76 @@ class Banner extends Model
         'image_url',
         'promo_code',
     ];
+
+    public function bookings()
+    {
+        return $this->hasMany(Booking::class);
+    }
+
+    /**
+     * Check if the coupon has remaining usage allowances.
+     */
+    public function hasAvailableUses(): bool
+    {
+        if (empty($this->max_uses) || (int)$this->max_uses <= 0) {
+            return true;
+        }
+
+        $usedCount = Booking::where('banner_id', $this->id)
+            ->where('status', '!=', 'cancelled')
+            ->count();
+
+        return $usedCount < (int)$this->max_uses;
+    }
+
+    /**
+     * Exact match for active coupon code with max_uses enforcement.
+     */
+    public static function findActiveCoupon(string $code, string $audience = 'user'): ?self
+    {
+        $clean = strtoupper(trim($code));
+        if (empty($clean)) {
+            return null;
+        }
+
+        $banner = self::where('is_active', true)
+            ->whereIn('target_audience', [$audience, 'all'])
+            ->where(function ($q) {
+                $q->whereNull('expires_at')
+                  ->orWhere('expires_at', '>=', now());
+            })
+            ->where(function ($q) use ($clean) {
+                $q->where(DB::raw('UPPER(discount_code)'), $clean);
+            })
+            ->latest()
+            ->first();
+
+        if ($banner && $banner->hasAvailableUses()) {
+            return $banner;
+        }
+
+        return null;
+    }
+
+    /**
+     * Active automatic promotional offer (not requiring a manual coupon code).
+     */
+    public static function activeAutoOffer(string $audience = 'user'): ?self
+    {
+        return self::where('is_active', true)
+            ->whereIn('target_audience', [$audience, 'all'])
+            ->where(function ($q) {
+                $q->whereNull('expires_at')
+                  ->orWhere('expires_at', '>=', now());
+            })
+            ->where('discount_percentage', '>', 0)
+            ->where(function ($q) {
+                $q->whereNull('discount_code')
+                  ->orWhere('discount_code', '');
+            })
+            ->latest()
+            ->first();
+    }
 
     public function getPromoCodeAttribute()
     {

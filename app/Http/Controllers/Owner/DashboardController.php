@@ -29,22 +29,25 @@ class DashboardController extends Controller
         $bookingsQuery = Booking::whereIn('hotel_id', $hotelIds);
 
         if ($filter === 'today') {
-            $bookingsQuery->whereDate('created_at', today());
+            [$startUtc, $endUtc] = \App\Support\BusinessDate::dayRangeUtc();
+            $bookingsQuery->whereBetween('created_at', [$startUtc, $endUtc]);
         } elseif ($filter === 'last_7_days' || $filter === '7days') {
-            $bookingsQuery->where('created_at', '>=', now()->subDays(7)->startOfDay());
+            $sevenDaysAgo = \App\Support\BusinessDate::now()->subDays(7)->startOfDay()->utc();
+            $bookingsQuery->where('created_at', '>=', $sevenDaysAgo);
         } elseif ($filter === 'last_25_days' || $filter === '25days') {
-            $bookingsQuery->where('created_at', '>=', now()->subDays(25)->startOfDay());
+            $twentyFiveDaysAgo = \App\Support\BusinessDate::now()->subDays(25)->startOfDay()->utc();
+            $bookingsQuery->where('created_at', '>=', $twentyFiveDaysAgo);
         } elseif (!empty($startDate) && !empty($endDate)) {
-            $bookingsQuery->whereBetween('created_at', [
-                \Carbon\Carbon::parse($startDate)->startOfDay(),
-                \Carbon\Carbon::parse($endDate)->endOfDay()
-            ]);
+            $startUtc = \Carbon\Carbon::parse($startDate, \App\Support\BusinessDate::TIMEZONE)->startOfDay()->utc();
+            $endUtc   = \Carbon\Carbon::parse($endDate, \App\Support\BusinessDate::TIMEZONE)->endOfDay()->utc();
+            $bookingsQuery->whereBetween('created_at', [$startUtc, $endUtc]);
         }
 
         $totalBookings = (clone $bookingsQuery)->count();
 
+        [$startToday, $endToday] = \App\Support\BusinessDate::dayRangeUtc();
         $todayBookings = Booking::whereIn('hotel_id', $hotelIds)
-            ->whereDate('created_at', today())
+            ->whereBetween('created_at', [$startToday, $endToday])
             ->count();
 
         // Owner Confirmed, Paid & Cash (Pay at hotel) Bookings Query

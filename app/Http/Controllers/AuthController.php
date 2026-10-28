@@ -3,28 +3,33 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Support\SafeUpload;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
-use Kreait\Firebase\Contract\Auth as FirebaseAuth; // FIX: uncommented — was missing, caused fatal error in production
+use Kreait\Firebase\Contract\Auth as FirebaseAuth;
 
 class AuthController extends Controller
 {
-    // Note: FirebaseAuth is lazy-resolved in verifyOtp() so routes like /register and /login
-    // will not crash if Firebase credentials are missing or bypassed.
+    /**
+     * Determine if a user record is an abandoned unverified sign-up that can be re-registered safely.
+     */
+    private function isAbandonedSignup(User $user): bool
+    {
+        return empty($user->firebase_uid)
+            && !$user->is_verified
+            && !$user->hotels()->exists()
+            && !$user->ownerProfile()->exists()
+            && !$user->bookings()->exists();
+    }
 
     // ============================================================
-    // 1. REGISTER
-    //    URL:  POST /api/register
-    //    Body: name, email, phone, role
-        // ============================================================
     // 1. REGISTER
     //    URL:  POST /api/register
     //    Body: name, email, phone, role, password (optional)
     // ============================================================
     public function register(Request $request)
     {
-        // Normalize role: User App gets 'user', Hotel Owner App gets 'owner'
         $rawRole = strtolower($request->input('role', 'user'));
         if (in_array($rawRole, ['owner', 'hotel_owner', 'hotelowner'])) {
             $role = 'owner';
@@ -51,7 +56,6 @@ class AuthController extends Controller
             ], 422);
         }
 
-        // Extract raw digits for matching last 10 digits
         $rawDigits = preg_replace('/[^0-9]/', '', $phone);
         $last10 = strlen($rawDigits) >= 10 ? substr($rawDigits, -10) : $rawDigits;
 
@@ -62,7 +66,7 @@ class AuthController extends Controller
             ], 422);
         }
 
-        // Find existing user by email OR phone (last 10 digits), excluding super admin
+        // Look up existing user (strictly excluding super admin)
         $existingUser = User::where('role', '!=', 'admin')
             ->where(function($q) use ($email, $phone, $rawDigits, $last10) {
                 $q->where('email', $email)
@@ -77,30 +81,40 @@ class AuthController extends Controller
             : Hash::make('temp_' . uniqid());
 
         if ($existingUser) {
-            // Prevent cross-app role mismatch registration
-            if ($existingUser->role !== $role) {
-                $msg = $existingUser->role === 'owner'
-                    ? "This mobile number is already registered as a Hotel Owner account. It cannot be used to register a Customer account."
-                    : "This mobile number is already registered as a Customer account. It cannot be used to register a Hotel Owner account.";
+            $isAbandoned = $this->isAbandonedSignup($existingUser);
 
+            if ($isAbandoned) {
+                // Abandoned sign-up: reset access tokens and overwrite with clean profile
+                $existingUser->tokens()->delete();
+                $existingUser->update([
+                    'name'        => $name,
+                    'email'       => $email,
+                    'phone'       => $phone,
+                    'password'    => $userPassword,
+                    'role'        => $role,
+                    'is_verified' => false,
+                ]);
+                $user = $existingUser;
+            } else {
+                // Account is NOT abandoned: protect role isolation and existing verified accounts
+                if ($existingUser->role !== $role) {
+                    $msg = $existingUser->role === 'owner'
+                        ? "This mobile number is already registered as a Hotel Owner account. It cannot be used to register a Customer account."
+                        : "This mobile number is already registered as a Customer account. It cannot be used to register a Hotel Owner account.";
+
+                    return response()->json([
+                        'error'   => 'Role restriction error.',
+                        'message' => $msg,
+                    ], 422);
+                }
+
+                // Prevent overwriting any active or verified account
                 return response()->json([
-                    'error'   => 'Role restriction error.',
-                    'message' => $msg,
+                    'error'   => 'Account already exists. Please log in.',
+                    'message' => 'Account already exists. Please log in.',
                 ], 422);
             }
-
-            // Update existing record for seamless re-registration & OTP verification
-            $existingUser->update([
-                'name'        => $name,
-                'email'       => $email,
-                'phone'       => $phone,
-                'password'    => $userPassword,
-                'role'        => $role,
-                'is_verified' => false,
-            ]);
-            $user = $existingUser;
         } else {
-            // Create new User record
             $user = User::create([
                 'name'        => $name,
                 'email'       => $email,
@@ -127,7 +141,6 @@ class AuthController extends Controller
     // ============================================================
     public function verifyOtp(Request $request)
     {
-        // Accept firebase_id_token under various naming keys
         $idToken = $request->input('firebase_id_token') 
                 ?? $request->input('id_token') 
                 ?? $request->input('idToken') 
@@ -135,11 +148,11 @@ class AuthController extends Controller
 
         if (empty($idToken)) {
             return response()->json([
-                'error' => 'Firebase ID token is required.',
+                'error'   => 'Firebase ID token is required.',
+                'message' => 'Firebase ID token is required.',
             ], 422);
         }
 
-        // Find user by user_id OR phone OR email
         $user = null;
         if ($request->filled('user_id')) {
             $user = User::find($request->user_id);
@@ -161,11 +174,11 @@ class AuthController extends Controller
 
         if (!$user) {
             return response()->json([
-                'error' => 'User account not found. Please register first.',
+                'error'   => 'User account not found. Please register first.',
+                'message' => 'User account not found. Please register first.',
             ], 404);
         }
 
-        // Verify role isolation if role parameter is supplied
         if ($request->filled('role')) {
             $rawRole = strtolower($request->input('role'));
             $requestedRole = in_array($rawRole, ['owner', 'hotel_owner', 'hotelowner']) ? 'owner' : 'user';
@@ -181,24 +194,19 @@ class AuthController extends Controller
             }
         }
 
-        // Update password if provided
         if ($request->filled('password')) {
             $password = $request->password;
             if (strlen($password) < 6) {
                 return response()->json([
-                    'error' => 'Password must be at least 6 characters long.',
+                    'error'   => 'Password must be at least 6 characters long.',
+                    'message' => 'Password must be at least 6 characters long.',
                 ], 422);
             }
             $user->password = Hash::make($password);
         }
 
-        // 1. Check for FIREBASE_BYPASS (strictly blocked in production)
-        $isBypass = !app()->isProduction() && (
-            config('app.firebase_bypass') === true 
-            || env('FIREBASE_BYPASS') === true 
-            || env('FIREBASE_BYPASS') === 'true'
-            || $idToken === 'bypass_token'
-        );
+        // 1. Check for FIREBASE_BYPASS (strictly blocked in production/staging)
+        $isBypass = app()->environment('local') && config('app.firebase_bypass') === true && $idToken === 'bypass_token';
 
         if ($isBypass) {
             $user->firebase_uid = 'bypass_uid_' . $user->id;
@@ -215,7 +223,7 @@ class AuthController extends Controller
             ]);
         }
 
-        // PRODUCTION — Real Firebase Token Verification
+        // 2. Real Firebase ID Token Verification
         try {
             $firebaseAuth  = app(FirebaseAuth::class);
             $verifiedToken = $firebaseAuth->verifyIdToken($idToken);
@@ -224,22 +232,38 @@ class AuthController extends Controller
         } catch (\Throwable $e) {
             Log::error('Firebase verifyIdToken failed: ' . $e->getMessage());
             return response()->json([
-                'error' => 'Firebase Auth Error: ' . $e->getMessage(),
+                'error'   => 'Invalid or expired OTP token. Please try again.',
+                'message' => 'Invalid or expired OTP token. Please try again.',
             ], 401);
         }
 
-        // Match registered phone with Firebase verified phone (last 10 digits)
-        if ($fbPhone) {
-            $cleanUserPhone = preg_replace('/[^0-9]/', '', $user->phone);
-            $cleanFbPhone   = preg_replace('/[^0-9]/', '', $fbPhone);
-            $last10User     = strlen($cleanUserPhone) >= 10 ? substr($cleanUserPhone, -10) : $cleanUserPhone;
-            $last10Fb       = strlen($cleanFbPhone) >= 10 ? substr($cleanFbPhone, -10) : $cleanFbPhone;
+        // 3. Strict Phone Verification against Token Claims
+        if (empty($fbPhone)) {
+            return response()->json([
+                'error'   => 'Firebase token does not contain a verified phone number.',
+                'message' => 'Firebase token does not contain a verified phone number.',
+            ], 422);
+        }
 
-            if ($last10User !== $last10Fb) {
-                return response()->json([
-                    'error' => 'Phone number does not match the registered number.',
-                ], 422);
-            }
+        $cleanUserPhone = preg_replace('/[^0-9]/', '', $user->phone);
+        $cleanFbPhone   = preg_replace('/[^0-9]/', '', $fbPhone);
+        $last10User     = strlen($cleanUserPhone) >= 10 ? substr($cleanUserPhone, -10) : $cleanUserPhone;
+        $last10Fb       = strlen($cleanFbPhone) >= 10 ? substr($cleanFbPhone, -10) : $cleanFbPhone;
+
+        if ($last10User !== $last10Fb) {
+            return response()->json([
+                'error'   => 'Phone number does not match the registered number.',
+                'message' => 'Phone number does not match the registered number.',
+            ], 422);
+        }
+
+        // 4. Ensure one Firebase UID belongs to only one user account
+        $uidInUse = User::where('firebase_uid', $uid)->where('id', '!=', $user->id)->exists();
+        if ($uidInUse) {
+            return response()->json([
+                'error'   => 'This phone number is already verified with another account.',
+                'message' => 'This phone number is already verified with another account.',
+            ], 422);
         }
 
         $user->firebase_uid = $uid;
@@ -268,7 +292,8 @@ class AuthController extends Controller
 
         if (empty($loginInput) || empty($password)) {
             return response()->json([
-                'error' => 'Email/Phone and password are required.',
+                'error'   => 'Email/Phone and password are required.',
+                'message' => 'Email/Phone and password are required.',
             ], 422);
         }
 
@@ -282,42 +307,34 @@ class AuthController extends Controller
             $role = 'user';
         }
 
-        // Seed initial Super Admin only if no admin record exists
-        if (strtolower($loginInput) === 'admin@yaan.com') {
-            $user = User::where('email', 'admin@yaan.com')->first();
-            if (!$user) {
-                $user = new User();
-                $user->name         = 'Super Admin';
-                $user->email        = 'admin@yaan.com';
-                $user->phone        = '9999999999';
-                $user->password     = Hash::make('admin123456');
-                $user->role         = 'admin';
-                $user->firebase_uid = 'admin_bypass_uid';
-                $user->is_verified  = true;
-                $user->save();
-            }
-        } else {
-            // Find user by Email OR Phone (matching phone format or last 10 digits)
-            $rawDigits = preg_replace('/[^0-9]/', '', $loginInput);
-            $last10 = strlen($rawDigits) >= 10 ? substr($rawDigits, -10) : $rawDigits;
+        // Find user by Email OR Phone (matching phone format or last 10 digits)
+        $rawDigits = preg_replace('/[^0-9]/', '', $loginInput);
+        $last10 = strlen($rawDigits) >= 10 ? substr($rawDigits, -10) : $rawDigits;
 
-            $user = User::where('email', strtolower($loginInput))
-                ->orWhere(function($q) use ($loginInput, $rawDigits, $last10) {
-                    if (!empty($rawDigits)) {
-                        $q->where('phone', $loginInput)
-                          ->orWhere('phone', $rawDigits)
-                          ->orWhere('phone', '+' . $rawDigits)
-                          ->orWhere('phone', 'LIKE', '%' . $last10);
-                    }
-                })->first();
+        $user = User::where('email', strtolower($loginInput))
+            ->orWhere(function($q) use ($loginInput, $rawDigits, $last10) {
+                if (!empty($rawDigits)) {
+                    $q->where('phone', $loginInput)
+                      ->orWhere('phone', $rawDigits)
+                      ->orWhere('phone', '+' . $rawDigits)
+                      ->orWhere('phone', 'LIKE', '%' . $last10);
+                }
+            })->first();
+
+        // Security: verify password FIRST to prevent account existence enumeration
+        if (!$user || !Hash::check($password, $user->password)) {
+            return response()->json([
+                'error'   => 'Invalid credentials or role.',
+                'message' => 'Invalid credentials or role.',
+            ], 401);
         }
 
-        if ($user && $user->role === 'admin') {
+        if ($user->role === 'admin') {
             $role = 'admin';
         }
 
         // Prevent cross-app role mismatch login
-        if ($user && $user->role !== 'admin' && $hasRoleInput && !empty($request->input('role')) && $user->role !== $role) {
+        if ($user->role !== 'admin' && $hasRoleInput && !empty($request->input('role')) && $user->role !== $role) {
             $msg = $user->role === 'owner'
                 ? "This mobile number is registered as a Hotel Owner account. Please log in using the Hotel Owner App."
                 : "This mobile number is registered as a Customer account. Please log in using the Customer App.";
@@ -328,19 +345,10 @@ class AuthController extends Controller
             ], 401);
         }
 
-        if (!$user || !Hash::check($password, $user->password)) {
-            return response()->json([
-                'error'   => 'Invalid credentials or role.',
-                'message' => 'Invalid credentials or role.',
-            ], 401);
-        }
-
         if ($user->role === 'admin') {
             if (!$user->is_verified) {
-                try {
-                    \Illuminate\Support\Facades\DB::statement("UPDATE users SET is_verified = true WHERE id = ?", [$user->id]);
-                    $user->refresh();
-                } catch (\Throwable $e) {}
+                $user->is_verified = true;
+                $user->save();
             }
         } elseif ($user->role !== 'owner' && !$user->is_verified) {
             return response()->json([
@@ -350,7 +358,6 @@ class AuthController extends Controller
         }
 
         $user->tokens()->delete();
-
         $token = $user->createToken('auth_token')->plainTextToken;
 
         $targetHotel = \App\Models\Hotel::where('owner_id', $user->id)->first();
@@ -486,29 +493,36 @@ class AuthController extends Controller
     {
         $user = $request->user();
 
-        // 1. Update Name (check 'name', 'full_name', 'user_name')
+        // 1. Update Name
         $name = $request->input('name') ?? $request->input('full_name') ?? $request->input('user_name');
         if ($name !== null && trim($name) !== '') {
             $user->name = trim($name);
         }
 
         // 2. Update Email if changed and valid
-        if ($request->filled('email') && $request->email !== $user->email) {
+        if ($request->filled('email') && strtolower(trim($request->email)) !== strtolower($user->email)) {
             $request->validate([
                 'email' => 'email|unique:users,email,' . $user->id,
             ]);
-            $user->email = $request->email;
+            $user->email = strtolower(trim($request->email));
         }
 
-        // 3. Update Phone if changed and valid
-        if ($request->filled('phone') && $request->phone !== $user->phone) {
-            $request->validate([
-                'phone' => 'string|unique:users,phone,' . $user->id,
-            ]);
-            $user->phone = $request->phone;
+        // 3. Security: Phone is strictly read-only after verification
+        if ($request->filled('phone')) {
+            $newRaw = preg_replace('/[^0-9]/', '', (string)$request->phone);
+            $oldRaw = preg_replace('/[^0-9]/', '', (string)$user->phone);
+            $last10New = strlen($newRaw) >= 10 ? substr($newRaw, -10) : $newRaw;
+            $last10Old = strlen($oldRaw) >= 10 ? substr($oldRaw, -10) : $oldRaw;
+
+            if ($last10New !== $last10Old) {
+                return response()->json([
+                    'error'   => 'Phone number cannot be changed directly.',
+                    'message' => 'Phone number cannot be changed without OTP verification.',
+                ], 422);
+            }
         }
 
-        // 4. Update Profile Avatar Image (file or base64)
+        // 4. Update Profile Avatar Image safely
         $imageFile = null;
         foreach (['avatar', 'image', 'profile_image', 'photo', 'file'] as $key) {
             if ($request->hasFile($key)) {
@@ -517,25 +531,22 @@ class AuthController extends Controller
             }
         }
 
-        if ($imageFile && $imageFile->isValid()) {
-            $path = $imageFile->store('avatars', 'public');
-            $user->avatar = url('storage/' . $path);
+        if ($imageFile) {
+            try {
+                $path = SafeUpload::storePublicImage($imageFile, 'avatars');
+                if ($path) {
+                    $user->avatar = url('storage/' . $path);
+                }
+            } catch (\Throwable $e) {}
         } else {
-            // Check for Base64 image payload
             $base64Input = $request->input('avatar') ?? $request->input('profile_image') ?? $request->input('image');
             if (is_string($base64Input) && str_starts_with($base64Input, 'data:image')) {
                 try {
-                    @list($type, $data) = explode(';', $base64Input);
-                    @list(, $data)      = explode(',', $data);
-                    if ($data) {
-                        $decoded = base64_decode($data);
-                        $filename = 'avatars/' . uniqid() . '.png';
-                        \Illuminate\Support\Facades\Storage::disk('public')->put($filename, $decoded);
-                        $user->avatar = url('storage/' . $filename);
+                    $path = SafeUpload::storePublicImage($base64Input, 'avatars');
+                    if ($path) {
+                        $user->avatar = url('storage/' . $path);
                     }
-                } catch (\Throwable $e) {
-                    // Ignore base64 parsing error
-                }
+                } catch (\Throwable $e) {}
             }
         }
 

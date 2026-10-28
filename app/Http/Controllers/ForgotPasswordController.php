@@ -4,10 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\PasswordResetToken;
+use App\Support\BusinessDate;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class ForgotPasswordController extends Controller
@@ -20,18 +22,29 @@ class ForgotPasswordController extends Controller
     public function sendResetLink(Request $request)
     {
         $request->validate([
-            'email' => 'required|email|exists:users,email',
+            'email' => 'required|email',
         ]);
 
-        $user = User::where('email', $request->email)->first();
+        $email = strtolower(trim($request->email));
+        $user  = User::whereRaw('LOWER(email) = ?', [$email])->first();
 
-        if (!$user->is_verified) {
-            return response()->json([
-                'error' => 'Account not verified. Complete phone verification first.',
-            ], 403);
+        $genericResponse = response()->json([
+            'message'       => 'If your email is registered, a password reset link has been sent.',
+            'attempts_left' => 3,
+        ]);
+
+        // Security: return generic response if user doesn't exist
+        if (!$user) {
+            return $genericResponse;
         }
 
-        $today = Carbon::today()->toDateString();
+        // Allow password reset if account is verified OR has phone verified via firebase_uid (e.g. pending owner)
+        $isEligible = (bool) $user->is_verified || !empty($user->firebase_uid);
+        if (!$isEligible) {
+            return $genericResponse;
+        }
+
+        $today = BusinessDate::today();
         $existing = PasswordResetToken::where('user_id', $user->id)->first();
 
         if ($existing) {
@@ -40,6 +53,7 @@ class ForgotPasswordController extends Controller
             if ($isToday && $existing->attempts_today >= 3) {
                 return response()->json([
                     'error'          => 'Daily limit reached.',
+                    'message'        => 'Daily limit reached for password reset requests. Please try again tomorrow.',
                     'attempts_left'  => 0,
                     'retry_tomorrow' => true,
                 ], 429);
@@ -56,10 +70,11 @@ class ForgotPasswordController extends Controller
 
         $plainToken = Str::random(64);
 
+        // Security fix: Increase link validity to 30 minutes
         PasswordResetToken::create([
             'user_id'        => $user->id,
             'token'          => Hash::make($plainToken),
-            'expires_at'     => now()->addMinutes(3),
+            'expires_at'     => now()->addMinutes(30),
             'attempts_today' => $attemptsToday,
             'attempts_date'  => $today,
         ]);
@@ -77,17 +92,13 @@ class ForgotPasswordController extends Controller
                             ->subject('Reset Your Yaan Password');
                 }
             );
-            \Log::info('Email sent successfully to: ' . $user->email);
-        } catch (\Exception $e) {
-            \Log::error('Mail failed: ' . $e->getMessage());
-            return response()->json([
-                'error' => 'Mail failed: ' . $e->getMessage(),
-            ], 500);
+        } catch (\Throwable $e) {
+            Log::error('Password reset email sending failed: ' . $e->getMessage());
         }
 
         return response()->json([
-            'message'       => 'Password reset link sent to your email.',
-            'attempts_left' => 3 - $attemptsToday,
+            'message'       => 'If your email is registered, a password reset link has been sent.',
+            'attempts_left' => max(0, 3 - $attemptsToday),
         ]);
     }
 
@@ -100,29 +111,41 @@ class ForgotPasswordController extends Controller
     {
         $request->validate([
             'token'    => 'required|string',
-            'email'    => 'required|email|exists:users,email',
+            'email'    => 'required|email',
             'password' => 'required|min:6|confirmed',
         ]);
 
-        $user = User::where('email', $request->email)->first();
+        $email = strtolower(trim($request->email));
+        $user  = User::whereRaw('LOWER(email) = ?', [$email])->first();
+
+        if (!$user) {
+            return response()->json([
+                'error'   => 'Invalid or expired reset link.',
+                'message' => 'Invalid or expired reset link.',
+            ], 422);
+        }
+
         $record = PasswordResetToken::where('user_id', $user->id)->first();
 
         if (!$record) {
             return response()->json([
-                'error' => 'Invalid or expired reset link.',
+                'error'   => 'Invalid or expired reset link.',
+                'message' => 'Invalid or expired reset link.',
             ], 422);
         }
 
         if (Carbon::now()->isAfter($record->expires_at)) {
             $record->delete();
             return response()->json([
-                'error' => 'Reset link has expired. Please request a new one.',
+                'error'   => 'Reset link has expired. Please request a new one.',
+                'message' => 'Reset link has expired. Please request a new one.',
             ], 422);
         }
 
         if (!Hash::check($request->token, $record->token)) {
             return response()->json([
-                'error' => 'Invalid reset token.',
+                'error'   => 'Invalid reset token.',
+                'message' => 'Invalid reset token.',
             ], 422);
         }
 

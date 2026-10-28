@@ -4,21 +4,13 @@ namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
 use App\Models\Hotel;
+use App\Models\Banner;
+use App\Models\Booking;
+use App\Support\BusinessDate;
 use Illuminate\Http\Request;
 
 class HotelController extends Controller
 {
-    private function applyApprovedScope($query)
-    {
-        return $query->whereIn('status', ['active', 'approved'])
-            ->whereHas('owner', function($oq) {
-                $oq->where('is_verified', true)
-                   ->whereHas('ownerProfile', function($pq) {
-                       $pq->where('status', 'approved');
-                   });
-            });
-    }
-
     public function search(Request $request)
     {
         // 1. Normalize Amenities input (can be array, comma-separated string, or JSON string)
@@ -37,41 +29,37 @@ class HotelController extends Controller
             }
         }
 
-        // 2. Extract Latitude & Longitude parameters flexibly (snake_case, camelCase, origin/dest)
+        // 2. Extract Latitude & Longitude parameters flexibly
         $fromLat = $request->input('from_lat') ?? $request->input('fromLat') ?? $request->input('origin_lat') ?? $request->input('pickup_lat');
         $fromLng = $request->input('from_lng') ?? $request->input('fromLng') ?? $request->input('origin_lng') ?? $request->input('pickup_lng');
         $toLat   = $request->input('to_lat')   ?? $request->input('toLat')   ?? $request->input('dest_lat')   ?? $request->input('drop_lat');
         $toLng   = $request->input('to_lng')   ?? $request->input('toLng')   ?? $request->input('dest_lng')   ?? $request->input('drop_lng');
 
-        // 3. Determine Sort Order Direction (forward: Origin -> Destination, reverse: Destination -> Origin)
         $sortParam = strtolower(trim($request->input('sort') ?? $request->input('sort_order') ?? $request->input('order') ?? $request->input('direction') ?? $request->input('sort_by') ?? 'asc'));
         $isReverse = in_array($sortParam, ['desc', 'reverse', 'destination_first', 'to_first', 'reverse_flow']);
 
         $hasCoords = is_numeric($fromLat) && is_numeric($fromLng) && is_numeric($toLat) && is_numeric($toLng);
 
+        // Security: customer queries never load owner or ownerProfile KYC relations
         if ($hasCoords) {
             $fromLat = (float) $fromLat;
             $fromLng = (float) $fromLng;
             $toLat   = (float) $toLat;
             $toLng   = (float) $toLng;
 
-            $midLat = ($fromLat + $toLat) / 2;
-            $midLng = ($fromLng + $toLng) / 2;
-
             $routeDistance = $this->haversine($fromLat, $fromLng, $toLat, $toLng);
             $radius = ($routeDistance / 2) + 50;
 
-            // Distance SQL relative to Origin (From location, e.g., Bharuch)
             $fromDistSql = "(6371 * acos(
                 GREATEST(-1.0, LEAST(1.0, cos(radians(?)) * cos(radians(latitude))
                 * cos(radians(longitude) - radians(?))
                 + sin(radians(?)) * sin(radians(latitude))))
             ))";
 
-            $query = $this->applyApprovedScope(Hotel::query())
+            $query = Hotel::bookable()
                 ->selectRaw("*, {$fromDistSql} AS distance", [$fromLat, $fromLng, $fromLat])
                 ->whereRaw("{$fromDistSql} <= ?", [$fromLat, $fromLng, $fromLat, $radius + 50])
-                ->with(['images', 'primaryImage', 'amenities', 'owner.ownerProfile']);
+                ->with(['images', 'primaryImage', 'amenities']);
 
             if (!empty($amenities)) {
                 foreach ($amenities as $amenityName) {
@@ -81,7 +69,6 @@ class HotelController extends Controller
                 }
             }
 
-            // Order by selection: price_low, price_high, rating, or route distance (forward/reverse)
             if (in_array($sortParam, ['price_low', 'price_asc', 'price_low_to_high'])) {
                 $hotels = $query->orderBy('price_per_night', 'asc')->get();
             } elseif (in_array($sortParam, ['price_high', 'price_desc', 'price_high_to_low'])) {
@@ -89,28 +76,26 @@ class HotelController extends Controller
             } elseif (in_array($sortParam, ['rating', 'rating_desc', 'top_rated'])) {
                 $hotels = $query->orderBy('rating', 'desc')->get();
             } else {
-                // Order by distance from origin: ASC = Forward (Origin -> Destination), DESC = Reverse (Destination -> Origin)
                 $hotels = $query->orderBy('distance', $isReverse ? 'desc' : 'asc')->get();
             }
         } else {
-            $query = $this->applyApprovedScope(Hotel::query())
-                ->with(['images', 'primaryImage', 'amenities', 'owner.ownerProfile']);
+            $query = Hotel::bookable()->with(['images', 'primaryImage', 'amenities']);
 
             $fromCity = $request->input('from_city') ?? $request->input('from');
             $toCity   = $request->input('to_city')   ?? $request->input('to') ?? $request->input('destination') ?? $request->input('city') ?? $request->input('location') ?? $request->input('search');
 
-            if (!empty($fromCity) || !empty($toCity)) {
-                $query->where(function($q) use ($fromCity, $toCity) {
-                    $likeOp = \Illuminate\Support\Facades\DB::connection()->getDriverName() === 'pgsql' ? 'ILIKE' : 'LIKE';
-                    if (!empty($fromCity)) {
-                        $q->orWhere('city', $likeOp, '%' . $fromCity . '%')
-                          ->orWhere('address', $likeOp, '%' . $fromCity . '%');
-                    }
-                    if (!empty($toCity)) {
-                        $q->orWhere('city', $likeOp, '%' . $toCity . '%')
-                          ->orWhere('name', $likeOp, '%' . $toCity . '%')
-                          ->orWhere('address', $likeOp, '%' . $toCity . '%');
-                    }
+            if ($fromCity && $toCity) {
+                $query->where(function ($q) use ($fromCity, $toCity) {
+                    $q->where('city', 'LIKE', "%{$fromCity}%")
+                      ->orWhere('city', 'LIKE', "%{$toCity}%")
+                      ->orWhere('address', 'LIKE', "%{$fromCity}%")
+                      ->orWhere('address', 'LIKE', "%{$toCity}%");
+                });
+            } elseif ($toCity) {
+                $query->where(function ($q) use ($toCity) {
+                    $q->where('city', 'LIKE', "%{$toCity}%")
+                      ->orWhere('address', 'LIKE', "%{$toCity}%")
+                      ->orWhere('name', 'LIKE', "%{$toCity}%");
                 });
             }
 
@@ -129,74 +114,42 @@ class HotelController extends Controller
             } elseif (in_array($sortParam, ['rating', 'rating_desc', 'top_rated'])) {
                 $hotels = $query->orderBy('rating', 'desc')->get();
             } else {
-                $hotels = $isReverse ? $query->oldest()->get() : $query->latest()->get();
-            }
-            $fromLat = $fromLng = $toLat = $toLng = $midLat = $midLng = 0;
-            $routeDistance = $radius = 0;
-        }
-
-        $today = \Carbon\Carbon::today()->toDateString();
-
-        foreach ($hotels as $h) {
-            $h->ensurePrimaryImageExists();
-
-            $todayBooked = \App\Models\Booking::where('hotel_id', $h->id)
-                ->whereIn('status', ['pending', 'confirmed'])
-                ->whereDate('booking_date', $today)
-                ->count();
-            $h->available_rooms = max(0, $h->total_rooms - $todayBooked);
-
-            // Automatic fallback: ensure hotel has amenities to display
-            if ($h->amenities->isEmpty()) {
-                $defaultNames = ['Wi-Fi', 'Air Conditioning', 'Free Parking'];
-                $defaultIds = [];
-                foreach ($defaultNames as $dName) {
-                    $d = \App\Models\Amenity::firstOrCreate(['name' => $dName]);
-                    $defaultIds[] = $d->id;
-                }
-                $h->amenities()->syncWithoutDetaching($defaultIds);
-                $h->load('amenities');
+                $hotels = $query->orderBy('id', 'asc')->get();
             }
 
-            $h->amenity_names = $h->amenities->pluck('name')->toArray();
-            $this->attachActiveDiscountInfo($h);
+            $routeDistance = 0;
+            $radius = 0;
         }
+
+        $hotels->each(function ($hotel) {
+            $hotel->ensurePrimaryImageExists();
+            $this->attachActiveDiscountInfo($hotel);
+        });
 
         return response()->json([
+            'count'           => $hotels->count(),
             'hotels'          => $hotels,
-            'from'            => ['lat' => $fromLat, 'lng' => $fromLng],
-            'to'              => ['lat' => $toLat,   'lng' => $toLng],
-            'midpoint'        => ['lat' => $midLat,  'lng' => $midLng],
             'route_km'        => round($routeDistance, 2),
             'search_radius'   => round($radius, 2),
             'sort_order'      => $isReverse ? 'reverse' : 'forward',
             'is_reversed'     => $isReverse,
-            'available_sorts' => [
-                'forward' => 'Bharuch to Vadodara (Start to Destination)',
-                'reverse' => 'Vadodara to Bharuch (Destination to Start)',
-            ],
         ]);
     }
 
     public function show($id)
     {
-        $query = $this->applyApprovedScope(Hotel::query())
+        $hotel = Hotel::bookable()
             ->where('id', $id)
-            ->with(['images', 'primaryImage', 'amenities', 'reviews.user:id,name,email', 'owner.ownerProfile']);
-
-        $hotel = $query->firstOrFail();
+            ->with(['images', 'primaryImage', 'amenities', 'reviews.user:id,name'])
+            ->firstOrFail();
 
         $hotel->ensurePrimaryImageExists();
         $this->attachActiveDiscountInfo($hotel);
 
-        $today = \Carbon\Carbon::today()->toDateString();
-        $todayBooked = \App\Models\Booking::where('hotel_id', $hotel->id)
-            ->whereIn('status', ['pending', 'confirmed'])
-            ->whereDate('booking_date', $today)
-            ->count();
+        $today = BusinessDate::today();
+        $todayBooked = Booking::holdingSlot($hotel->id, $today)->count();
         $hotel->available_rooms = max(0, $hotel->total_rooms - $todayBooked);
 
-        // Automatic fallback: ensure hotel has amenities to display
         if ($hotel->amenities->isEmpty()) {
             $defaultNames = ['Wi-Fi', 'Air Conditioning', 'Free Parking'];
             $defaultIds = [];
@@ -218,7 +171,7 @@ class HotelController extends Controller
      */
     private function attachActiveDiscountInfo($hotel)
     {
-        $activeUserBanner = \App\Models\Banner::whereRaw('is_active IS TRUE')
+        $activeUserBanner = Banner::where('is_active', true)
             ->whereIn('target_audience', ['user', 'all'])
             ->where(function($q) {
                 $q->whereNull('expires_at')
@@ -249,81 +202,80 @@ class HotelController extends Controller
         $hotel->discounted_price            = $discountedBasePrice;
         $hotel->gst_amount                  = $gstAmount;
         $hotel->total_payable               = $totalPayable;
-        $hotel->display_total_payable       = $totalPayable;
-
-        return $hotel;
+        $hotel->amount_payable              = $totalPayable;
+        $hotel->grand_total                 = $totalPayable;
     }
 
-    private function haversine($lat1, $lng1, $lat2, $lng2)
+    private function haversine($lat1, $lon1, $lat2, $lon2)
     {
         $earthRadius = 6371;
         $dLat = deg2rad($lat2 - $lat1);
-        $dLng = deg2rad($lng2 - $lng1);
+        $dLon = deg2rad($lon2 - $lon1);
         $a = sin($dLat / 2) * sin($dLat / 2) +
              cos(deg2rad($lat1)) * cos(deg2rad($lat2)) *
-             sin($dLng / 2) * sin($dLng / 2);
+             sin($dLon / 2) * sin($dLon / 2);
         $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
         return $earthRadius * $c;
     }
 
     /**
-     * ============================================================
-     * SCAN & SPOT BOOKING VERIFICATION API
-     * URL: POST /api/hotels/scan-qr
-     * URL: GET  /api/hotels/scan/{code}
-     * URL: GET  /api/hotels/verify-qr?code=...
-     * ============================================================
+     * QR Code Scan Endpoint for Instant Spot Booking.
+     * Matches ONLY official YAAN- ID, never plain numeric database IDs.
      */
     public function scanQr(Request $request, $code = null)
     {
-        $rawInput = trim((string)($code ?? $request->input('code') ?? $request->input('hotel_code') ?? $request->input('yaan_id') ?? $request->input('id') ?? ''));
+        $rawInput = $code 
+            ?? $request->input('code') 
+            ?? $request->input('qr_code') 
+            ?? $request->input('qr_data') 
+            ?? $request->input('hotel_code') 
+            ?? $request->input('payload');
 
         if (empty($rawInput)) {
             return response()->json([
                 'status'     => 'invalid_request',
                 'registered' => false,
                 'can_book'   => false,
+                'error'      => 'Please provide a valid Hotel QR code or YAAN ID.',
                 'message'    => 'Please provide a valid Hotel QR code or YAAN ID.',
             ], 422);
         }
 
-        // Support URL input (e.g. https://yaan.app/hotel/YAAN-H0001)
         if (str_contains($rawInput, '/')) {
             $parts = explode('/', rtrim($rawInput, '/'));
             $rawInput = end($parts);
         }
 
-        // Support JSON input scanned directly from QR code
         if (str_starts_with($rawInput, '{') && str_ends_with($rawInput, '}')) {
             $decoded = json_decode($rawInput, true);
             if (is_array($decoded)) {
-                $rawInput = $decoded['yaan_id'] ?? $decoded['hotel_code'] ?? $decoded['code'] ?? $decoded['hotel_id'] ?? $rawInput;
+                $rawInput = $decoded['yaan_id'] ?? $decoded['hotel_code'] ?? $decoded['code'] ?? $rawInput;
             }
         }
 
         $cleanCode = trim((string)$rawInput);
 
-        // 1. Check if hotel exists in our database
+        // Security Fix: Match ONLY yaan_id (never plain numeric database IDs)
         $hotel = Hotel::where('yaan_id', $cleanCode)
-            ->orWhere('id', is_numeric($cleanCode) ? (int)$cleanCode : 0)
-            ->with(['images', 'primaryImage', 'amenities', 'reviews.user:id,name,email', 'owner.ownerProfile'])
+            ->with(['images', 'primaryImage', 'amenities', 'reviews.user:id,name', 'owner.ownerProfile'])
             ->first();
 
         if (!$hotel) {
             return response()->json([
-                'status'     => 'not_found',
-                'registered' => false,
-                'can_book'   => false,
+                'status'        => 'not_found',
+                'registered'    => false,
+                'can_book'      => false,
                 'searched_code' => $cleanCode,
-                'message'    => 'This hotel is not registered with Yaan company. Spot booking is not available for this location.',
+                'error'         => 'Hotel not found.',
+                'message'       => 'This hotel is not registered with Yaan company. Spot booking is not available for this location.',
             ], 404);
         }
 
-        // Ensure primary image exists
         $hotel->ensurePrimaryImageExists();
 
         // 2. Check if hotel status is active / approved
-        if (!in_array($hotel->status, ['active', 'approved'])) {
+        if (!in_array($hotel->status, ['active', 'approved'], true)) {
+            $hotel->unsetRelation('owner');
             return response()->json([
                 'status'     => 'inactive_hotel',
                 'registered' => true,
@@ -332,14 +284,18 @@ class HotelController extends Controller
                 'hotel_name' => $hotel->name,
                 'yaan_id'    => $hotel->yaan_id,
                 'hotel_code' => $hotel->yaan_id,
+                'error'      => 'Hotel inactive.',
                 'message'    => 'This hotel is registered with Yaan, but is currently undergoing verification or is temporarily inactive.',
             ], 403);
         }
 
-        // 3. Check if Owner is KYC Approved
+        // 3. Check Owner KYC Approval status
         $owner = $hotel->owner;
         $ownerProfile = $owner ? $owner->ownerProfile : null;
         $isOwnerApproved = $owner && $owner->is_verified && $ownerProfile && $ownerProfile->status === 'approved';
+
+        // Security: Unset owner relation so owner KYC documents/numbers are NEVER leaked to the customer
+        $hotel->unsetRelation('owner');
 
         if (!$isOwnerApproved) {
             return response()->json([
@@ -350,17 +306,14 @@ class HotelController extends Controller
                 'hotel_name' => $hotel->name,
                 'yaan_id'    => $hotel->yaan_id,
                 'hotel_code' => $hotel->yaan_id,
+                'error'      => 'KYC pending.',
                 'message'    => 'Hotel partner KYC verification is in progress. Please contact hotel reception.',
             ], 403);
         }
 
-        // 4. Check available rooms / parking slots for TODAY
-        $today = \Carbon\Carbon::today()->toDateString();
-        $todayBooked = \App\Models\Booking::where('hotel_id', $hotel->id)
-            ->whereIn('status', ['pending', 'confirmed'])
-            ->whereDate('booking_date', $today)
-            ->count();
-
+        // 4. Check available rooms / parking slots for TODAY in India time
+        $today = BusinessDate::today();
+        $todayBooked = Booking::holdingSlot($hotel->id, $today)->count();
         $availableRooms = max(0, $hotel->total_rooms - $todayBooked);
 
         if ($availableRooms < 1) {
@@ -373,11 +326,11 @@ class HotelController extends Controller
                 'yaan_id'         => $hotel->yaan_id,
                 'hotel_code'      => $hotel->yaan_id,
                 'available_rooms' => 0,
+                'error'           => 'Fully booked.',
                 'message'         => 'Hotel is registered with Yaan, but all parking slots and rooms are fully booked for today.',
             ], 400);
         }
 
-        // 5. Attach active discounts, pricing, and amenities
         $this->attachActiveDiscountInfo($hotel);
         $hotel->available_rooms = $availableRooms;
 
@@ -391,22 +344,19 @@ class HotelController extends Controller
             $hotel->amenities()->syncWithoutDetaching($defaultIds);
             $hotel->load('amenities');
         }
+
         $hotel->amenity_names = $hotel->amenities->pluck('name')->toArray();
 
         return response()->json([
             'status'          => 'verified',
             'registered'      => true,
             'can_book'        => true,
-            'booking_context' => 'spot_booking',
-            'booking_date'    => $today,
-            'check_in'        => $today,
-            'check_out'       => \Carbon\Carbon::today()->addDay()->toDateString(),
-            'hotel_id'        => $hotel->id,
-            'hotel_name'      => $hotel->name,
-            'yaan_id'         => $hotel->yaan_id,
-            'hotel_code'      => $hotel->yaan_id,
+            'message'         => 'Hotel verified! You can proceed with instant spot booking.',
             'hotel'           => $hotel,
-            'message'         => 'Hotel verified successfully! You can proceed with spot booking.',
-        ], 200);
+            'today_date'      => $today,
+            'check_in'        => $today,
+            'check_out'       => BusinessDate::nextDay($today),
+            'available_rooms' => $availableRooms,
+        ]);
     }
 }

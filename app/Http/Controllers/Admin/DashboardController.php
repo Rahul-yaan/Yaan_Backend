@@ -51,7 +51,7 @@ class DashboardController extends Controller
         ->count();
 
         // Today's Active Bookings (strictly active today: check_in <= today AND check_out >= today, or today's date)
-        $today = Carbon::today()->toDateString();
+        $today = \App\Support\BusinessDate::today();
         $todayActiveBookingsCount = Booking::where(function($q) {
             $q->whereIn('payment_status', ['paid', 'pay_at_hotel', 'cash', 'completed'])
               ->orWhereIn('status', ['confirmed', 'completed']);
@@ -507,19 +507,26 @@ class DashboardController extends Controller
 
     public function cleanTestDataApi(Request $request)
     {
+        if (app()->environment('production')) {
+            return response()->json([
+                'error'   => 'Cannot clean test data in production environment.',
+                'message' => 'Cannot clean test data in production environment.',
+            ], 403);
+        }
+
         try {
             \Illuminate\Support\Facades\Artisan::call('db:clean-test-data');
             $output = \Illuminate\Support\Facades\Artisan::output();
 
             return response()->json([
                 'success' => true,
-                'message' => 'All test hotels, owners, customer accounts, bookings, and transactions have been safely wiped. Super Admin (admin@yaan.com / admin123456) is ready.',
+                'message' => 'Test data cleaned successfully. Admin account and amenities are ready.',
                 'output'  => $output
             ]);
         } catch (\Throwable $e) {
             return response()->json([
-                'success' => false,
-                'error'   => $e->getMessage()
+                'error'   => 'Cleanup failed.',
+                'message' => 'Cleanup failed: ' . $e->getMessage()
             ], 500);
         }
     }
