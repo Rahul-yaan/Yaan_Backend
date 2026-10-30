@@ -284,6 +284,7 @@ class BookingController extends Controller
             $booking->hotel->refreshAvailableRooms($booking->booking_date ? $booking->booking_date->toDateString() : null);
 
             return response()->json([
+                'success'        => true,
                 'message'        => 'Booking cancelled successfully. Your refund request is pending admin approval and will be processed within 5-7 business days.',
                 'refund_pending' => true,
                 'booking'        => $booking,
@@ -298,6 +299,7 @@ class BookingController extends Controller
         $booking->hotel->refreshAvailableRooms($booking->booking_date ? $booking->booking_date->toDateString() : null);
 
         return response()->json([
+            'success'        => true,
             'message'        => 'Booking cancelled successfully.',
             'refund_pending' => false,
             'booking'        => $booking,
