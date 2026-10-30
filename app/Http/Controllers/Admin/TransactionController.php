@@ -388,63 +388,74 @@ class TransactionController extends Controller
 
         $transaction = Booking::with(['user', 'hotel'])->findOrFail($id);
 
-        // Resolve Razorpay payment ID from razorpay_payment_id or transaction_id
+        // Only a real Razorpay payment can be refunded (no made-up payment or refund IDs)
         $paymentId = $transaction->razorpay_payment_id ?? $transaction->transaction_id;
 
-        if (empty($paymentId) && !empty($transaction->temp_transaction_id)) {
-            $paymentId = $transaction->temp_transaction_id;
-        }
-
-        if (empty($paymentId)) {
-            $paymentId = 'pay_MANUAL_' . time();
-        }
-
-        if ($transaction->payment_status === 'refunded') {
+        if (empty($paymentId) || !str_starts_with($paymentId, 'pay_')) {
             return response()->json([
+                'success' => false,
+                'error'   => 'No Razorpay payment.',
+                'message' => 'This booking has no Razorpay payment ID (pay_...), so it cannot be refunded through Razorpay. Pay-at-hotel cash must be returned by the hotel.',
+            ], 422);
+        }
+
+        if (in_array($transaction->payment_status, ['refunded', 'refund_initiated'], true)) {
+            return response()->json([
+                'success' => false,
                 'error'   => 'Already Refunded',
-                'message' => 'This payment has already been marked as refunded.'
+                'message' => 'A refund for this payment was already processed or started.',
             ], 422);
         }
 
         $razorpayKeyId     = config('services.razorpay.key_id') ?? env('RAZORPAY_KEY_ID');
         $razorpayKeySecret = config('services.razorpay.key_secret') ?? env('RAZORPAY_KEY_SECRET');
 
-        $refundData = null;
-        $refundId   = 'rfnd_' . substr(md5(uniqid()), 0, 14);
-        $apiSuccess = false;
-        $apiError   = null;
-
-        if (!empty($razorpayKeyId) && !empty($razorpayKeySecret) && str_starts_with($paymentId, 'pay_')) {
-            try {
-                $amountInPaise = (int) round(($transaction->total_payable ?? $transaction->total_amount) * 100);
-
-                $response = Http::withBasicAuth($razorpayKeyId, $razorpayKeySecret)
-                    ->post("https://api.razorpay.com/v1/payments/{$paymentId}/refund", [
-                        'amount' => $amountInPaise,
-                        'notes'  => [
-                            'admin_id'   => $request->user() ? $request->user()->id : null,
-                            'booking_id' => $transaction->id,
-                            'reason'     => $request->reason,
-                        ]
-                    ]);
-
-                if ($response->successful()) {
-                    $refundData = $response->json();
-                    $refundId   = $refundData['id'] ?? $refundId;
-                    $apiSuccess = true;
-                } else {
-                    $apiError = $response->json('error.description') ?? 'Razorpay refund API response error';
-                    Log::warning("Razorpay Refund API Note for Booking #{$id}: " . $response->body());
-                }
-            } catch (\Throwable $e) {
-                $apiError = $e->getMessage();
-                Log::error("Razorpay Refund Exception for Booking #{$id}: " . $e->getMessage());
-            }
-        } else {
-            if (empty($razorpayKeyId) || empty($razorpayKeySecret)) {
-                $apiError = 'Razorpay API credentials missing in server config (System fallback refund executed)';
-            }
+        if (empty($razorpayKeyId) || empty($razorpayKeySecret)) {
+            return response()->json([
+                'success' => false,
+                'error'   => 'Razorpay not configured.',
+                'message' => 'Razorpay keys are missing on the server. Nothing was changed.',
+            ], 502);
         }
+
+        $amountInPaise = (int) round(($transaction->total_payable ?? $transaction->total_amount) * 100);
+        $apiError = null;
+        $refundData = null;
+
+        try {
+            $response = Http::withBasicAuth($razorpayKeyId, $razorpayKeySecret)
+                ->post("https://api.razorpay.com/v1/payments/{$paymentId}/refund", [
+                    'amount' => $amountInPaise,
+                    'notes'  => [
+                        'admin_id'   => $request->user() ? $request->user()->id : null,
+                        'booking_id' => $transaction->id,
+                        'reason'     => $request->reason,
+                    ]
+                ]);
+
+            if ($response->successful() && !empty($response->json('id')) && $response->json('status') !== 'failed') {
+                $refundData = $response->json();
+            } else {
+                $apiError = $response->json('error.description') ?? ('Razorpay refund failed (HTTP ' . $response->status() . ').');
+                Log::warning("Razorpay Refund API error for Booking #{$id}: " . $response->body());
+            }
+        } catch (\Throwable $e) {
+            $apiError = 'Could not reach Razorpay: ' . $e->getMessage();
+            Log::error("Razorpay Refund Exception for Booking #{$id}: " . $e->getMessage());
+        }
+
+        // Razorpay did not refund: change nothing
+        if ($refundData === null) {
+            return response()->json([
+                'success' => false,
+                'error'   => 'Razorpay refund failed.',
+                'message' => 'Refund failed: ' . $apiError . ' Nothing was changed.',
+            ], 502);
+        }
+
+        $refundId = $refundData['id'];
+        // processed = money sent back; pending = Razorpay is still processing it
+        $newPaymentStatus = ($refundData['status'] ?? '') === 'processed' ? 'refunded' : 'refund_initiated';
 
         // Record audit log for refund override
         \App\Models\TransactionStatusOverride::create([
@@ -453,24 +464,22 @@ class TransactionController extends Controller
             'old_status'         => $transaction->status,
             'new_status'         => 'cancelled',
             'old_payment_status' => $transaction->payment_status,
-            'new_payment_status' => 'refunded',
+            'new_payment_status' => $newPaymentStatus,
             'reason'             => 'Razorpay Refund Initiated: ' . $request->reason . ' (Refund ID: ' . $refundId . ')',
             'ip_address'         => $request->ip(),
         ]);
 
         // Save updated booking state
-        $transaction->payment_status      = 'refunded';
+        $transaction->payment_status      = $newPaymentStatus;
         $transaction->status              = 'cancelled';
         $transaction->razorpay_payment_id = $paymentId;
         $transaction->cancellation_reason = 'Refund Processed via Razorpay API: ' . $request->reason . ' (Refund ID: ' . $refundId . ')';
-        if ($refundData) {
-            $transaction->gateway_response = json_encode($refundData);
-        }
+        $transaction->gateway_response    = json_encode($refundData);
         $transaction->save();
 
-        $userMsg = $apiSuccess 
+        $userMsg = $newPaymentStatus === 'refunded'
             ? "Refund of ₹{$transaction->total_payable} processed successfully with Razorpay! (Refund ID: {$refundId}). Customer will receive payment back."
-            : "Refund of ₹{$transaction->total_payable} marked as Refunded in system! (Refund ID: {$refundId})." . ($apiError ? " Note: {$apiError}" : "");
+            : "Refund of ₹{$transaction->total_payable} started with Razorpay (Refund ID: {$refundId}). Razorpay is still processing it.";
 
         return response()->json([
             'success'     => true,

@@ -1637,7 +1637,7 @@ async function updateBookingStatus(id, status) {
                 body: JSON.stringify({ reason })
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error || data.message || 'Refund failed');
+            if (!res.ok) throw new Error(data.message || data.error || 'Refund failed');
 
             showToast(data.message || 'Refund processed successfully!', 'success');
             loadBookingsData();
@@ -2662,7 +2662,7 @@ async function refundTransactionDirect(txnId) {
             body: JSON.stringify({ reason })
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || data.message || 'Razorpay refund failed');
+        if (!res.ok) throw new Error(data.message || data.error || 'Razorpay refund failed');
 
         showToast(data.message || 'Refund processed with Razorpay successfully!', 'success');
         loadTransactionsData();
@@ -2712,7 +2712,7 @@ async function updateTransactionStatus(txnId, newStatus) {
                 body: JSON.stringify({ reason })
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error || data.message || 'Razorpay refund failed');
+            if (!res.ok) throw new Error(data.message || data.error || 'Razorpay refund failed');
 
             showToast(data.message || 'Refund initiated with Razorpay successfully!', 'success');
             loadTransactionsData();
