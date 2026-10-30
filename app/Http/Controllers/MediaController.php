@@ -56,10 +56,11 @@ class MediaController extends Controller
         }
 
         // 4. If missing from disk, attempt to restore from HotelImage DB backup if applicable
-        $cleanBase = basename($path);
+        //    (exact path match only: a LIKE on the file name could return another hotel's photo)
         try {
             $hotelImg = HotelImage::where('image_path', $path)
-                ->orWhere('image_path', 'LIKE', "%{$cleanBase}")
+                ->orWhere('image_path', 'storage/' . $path)
+                ->orWhere('image_path', url('storage/' . $path))
                 ->first();
 
             if ($hotelImg && !empty($hotelImg->image_data) && str_starts_with($hotelImg->image_data, 'data:image/')) {
@@ -67,11 +68,13 @@ class MediaController extends Controller
                 $raw = $commaPos !== false ? substr($hotelImg->image_data, $commaPos + 1) : $hotelImg->image_data;
                 $decoded = base64_decode($raw, true);
 
-                if ($decoded !== false) {
+                // Old rows may hold any file: only restore real images
+                $decodedMime = $decoded !== false ? ((new \finfo(FILEINFO_MIME_TYPE))->buffer($decoded) ?: '') : '';
+                if ($decoded !== false && in_array($decodedMime, ['image/jpeg', 'image/png', 'image/webp', 'image/gif'], true)) {
                     @mkdir(dirname($publicStoragePath), 0775, true);
                     file_put_contents($publicStoragePath, $decoded);
 
-                    $mime = mime_content_type($publicStoragePath) ?: 'image/jpeg';
+                    $mime = $decodedMime;
                     return response()->file($publicStoragePath, [
                         'Content-Type'  => $mime,
                         'Cache-Control' => 'public, max-age=86400',
