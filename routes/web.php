@@ -2,28 +2,32 @@
 
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return response()->json([
-        'status' => 'online',
-        'message' => 'Yaan Backend API is running successfully on Render.',
-        'timestamp' => now()->toIso8601String()
-    ]);
-});
+// Status and keep-alive URLs. They skip the "web" middleware (session, cookies, CSRF), so a ping
+// never reads or writes the sessions table and never wakes the Neon database.
+Route::withoutMiddleware('web')->group(function () {
+    Route::get('/', function () {
+        return response()->json([
+            'status' => 'online',
+            'message' => 'Yaan Backend API is running successfully on Render.',
+            'timestamp' => now()->toIso8601String()
+        ]);
+    });
 
-Route::get('/ping', function () {
-    return response()->json([
-        'status' => 'ok',
-        'message' => 'Yaan Backend is awake',
-        'timestamp' => now()->toIso8601String()
-    ]);
-});
+    Route::get('/ping', function () {
+        return response()->json([
+            'status' => 'ok',
+            'message' => 'Yaan Backend is awake',
+            'timestamp' => now()->toIso8601String()
+        ]);
+    });
 
-Route::get('/health', function () {
-    return response()->json([
-        'status' => 'ok',
-        'service' => 'yaan-backend',
-        'timestamp' => now()->toIso8601String()
-    ]);
+    Route::get('/health', function () {
+        return response()->json([
+            'status' => 'ok',
+            'service' => 'yaan-backend',
+            'timestamp' => now()->toIso8601String()
+        ]);
+    });
 });
 
 Route::get('/reset-password', function () {

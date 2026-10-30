@@ -5,6 +5,7 @@ services:
     dockerfilePath: ./Dockerfile
     plan: free
     region: singapore # Options: oregon, frankfurt, singapore, ohio
+    healthCheckPath: /api/ping # no database access, so a slow or sleeping Neon never restarts the server
     envVars:
       # NOTE: Production secrets are NOT stored in this file.
       # Every variable with `sync: false` must be set in the Render Dashboard -> yaan-backend -> Environment.

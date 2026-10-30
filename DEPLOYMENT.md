@@ -110,17 +110,35 @@ To mount the Firebase service account JSON:
 
 ### Laravel Scheduler
 `docker-entrypoint.sh` starts `php artisan schedule:work &` in the container background to process scheduled tasks defined in `routes/console.php`:
-- Every minute: `bookings:release-expired-holds` (Releases unconfirmed holds older than 15 minutes and refreshes hotel inventory).
-- Daily at 03:00 IST: `users:purge-unverified` (Purges abandoned unverified registrations older than 24 hours).
+- Daily: `users:purge-unverified` (Purges abandoned unverified registrations older than 24 hours).
+
+Unpaid slot holds need no background job: `Booking::holdingSlot()` ignores pending bookings older than 15 minutes, so they expire on their own.
 
 ### Anti-Sleep Ping (Render Free Plan)
-Free-tier instances spin down after 15 minutes of inactivity. To keep the service responsive for truckers and hotel owners:
-1. Use an external uptime monitor (e.g. UptimeRobot, BetterStack, or Render Cron Service).
-2. Configure a `GET` request every 10 minutes to:
-   ```
-   https://yaan-backend.onrender.com/api/hotels
-   ```
-3. This guarantees fast responses, avoids cold starts, and ensures continuous hold-release execution.
+Free-tier instances spin down after 15 minutes without inbound traffic. Waking up takes 30-60 seconds,
+which is longer than most app requests wait (35 seconds), so the first user after a quiet period gets an error.
+
+**Ping URL:** `https://yaan-backend.onrender.com/api/ping` (also `/ping`, `/health`, `/api/health`).
+These URLs use no session, cookie or database, so pinging them never wakes the Neon database.
+Never ping a URL that reads the database (for example `/api/hotels`): Neon's free plan has about
+400 hours of compute per month, so a database kept awake 24/7 would be suspended mid-month.
+
+**1. Built-in self-ping (on by default).** `docker-entrypoint.sh` calls `$RENDER_EXTERNAL_URL/api/ping`
+every 5 minutes. It runs only on Render (Render sets `RENDER_EXTERNAL_URL`). Failures appear in the Render
+logs as `Keep-alive ping failed`. Turn it off with `KEEP_ALIVE=false`, or point it elsewhere with `KEEP_ALIVE_URL`.
+
+**2. External monitor (recommended as backup and alert).** Create a free UptimeRobot (or cron-job.org)
+HTTP monitor for `https://yaan-backend.onrender.com/api/ping`, every 5 minutes, with email alerts.
+It wakes the server if it ever falls asleep and tells you when production is down.
+
+**3. Render health check.** `render.yaml` sets `healthCheckPath: /api/ping`. If the service was created
+without the Blueprint, set it by hand: Render Dashboard -> yaan-backend -> Settings -> Health Check Path.
+
+> [!WARNING]
+> Render gives 750 free instance hours per **workspace** per month, and one service awake all month uses ~744.
+> If another free web service in the same workspace is also kept awake, the hours run out and Render
+> suspends **all** free services until the next month. Keep only this service awake, or move it to a paid
+> instance type (paid instances never sleep).
 
 ---
 
