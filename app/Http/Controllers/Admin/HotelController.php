@@ -192,30 +192,28 @@ class HotelController extends Controller
         $hotel = Hotel::findOrFail($id);
         $b64Data = null;
 
+        $invalid = response()->json([
+            'error'   => 'Invalid image.',
+            'message' => 'Please upload a JPG, PNG or WEBP photo.',
+        ], 422);
+
         if ($request->hasFile('image')) {
-            $file = $request->file('image');
-            $path = $file->store('hotels', 'public');
-            try {
-                $realPath = $file->getRealPath();
-                if ($realPath && file_exists($realPath)) {
-                    $mime = $file->getClientMimeType() ?: 'image/jpeg';
-                    $b64Data = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($realPath));
-                }
-            } catch (\Throwable $e) {}
+            // Real JPG/PNG/WEBP only (no HTML/SVG), plus a database copy for Render deploys
+            $saved = $request->file('image')->isValid() ? \App\Support\SafeUpload::storeHotelPhoto($request->file('image')) : null;
+            if (!$saved) {
+                return $invalid;
+            }
+            [$path, $b64Data] = $saved;
         } elseif ($request->has('image_url') && !empty($request->image_url)) {
-            $path = trim($request->image_url);
+            $path = trim((string) $request->image_url);
             if (str_starts_with($path, 'data:')) {
-                $b64Data = $path;
-                $ext = 'jpg';
-                if (preg_match('/^data:image\/(\w+);base64,/', $path, $m)) {
-                    $ext = $m[1] === 'jpeg' ? 'jpg' : $m[1];
+                $saved = \App\Support\SafeUpload::storeHotelPhoto($path);
+                if (!$saved) {
+                    return $invalid;
                 }
-                $fileName = 'hotel_' . $hotel->id . '_' . uniqid() . '.' . $ext;
-                $path = 'hotels/' . $fileName;
-                try {
-                    $raw = substr($b64Data, strpos($b64Data, ',') + 1);
-                    \Illuminate\Support\Facades\Storage::disk('public')->put($path, base64_decode($raw));
-                } catch (\Throwable $e) {}
+                [$path, $b64Data] = $saved;
+            } elseif (!str_starts_with($path, 'https://')) {
+                return $invalid; // only https links or uploaded photos
             }
         } else {
             return response()->json(['error' => 'No image provided.'], 422);

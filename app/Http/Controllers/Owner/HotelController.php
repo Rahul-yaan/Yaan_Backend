@@ -518,25 +518,24 @@ class HotelController extends Controller
             foreach ($rawImages as $imgStr) {
                 if (is_string($imgStr) && !empty(trim($imgStr))) {
                     $imgStr = trim($imgStr);
+
+                    if (str_starts_with($imgStr, 'data:')) {
+                        $saved = \App\Support\SafeUpload::storeHotelPhoto($imgStr);
+                        if (!$saved) {
+                            continue; // not a real JPG/PNG/WEBP photo
+                        }
+                        [$cleanPath, $b64] = $saved;
+                    } elseif (str_starts_with($imgStr, 'https://')) {
+                        $cleanPath = $imgStr;
+                        $b64 = null;
+                    } else {
+                        continue; // ignore anything else (http://, paths, javascript:, ...)
+                    }
+
                     $isPrimary = !$hasPrimary;
                     if ($isPrimary) {
                         \Illuminate\Support\Facades\DB::statement("UPDATE hotel_images SET is_primary = false WHERE hotel_id = ?", [$hotel->id]);
                         $hasPrimary = true;
-                    }
-
-                    $b64 = str_starts_with($imgStr, 'data:') ? $imgStr : null;
-                    $cleanPath = $imgStr;
-                    if ($b64) {
-                        $ext = 'jpg';
-                        if (preg_match('/^data:image\/(\w+);base64,/', $imgStr, $m)) {
-                            $ext = $m[1] === 'jpeg' ? 'jpg' : $m[1];
-                        }
-                        $fileName = 'hotel_' . $hotel->id . '_' . uniqid() . '.' . $ext;
-                        $cleanPath = 'hotels/' . $fileName;
-                        try {
-                            $raw = substr($imgStr, strpos($imgStr, ',') + 1);
-                            Storage::disk('public')->put($cleanPath, base64_decode($raw));
-                        } catch (\Throwable $e) {}
                     }
 
                     $image = HotelImage::create([
@@ -555,23 +554,17 @@ class HotelController extends Controller
         }
 
         foreach ($files as $index => $file) {
-            if (!$file->isValid()) continue;
+            $saved = $file->isValid() ? \App\Support\SafeUpload::storeHotelPhoto($file) : null;
+            if (!$saved) {
+                continue; // not a real JPG/PNG/WEBP photo (e.g. HTML or SVG)
+            }
+            [$path, $b64Data] = $saved;
 
-            $path = $file->store('hotels', 'public');
             $isPrimary = !$hasPrimary || ($index === 0);
 
             if ($isPrimary) {
                 \Illuminate\Support\Facades\DB::statement("UPDATE hotel_images SET is_primary = false WHERE hotel_id = ?", [$hotel->id]);
             }
-
-            $b64Data = null;
-            try {
-                $realPath = $file->getRealPath();
-                if ($realPath && file_exists($realPath)) {
-                    $mime = $file->getClientMimeType() ?: 'image/jpeg';
-                    $b64Data = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($realPath));
-                }
-            } catch (\Throwable $e) {}
 
             $image = HotelImage::create([
                 'hotel_id'   => $hotel->id,
@@ -739,25 +732,36 @@ class HotelController extends Controller
         // Process KYC documents
         $docKeys = ['business_proof', 'aadhaar_front', 'aadhaar_back', 'pan_card', 'fssai_license', 'gst_image'];
         foreach ($docKeys as $field) {
-            if ($request->hasFile($field)) {
-                $file = $request->file($field);
-                if ($file->isValid()) {
-                    $path = $file->store('kyc_docs', 'public');
-                    $b64 = null;
-                    try {
-                        $rp = $file->getRealPath();
-                        if ($rp && file_exists($rp)) {
-                            $mime = $file->getClientMimeType() ?: 'image/jpeg';
-                            $b64 = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($rp));
-                        }
-                    } catch (\Throwable $e) {}
-                    $profile->{$field} = $b64 ?? $path;
-                }
+            $input = null;
+            if ($request->hasFile($field) && $request->file($field)->isValid()) {
+                $input = $request->file($field);
             } elseif ($request->filled($field) && is_string($request->input($field))) {
                 $val = trim((string)$request->input($field));
-                if (str_starts_with($val, 'data:image/') || str_starts_with($val, 'data:application/pdf') || str_starts_with($val, 'http://') || str_starts_with($val, 'https://')) {
+                if (str_starts_with($val, 'data:')) {
+                    $input = $val;
+                } elseif (str_starts_with($val, 'http://') || str_starts_with($val, 'https://')) {
                     $profile->{$field} = $val;
                 }
+            }
+
+            if ($input === null) {
+                continue;
+            }
+
+            // Same as the profile screen: private disk, real JPG/PNG/WEBP/PDF only, plus a database copy
+            try {
+                $path = \App\Support\SafeUpload::storeKycDocument($input);
+                if ($path) {
+                    $profile->{$field} = $path;
+                    \App\Models\KycDocument::storeCopy(
+                        $user->id,
+                        $field,
+                        Storage::disk('local')->get($path),
+                        \App\Support\SafeUpload::detectMimeType(Storage::disk('local')->path($path))
+                    );
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("KYC upload via hotel form skipped for user {$user->id} field {$field}: " . $e->getMessage());
             }
         }
 

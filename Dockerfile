@@ -56,10 +56,11 @@ RUN echo '# Yaan Security Rules\n\
 </Directory>\n\
 <Directory /var/www/html/public/storage>\n\
     Options -Indexes\n\
-    <FilesMatch "\.(php|phtml|phar|sh|bash|py|pl|cgi)$">\n\
+    <FilesMatch "\.(php|phtml|phar|sh|bash|py|pl|cgi|html?|svg|xml|js)$">\n\
         Require all denied\n\
     </FilesMatch>\n\
 </Directory>\n\
+Header always set X-Content-Type-Options "nosniff"\n\
 <FilesMatch "^\.">\n\
     Require all denied\n\
 </FilesMatch>' > /etc/apache2/conf-available/yaan-security.conf \

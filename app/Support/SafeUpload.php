@@ -63,6 +63,31 @@ class SafeUpload
     }
 
     /**
+     * Save one hotel photo after checking its real content (JPG/PNG/WEBP only).
+     * Returns [public path, data URI copy for the database] or null if it is not a valid image.
+     * The database copy lets /storage restore the photo after a Render deploy wipes the disk.
+     */
+    public static function storeHotelPhoto(UploadedFile|string $input): ?array
+    {
+        if (is_string($input) && !str_starts_with(trim($input), 'data:')) {
+            return null; // only real uploads or data: images are stored here
+        }
+
+        try {
+            $path = self::storePublicImage($input, 'hotels');
+        } catch (\Throwable $e) {
+            return null;
+        }
+        if (!$path || !Storage::disk('public')->exists($path)) {
+            return null;
+        }
+
+        $mime = self::detectMimeType(Storage::disk('public')->path($path));
+
+        return [$path, 'data:' . $mime . ';base64,' . base64_encode(Storage::disk('public')->get($path))];
+    }
+
+    /**
      * Convenience wrapper for storePublicImage.
      */
     public static function uploadImage(UploadedFile|string $input, string $folder = 'hotels'): ?string
