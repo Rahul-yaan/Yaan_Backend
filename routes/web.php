@@ -98,6 +98,15 @@ Route::get('/about',      [\App\Http\Controllers\LegalController::class, 'aboutV
 Route::get('/contact-us', [\App\Http\Controllers\LegalController::class, 'contactView']);
 Route::get('/contact',    [\App\Http\Controllers\LegalController::class, 'contactView']);
 Route::get('/support',    [\App\Http\Controllers\LegalController::class, 'contactView']);
+// Account deletion page (URL required by Google Play Console)
+Route::get('/account-deletion', function () {
+    return view('account_deletion', [
+        'supportPhone' => \App\Models\Setting::get('support_phone', '+91 7777991598'),
+        'supportEmail' => 'support@yaanapp.com',
+    ]);
+});
+Route::get('/delete-account', fn () => redirect('/account-deletion'));
+
 Route::get('/cancellation-policy', [\App\Http\Controllers\LegalController::class, 'cancellationView']);
 Route::get('/cancellation',        [\App\Http\Controllers\LegalController::class, 'cancellationView']);
 Route::get('/refund-policy',       [\App\Http\Controllers\LegalController::class, 'cancellationView']);

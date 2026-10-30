@@ -563,6 +563,65 @@ class AuthController extends Controller
     }
 
     // ============================================================
+    // 4.6 DELETE ACCOUNT (required by Google Play)
+    //     URL:    DELETE /api/account
+    //     Header: Authorization: Bearer YOUR_TOKEN
+    //
+    // Personal data is removed, but booking and payment records are
+    // kept (anonymised) because they are needed for tax and accounting.
+    // ============================================================
+    public function deleteAccount(Request $request)
+    {
+        $user = $request->user();
+
+        if ($user->role === 'admin') {
+            return response()->json([
+                'error'   => 'Admin account cannot be deleted from the app.',
+                'message' => 'Admin account cannot be deleted from the app.',
+            ], 403);
+        }
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($user) {
+            if ($user->role === 'owner') {
+                // Take the hotel offline
+                \App\Models\Hotel::where('owner_id', $user->id)->update(['status' => 'inactive']);
+
+                // Remove KYC files and data
+                $profile = \App\Models\OwnerProfile::where('user_id', $user->id)->first();
+                if ($profile) {
+                    foreach (\App\Models\KycDocument::FIELDS as $field) {
+                        $raw = $profile->getRawOriginal($field);
+                        if (!empty($raw) && !str_starts_with($raw, 'data:') && !str_starts_with($raw, 'http')) {
+                            foreach (['local', 'public'] as $disk) {
+                                try { \Illuminate\Support\Facades\Storage::disk($disk)->delete($raw); } catch (\Throwable $e) {}
+                            }
+                        }
+                    }
+                    $profile->delete();
+                }
+                \App\Models\KycDocument::where('user_id', $user->id)->delete();
+            }
+
+            $user->tokens()->delete();
+
+            $user->forceFill([
+                'name'         => 'Deleted User',
+                'email'        => 'deleted_' . $user->id . '@deleted.local',
+                'phone'        => 'del_' . $user->id,
+                'firebase_uid' => null,
+                'is_verified'  => false,
+                'avatar'       => null,
+                'password'     => Hash::make(\Illuminate\Support\Str::random(40)),
+            ])->save();
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Your account has been deleted.',
+        ]);
+    }
+
+    // ============================================================
     // 5. LOGOUT
     //    URL:    POST /api/logout
     //    Header: Authorization: Bearer YOUR_TOKEN

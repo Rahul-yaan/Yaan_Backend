@@ -215,6 +215,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/profile',              [AuthController::class, 'updateProfile']);
 
     Route::post('/logout',              [AuthController::class, 'logout']);
+    Route::delete('/account',           [AuthController::class, 'deleteAccount']);
+    Route::post('/account/delete',      [AuthController::class, 'deleteAccount']);
 
     // Google Maps API Server-Side Proxies (Rate Limited 60/min)
     Route::middleware('throttle:60,1')->prefix('maps')->group(function () {
