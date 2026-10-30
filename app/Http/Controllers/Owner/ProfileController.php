@@ -281,28 +281,51 @@ class ProfileController extends Controller
             'pan_card', 'fssai_license', 'gst_image',
         ];
 
+        $uploadErrors = [];
         foreach ($fileFields as $field) {
+            $input = null;
             if ($request->hasFile($field)) {
-                $file = $request->file($field);
-                try {
-                    $path = \App\Support\SafeUpload::storeKycDocument($file);
-                    if ($path) {
-                        $data[$field] = $path;
-                    }
-                } catch (\Throwable $e) {}
+                $input = $request->file($field);
             } elseif ($request->filled($field) && is_string($request->input($field))) {
                 $val = trim($request->input($field));
                 if (str_starts_with($val, 'data:')) {
-                    try {
-                        $path = \App\Support\SafeUpload::storeKycDocument($val);
-                        if ($path) {
-                            $data[$field] = $path;
-                        }
-                    } catch (\Throwable $e) {}
+                    $input = $val;
                 } elseif (str_starts_with($val, 'http://') || str_starts_with($val, 'https://') || str_starts_with($val, 'kyc_docs/')) {
                     $data[$field] = $val;
                 }
             }
+
+            if ($input === null) {
+                continue;
+            }
+
+            try {
+                $path = \App\Support\SafeUpload::storeKycDocument($input);
+                if (!$path) {
+                    throw new \InvalidArgumentException('empty');
+                }
+                $data[$field] = $path;
+
+                // Database copy: Render deletes disk files on every deploy
+                \App\Models\KycDocument::storeCopy(
+                    $user->id,
+                    $field,
+                    Storage::disk('local')->get($path),
+                    \App\Support\SafeUpload::detectMimeType(Storage::disk('local')->path($path))
+                );
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("KYC upload failed for user {$user->id} field {$field}: " . $e->getMessage());
+                $uploadErrors[$field] = ['This document could not be saved. Please upload a clear JPG, PNG, WEBP or PDF file.'];
+            }
+        }
+
+        if (!empty($uploadErrors)) {
+            return response()->json([
+                'success' => false,
+                'error'   => 'Validation failed.',
+                'message' => 'Some documents could not be saved. Please upload them again as JPG, PNG, WEBP or PDF.',
+                'errors'  => $uploadErrors,
+            ], 422);
         }
 
         // 5. Update profile and mark as complete & pending admin verification
@@ -313,8 +336,8 @@ class ProfileController extends Controller
         $data['rejection_reason'] = null;
         $profile->update($data);
 
-        \Illuminate\Support\Facades\DB::statement("UPDATE owner_profiles SET is_profile_complete = true, status = 'pending', rejection_reason = NULL, updated_at = NOW() WHERE id = ?", [$profile->id]);
-        \Illuminate\Support\Facades\DB::statement("UPDATE users SET is_verified = false, updated_at = NOW() WHERE id = ?", [$user->id]);
+        \Illuminate\Support\Facades\DB::statement("UPDATE owner_profiles SET is_profile_complete = true, status = 'pending', rejection_reason = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?", [$profile->id]);
+        \Illuminate\Support\Facades\DB::statement("UPDATE users SET is_verified = false, updated_at = CURRENT_TIMESTAMP WHERE id = ?", [$user->id]);
 
         // 6. Sync hotel record
         $lat   = $request->input('latitude') ?? $request->input('lat') ?? $request->input('origin_lat') ?? 22.3072;

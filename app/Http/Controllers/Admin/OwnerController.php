@@ -248,6 +248,65 @@ class OwnerController extends Controller
     }
 
     /**
+     * Stream one owner KYC document to the admin panel.
+     * Endpoint: GET /api/admin/owners/{id}/documents/{field}
+     *
+     * Looks in the database copy first (survives Render deploys),
+     * then old base64 values, then the private / public disk.
+     */
+    public function document($id, $field)
+    {
+        if (!in_array($field, \App\Models\KycDocument::FIELDS, true)) {
+            abort(404);
+        }
+
+        $bytes = null;
+
+        $copy = \App\Models\KycDocument::where('user_id', $id)->where('field', $field)->first();
+        if ($copy) {
+            $bytes = base64_decode($copy->data, true);
+        } else {
+            $profile = OwnerProfile::where('user_id', $id)->first();
+            $raw = $profile ? $profile->getRawOriginal($field) : null;
+            if (empty($raw)) {
+                return response()->json(['message' => 'Document not uploaded.'], 404);
+            }
+
+            if (str_starts_with($raw, 'data:')) {
+                $bytes = base64_decode(substr($raw, strpos($raw, ',') + 1), true);
+            } else {
+                // Stored path, possibly saved as a full URL like https://.../storage/kyc_docs/x.jpg
+                $path = preg_replace('#^.*?(kyc_docs/)#', '$1', str_replace('\\', '/', $raw));
+                if (!str_contains($path, '..')) {
+                    foreach (['local', 'public'] as $disk) {
+                        if (\Illuminate\Support\Facades\Storage::disk($disk)->exists($path)) {
+                            $bytes = \Illuminate\Support\Facades\Storage::disk($disk)->get($path);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (empty($bytes)) {
+            return response()->json(['message' => 'Document file is missing on the server. Ask the owner to upload it again.'], 404);
+        }
+
+        // Use the real type from the file content, never a stored or phone-sent type,
+        // so a disguised HTML/SVG file can never run inside the admin panel.
+        $mime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($bytes) ?: '';
+        if (!array_key_exists($mime, \App\Support\SafeUpload::ALLOWED_KYC_MIMES)) {
+            return response()->json(['message' => 'This document is not a valid image or PDF. Ask the owner to upload it again.'], 415);
+        }
+
+        return response($bytes, 200, [
+            'Content-Type'           => $mime,
+            'Cache-Control'          => 'no-store, private',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
+    /**
      * Remove / Reset Owner KYC data completely.
      * Endpoint: POST /api/admin/owners/{id}/reset-kyc
      */
@@ -255,9 +314,11 @@ class OwnerController extends Controller
     {
         $owner = User::where('role', 'owner')->findOrFail($id);
 
-        \Illuminate\Support\Facades\DB::statement("UPDATE users SET is_verified = false, updated_at = NOW() WHERE id = ?", [$owner->id]);
+        \Illuminate\Support\Facades\DB::statement("UPDATE users SET is_verified = false, updated_at = CURRENT_TIMESTAMP WHERE id = ?", [$owner->id]);
 
-        \Illuminate\Support\Facades\DB::statement("UPDATE owner_profiles SET is_profile_complete = false, status = 'rejected', rejection_reason = 'Admin reset your KYC details. Please submit fresh valid KYC details.', aadhaar_number = NULL, pan_number = NULL, aadhaar_front = NULL, aadhaar_back = NULL, pan_card = NULL, fssai_license = NULL, gst_image = NULL, business_proof = NULL, gst_number = NULL, fssai_number = NULL, bank_name = NULL, account_number = NULL, ifsc_code = NULL, updated_at = NOW() WHERE user_id = ?", [$owner->id]);
+        \Illuminate\Support\Facades\DB::statement("UPDATE owner_profiles SET is_profile_complete = false, status = 'rejected', rejection_reason = 'Admin reset your KYC details. Please submit fresh valid KYC details.', aadhaar_number = NULL, pan_number = NULL, aadhaar_front = NULL, aadhaar_back = NULL, pan_card = NULL, fssai_license = NULL, gst_image = NULL, business_proof = NULL, gst_number = NULL, fssai_number = NULL, bank_name = NULL, account_number = NULL, ifsc_code = NULL, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?", [$owner->id]);
+
+        \App\Models\KycDocument::where('user_id', $owner->id)->delete();
 
         Hotel::where('owner_id', $owner->id)->update([
             'status'           => 'rejected',

@@ -1398,29 +1398,69 @@ async function openKycModal(id) {
             <h4 style="margin:0 0 8px 0; font-size:14px; color:var(--text-primary);"><i class="fa-solid fa-file-image"></i> KYC Uploaded Documents</h4>
             <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px;">
                 ${[
-                { label: 'Registration / Proof', url: businessProof },
-                { label: 'Aadhaar Front', url: aadhaarFront },
-                { label: 'Aadhaar Back', url: aadhaarBack },
-                { label: 'PAN Card', url: panCard },
-                { label: 'FSSAI License', url: fssaiLic },
-                { label: 'GST Certificate', url: gstImg }
+                { label: 'Registration / Proof', field: 'business_proof', has: !!businessProof },
+                { label: 'Aadhaar Front', field: 'aadhaar_front', has: !!aadhaarFront },
+                { label: 'Aadhaar Back', field: 'aadhaar_back', has: !!aadhaarBack },
+                { label: 'PAN Card', field: 'pan_card', has: !!panCard },
+                { label: 'FSSAI License', field: 'fssai_license', has: !!fssaiLic },
+                { label: 'GST Certificate', field: 'gst_image', has: !!gstImg }
             ].map(doc => `
                     <div style="background:var(--bg-dark); padding:8px; border-radius:6px; border:1px solid var(--border); text-align:center; font-size:11px;">
                         <strong style="display:block; margin-bottom:4px;">${doc.label}</strong>
-                        ${doc.url ? `
-                            <a href="${doc.url}" target="_blank">
-                                <img src="${doc.url}" style="width:100%; height:90px; object-fit:cover; border-radius:4px;" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22200%22%20height%3D%22120%22%3E%3Crect%20width%3D%22200%22%20height%3D%22120%22%20fill%3D%22%231e293b%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20fill%3D%22%2338bdf8%22%20font-size%3D%2212%22%20font-family%3D%22sans-serif%22%20font-weight%3D%22bold%22%3E%F0%9F%93%84%20View%20Document%3C%2Ftext%3E%3C%2Fsvg%3E';">
-                            </a>
+                        ${doc.has ? `
+                            <div class="kyc-doc-slot" data-field="${doc.field}" title="Click to open" style="height:90px; display:flex; align-items:center; justify-content:center; color:var(--text-muted); background:rgba(255,255,255,0.03); border-radius:4px; cursor:pointer;">
+                                <i class="fa-solid fa-spinner fa-spin"></i>
+                            </div>
                         ` : `<div style="height:90px; display:flex; align-items:center; justify-content:center; color:var(--text-muted); background:rgba(255,255,255,0.03); border-radius:4px;">Not Uploaded</div>`}
                     </div>
                 `).join('')}
             </div>
         `;
+        loadKycDocuments(body, owner.id);
     } catch (err) {
         body.innerHTML = `<div style="padding:20px; text-align:center; color:var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Failed to load owner KYC data'}</div>`;
     }
 }
 
+
+// KYC files are private. Load each one with the admin token, then show it from a local blob URL.
+async function loadKycDocuments(container, ownerId) {
+    const slots = container.querySelectorAll('.kyc-doc-slot');
+    for (const slot of slots) {
+        const field = slot.dataset.field;
+        try {
+            const res = await fetch(`${API_BASE}/admin/owners/${ownerId}/documents/${field}`, {
+                headers: getHeaders()
+            });
+            if (!res.ok) {
+                slot.style.cursor = 'default';
+                slot.textContent = res.status === 404 ? 'Not uploaded'
+                    : (res.status === 415 ? 'Invalid file - ask owner to upload again' : 'Could not load');
+                continue;
+            }
+            const blob = await res.blob();
+            // Server only sends real images or PDFs; never open anything else
+            if (!/^(image\/(png|jpeg|webp)|application\/pdf)$/.test(blob.type)) {
+                slot.textContent = 'Invalid file - ask owner to upload again';
+                continue;
+            }
+            const blobUrl = URL.createObjectURL(blob);
+            slot.innerHTML = '';
+            slot.onclick = () => window.open(blobUrl, '_blank');
+            if (blob.type.startsWith('image/')) {
+                const img = document.createElement('img');
+                img.src = blobUrl;
+                img.alt = field;
+                img.style.cssText = 'width:100%; height:90px; object-fit:cover; border-radius:4px;';
+                slot.appendChild(img);
+            } else {
+                slot.innerHTML = '<span><i class="fa-solid fa-file-pdf"></i> Open PDF</span>';
+            }
+        } catch (e) {
+            slot.textContent = 'Could not load';
+        }
+    }
+}
 
 function closeKycModal() {
     document.getElementById('kyc-modal').classList.add('hidden');
