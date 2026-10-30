@@ -81,7 +81,39 @@ class BookingController extends Controller
             ], 422);
         }
 
-        $booking->update(['status' => $request->status]);
+        // Only allow real-life status changes:
+        //   pending   -> cancelled
+        //   confirmed -> completed (driver checked in) or cancelled
+        $allowed = [
+            'pending'   => ['cancelled'],
+            'confirmed' => ['completed', 'cancelled'],
+        ];
+        $from = $booking->status;
+        $to   = $request->status;
+
+        if (!in_array($to, $allowed[$from] ?? [], true)) {
+            return response()->json([
+                'error'   => 'Invalid status change.',
+                'message' => "This booking is {$from} and cannot be changed to {$to}.",
+            ], 422);
+        }
+
+        $update = ['status' => $to];
+
+        // Hotel cancelled a booking the customer already paid for: money must go back
+        if ($to === 'cancelled' && in_array($booking->payment_status, ['paid', 'authorized'], true)) {
+            $update['payment_status']      = Booking::REFUND_PENDING;
+            $update['cancellation_reason'] = 'Cancelled by hotel. Refund pending admin approval.';
+        } elseif ($to === 'cancelled') {
+            $update['cancellation_reason'] = 'Cancelled by hotel.';
+        }
+
+        // Pay at Hotel: cash is collected when the driver checks in
+        if ($to === 'completed' && $booking->payment_method === 'pay_at_hotel') {
+            $update['payment_status'] = 'paid';
+        }
+
+        $booking->update($update);
 
         // Recompute available rooms accurately
         $booking->hotel->refreshAvailableRooms($booking->booking_date ? $booking->booking_date->toDateString() : null);
