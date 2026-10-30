@@ -114,27 +114,27 @@ class OwnerController extends Controller
             return (in_array($b->payment_status, ['paid', 'pay_at_hotel', 'cash', 'completed']) || in_array($b->status, ['confirmed', 'completed'])) && $b->payment_status !== 'refunded';
         });
 
-        $baseRevenueSum = (float) $confirmedBookings->sum(function($b) {
-            return (float) ($b->total_amount ?? $b->price_per_night ?? 0);
-        });
+        // Example: base ₹42.37 + GST ₹7.63 -> owner ₹27.96 + ₹5.03 = ₹32.99, platform ₹14.41 + ₹2.60 = ₹17.01
+        $split = \App\Support\Payout::sum($confirmedBookings);
+
+        $baseRevenueSum = $split['base'];
 
         $totalCustomerPaid = (float) $confirmedBookings->sum(function($b) {
             return (float) ($b->total_payable ?? round(($b->total_amount ?? 0) * 1.18, 2));
         });
 
-        if ($totalCustomerPaid <= 0 && $baseRevenueSum > 0) {
-            $totalCustomerPaid = round($baseRevenueSum * 1.18, 2);
+        if ($totalCustomerPaid <= 0 && $split['customer_paid'] > 0) {
+            $totalCustomerPaid = $split['customer_paid'];
         }
 
-        $baseRoomAmount       = $baseRevenueSum > 0 ? $baseRevenueSum : ($totalCustomerPaid > 0 ? round($totalCustomerPaid / 1.18, 2) : 0.00);
-        $platformFeeBase      = round($baseRoomAmount * 0.34, 2);           // 34% Platform Fee Base (e.g. ₹20.40)
-        $platformGst          = round($platformFeeBase * 0.18, 2);          // 18% Platform GST (e.g. ₹3.67)
-        $platformFeeCollected = round($platformFeeBase + $platformGst, 2);  // Platform Fee Collection (e.g. ₹24.07)
+        $platformFeeBase      = $split['platform_profit'];  // 34% Platform Fee (without GST)
+        $platformGst          = $split['platform_gst'];
+        $platformFeeCollected = $split['platform_total'];
 
-        $ownerBaseShare       = round($baseRoomAmount * 0.66, 2);           // 66% Owner Share Base (e.g. ₹39.60)
-        $ownerGstAmount       = round($ownerBaseShare * 0.18, 2);           // 18% Owner GST (e.g. ₹7.13)
-        $ownerTotalPayout     = round($ownerBaseShare + $ownerGstAmount, 2);// Total Owner Net Payout (e.g. ₹46.73)
-        $totalGst             = round($ownerGstAmount + $platformGst, 2);   // Total Customer GST (e.g. ₹10.80)
+        $ownerBaseShare       = $split['owner_profit'];     // 66% Owner Share (without GST)
+        $ownerGstAmount       = $split['owner_gst'];
+        $ownerTotalPayout     = $split['owner_total'];      // Owner payout including owner GST
+        $totalGst             = $split['gst'];
 
         $totalCancelled = $bookings->filter(function($b) {
             return $b->status === 'cancelled' || in_array($b->payment_status, ['refunded', 'refund_initiated']);

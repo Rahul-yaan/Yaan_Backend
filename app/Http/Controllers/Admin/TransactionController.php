@@ -565,14 +565,12 @@ class TransactionController extends Controller
             $totalPayable = round($discountedBase + $gstAmount, 2);
         }
 
-        // Owner 66% Share & Platform 34% Fee Breakdown
-        $ownerNetShare   = round($discountedBase * 0.66, 2);
-        $platformFeeBase = round($discountedBase * 0.34, 2);
-        $ownerGst        = round($gstAmount * 0.66, 2);
-        if ($ownerGst <= 0 && $ownerNetShare > 0) {
-            $ownerGst = round($ownerNetShare * 0.18, 2);
-        }
-        $platformFeeGst  = round($gstAmount - $ownerGst, 2);
+        // Owner 66% Share & Platform 34% Fee Breakdown (same rule as all dashboards)
+        $invoiceSplit    = \App\Support\Payout::split($discountedBase, $gstAmount);
+        $ownerNetShare   = $invoiceSplit['owner_profit'];
+        $platformFeeBase = $invoiceSplit['platform_profit'];
+        $ownerGst        = $invoiceSplit['owner_gst'];
+        $platformFeeGst  = $invoiceSplit['platform_gst'];
 
         $isRefunded = $transaction->payment_status === 'refunded' || str_contains(strtolower($transaction->cancellation_reason ?? ''), 'refund');
         $refundId   = null;
@@ -659,15 +657,16 @@ class TransactionController extends Controller
             $profile = $owner ? $owner->ownerProfile : null;
             $hBookings = Booking::where('hotel_id', $h->id)->get();
             $bCount = max(1, $hBookings->count());
+            $hSplit = \App\Support\Payout::sum($hBookings);
             $totSum = (float) $hBookings->sum('total_payable');
-            $baseSum = (float) $hBookings->sum('total_amount');
+            $baseSum = $hSplit['base'];
             if ($totSum <= 0) $totSum = (float) $totalPayable;
             if ($baseSum <= 0) $baseSum = round($totSum / 1.18, 2);
 
-            $gst18 = round($baseSum * 0.18, 2);
+            $gst18 = $hSplit['gst'] > 0 ? $hSplit['gst'] : round($baseSum * 0.18, 2);
             $totWithGst = $totSum > 0 ? $totSum : round($baseSum + $gst18, 2);
-            $comm34 = round($baseSum * 0.34, 2);
-            $commGst = round($comm34 * 0.18, 2);
+            $comm34 = $hSplit['platform_profit'] > 0 ? $hSplit['platform_profit'] : round($baseSum * 0.34, 2);
+            $commGst = $hSplit['platform_gst'] > 0 ? $hSplit['platform_gst'] : round($comm34 * 0.18, 2);
             $totComm = round($comm34 + $commGst, 2);
 
             $allGstIncomeReports[] = [

@@ -150,7 +150,7 @@ class BookingController extends Controller
                 'logistics_number'    => $request->logistics_number,
                 'guests'              => 1,
                 'price_per_night'     => $price,
-                'total_amount'        => $totalPayable,
+                'total_amount'        => $discountedBasePrice, // room price before GST (owner/platform split is calculated from this)
                 'status'              => $isOfflinePayment ? 'confirmed' : 'pending',
                 'payment_status'      => 'pending',
                 'payment_method'      => $isOfflinePayment ? 'pay_at_hotel' : 'online',

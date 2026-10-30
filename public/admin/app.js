@@ -499,7 +499,7 @@ function renderRecentBookings(bookings) {
             <i class="fa-solid fa-receipt"></i>
             <div style="flex:1">
                 <strong>${b.hotel ? b.hotel.name : 'Hotel'}</strong>
-                <span>${b.user ? b.user.name : 'Guest'} • ₹${b.total_amount}</span>
+                <span>${b.user ? b.user.name : 'Guest'} • ₹${b.total_payable || b.total_amount}</span>
             </div>
             <span class="badge ${b.status}">${b.status}</span>
         </div>

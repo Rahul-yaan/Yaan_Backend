@@ -59,34 +59,25 @@ class DashboardController extends Controller
             ->whereNotIn('status', ['cancelled'])
             ->whereNotIn('payment_status', ['refunded', 'refund_initiated']);
 
-        // Financial Calculation Model (34% Platform Fee on Base Hotel Price, 66% Owner Share, 18% GST breakdown):
-        $baseRevenueSum       = (float) (clone $ownerBookingsQuery)->sum(DB::raw('COALESCE(total_amount, price_per_night)'));
+        // Financial split (66% owner / 34% platform of the room price before GST, 18% GST on each share).
+        // Example: base ₹42.37 + GST ₹7.63 = ₹50.00 paid -> owner ₹27.96 + ₹5.03, platform ₹14.41 + ₹2.60
+        $split = \App\Support\Payout::sum((clone $ownerBookingsQuery)->get(\App\Support\Payout::COLUMNS));
+
         $grossCustomerPaid    = (float) (clone $ownerBookingsQuery)->sum(DB::raw('COALESCE(total_payable, round(total_amount * 1.18, 2))'));
         $totalDiscountApplied = (float) (clone $ownerBookingsQuery)->sum(DB::raw('COALESCE(promotion_applied, 0)'));
 
-        if ($grossCustomerPaid <= 0 && $baseRevenueSum > 0) {
-            $grossCustomerPaid = round($baseRevenueSum * 1.18, 2);
+        if ($grossCustomerPaid <= 0 && $split['customer_paid'] > 0) {
+            $grossCustomerPaid = $split['customer_paid'];
         }
 
-        // Base room price total before GST (e.g. ₹50.00 for ₹59.00 gross)
-        $baseRoomAmount       = $baseRevenueSum > 0 ? $baseRevenueSum : ($grossCustomerPaid > 0 ? round($grossCustomerPaid / 1.18, 2) : 0.00);
-        // Total GST paid by customer (e.g. ₹9.00 for ₹59.00 gross)
-        $customerGstTotal     = (float) (clone $ownerBookingsQuery)->sum(DB::raw('COALESCE(gst_amount, 0)'));
-        if ($customerGstTotal <= 0 && $grossCustomerPaid > 0) {
-            $customerGstTotal = round($grossCustomerPaid - $baseRoomAmount, 2);
-        }
-
-        // 34% Platform Base Fee (e.g. 34% of ₹60.00 = ₹20.40)
-        $platformFeeBase      = round($baseRoomAmount * 0.34, 2);
-        $platformGstAmount    = round($platformFeeBase * 0.18, 2); // e.g. 18% of ₹20.40 = ₹3.67
-        $platformFeeCollected = round($platformFeeBase + $platformGstAmount, 2); // e.g. ₹24.07 Total Platform Collection
-
-        // Owner Share Base (e.g. 66% of ₹60.00 = ₹39.60)
-        $ownerBaseShare       = round($baseRoomAmount * 0.66, 2);
-        $ownerGstAmount       = round($ownerBaseShare * 0.18, 2);  // e.g. 18% of ₹39.60 = ₹7.13
-        $ownerTotalPayout     = round($ownerBaseShare + $ownerGstAmount, 2); // e.g. ₹46.73 Total Owner Net Payout
-
-        $totalGst             = round($ownerGstAmount + $platformGstAmount, 2); // e.g. ₹10.80 Total GST
+        $baseRoomAmount       = $split['base'];             // Room price total before GST
+        $platformFeeBase      = $split['platform_profit'];  // 34% platform fee (without GST)
+        $platformGstAmount    = $split['platform_gst'];
+        $platformFeeCollected = $split['platform_total'];
+        $ownerBaseShare       = $split['owner_profit'];     // 66% owner share (without GST)
+        $ownerGstAmount       = $split['owner_gst'];
+        $ownerTotalPayout     = $split['owner_total'];
+        $totalGst             = $split['gst'];              // Total GST paid by customers
 
         $pendingBookings = (clone $bookingsQuery)
             ->where('status', 'pending')

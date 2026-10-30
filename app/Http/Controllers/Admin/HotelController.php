@@ -80,31 +80,27 @@ class HotelController extends Controller
             return ($b->payment_status === 'paid' || in_array($b->status, ['confirmed', 'completed'])) && $b->payment_status !== 'refunded';
         });
 
-        $baseHotelRevenue = (float) $confirmedBookings->sum(function($b) {
-            return (float) ($b->total_amount ?? $b->price_per_night ?? 0);
-        });
+        $split = \App\Support\Payout::sum($confirmedBookings);
+        $baseHotelRevenue = $split['base'];
 
         $totalRevenue = (float) $confirmedBookings->sum(function($b) {
             return (float) ($b->total_payable ?? round(($b->total_amount ?? 0) * 1.18, 2));
         });
 
-        if ($totalRevenue <= 0 && $baseHotelRevenue > 0) {
-            $totalRevenue = round($baseHotelRevenue * 1.18, 2);
-        }
-        if ($baseHotelRevenue <= 0 && $totalRevenue > 0) {
-            $baseHotelRevenue = round($totalRevenue / 1.18, 2);
+        if ($totalRevenue <= 0 && $split['customer_paid'] > 0) {
+            $totalRevenue = $split['customer_paid'];
         }
 
         $totalCancelled = $bookings->filter(function($b) {
             return $b->status === 'cancelled' || in_array($b->payment_status, ['refunded', 'refund_initiated']);
         })->count();
 
-        $platformFeeBase      = round($baseHotelRevenue * 0.34, 2);
-        $platformFeeCollected = round($platformFeeBase * 1.18, 2);
-        $ownerBaseShare       = round($baseHotelRevenue * 0.66, 2);
-        $ownerGstAmount       = round($ownerBaseShare * 0.18, 2);
-        $ownerPayableRevenue  = round($ownerBaseShare + $ownerGstAmount, 2);
-        $totalGst             = round($baseHotelRevenue * 0.18, 2);
+        $platformFeeBase      = $split['platform_profit'];
+        $platformFeeCollected = $split['platform_total'];
+        $ownerBaseShare       = $split['owner_profit'];
+        $ownerGstAmount       = $split['owner_gst'];
+        $ownerPayableRevenue  = $split['owner_total'];
+        $totalGst             = $split['gst'];
 
         return response()->json([
             'hotel'      => $hotel,

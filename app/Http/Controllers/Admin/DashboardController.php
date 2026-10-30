@@ -96,45 +96,29 @@ class DashboardController extends Controller
         });
 
         // 1. Gross Customer Revenue (actual total_payable paid by customers across all hotels)
-        $baseRevenueSum = (float) (clone $confirmedBookingsQuery)->sum(DB::raw('COALESCE(total_amount, price_per_night)'));
-        $totalRevenue   = (float) (clone $confirmedBookingsQuery)->sum(DB::raw('COALESCE(total_payable, round(total_amount * 1.18, 2))'));
-        if ($totalRevenue <= 0 && $baseRevenueSum > 0) {
-            $totalRevenue = round($baseRevenueSum * 1.18, 2);
+        $split        = \App\Support\Payout::sum((clone $confirmedBookingsQuery)->get(\App\Support\Payout::COLUMNS));
+        $totalRevenue = (float) (clone $confirmedBookingsQuery)->sum(DB::raw('COALESCE(total_payable, round(total_amount * 1.18, 2))'));
+        if ($totalRevenue <= 0 && $split['customer_paid'] > 0) {
+            $totalRevenue = $split['customer_paid'];
         }
 
-        $baseHotelRevenue = $baseRevenueSum > 0 ? $baseRevenueSum : ($totalRevenue > 0 ? round($totalRevenue / 1.18, 2) : 0.00);
+        // 2. Admin Platform Fee Collection (34% fee + its GST). Example: base ₹42.37 -> ₹14.41 + ₹2.60
+        $adminPlatformRevenue = $split['platform_total'];
 
-        // 2. Admin Platform Fee Collection (34% Base Fee + 18% Platform GST = 24.07 for 60 base)
-        $platformFeeBase      = round($baseHotelRevenue * 0.34, 2);
-        $platformGst          = round($platformFeeBase * 0.18, 2);
-        $adminPlatformRevenue = round($platformFeeBase + $platformGst, 2); // e.g. ₹24.07
-
-        // 3. Hotel Owners Net Payable Profit (66% Base Share + 18% Owner GST = 46.73 for 60 base)
-        $hotelOwnersBase     = round($baseHotelRevenue * 0.66, 2);
-        $hotelOwnersGstTotal = round($hotelOwnersBase * 0.18, 2);
-        $hotelOwnersRevenue  = round($hotelOwnersBase + $hotelOwnersGstTotal, 2); // e.g. ₹46.73
+        // 3. Hotel Owners Payout (66% share + its GST). Example: base ₹42.37 -> ₹27.96 + ₹5.03
+        $hotelOwnersRevenue = $split['owner_total'];
 
         // Current Month Revenue
         $startOfMonth = Carbon::now()->startOfMonth();
         $endOfMonth   = Carbon::now()->endOfMonth();
 
-        $currentMonthGross = (float) Booking::where(function($q) {
-            $q->whereIn('payment_status', ['paid', 'pay_at_hotel', 'cash', 'completed'])
-              ->orWhereIn('status', ['confirmed', 'completed']);
-        })
-        ->whereNotIn('status', ['cancelled'])
-        ->whereNotIn('payment_status', ['refunded', 'refund_initiated'])
-        ->where(function($q) {
-            $q->whereNull('cancellation_reason')
-              ->orWhere('cancellation_reason', 'not like', '%refund%');
-        })
-        ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
-        ->sum(DB::raw('COALESCE(total_payable, round(total_amount * 1.18, 2))'));
-
-        $currentMonthBase            = $currentMonthGross > 0 ? round($currentMonthGross / 1.18, 2) : 0.00;
-        $currentMonthPlatformFeeBase = round($currentMonthBase * 0.34, 2);
-        $currentMonthPlatformGst     = round($currentMonthPlatformFeeBase * 0.18, 2);
-        $currentMonthRevenue         = round($currentMonthPlatformFeeBase + $currentMonthPlatformGst, 2);
+        // Platform fee + its GST for this month's bookings (same split rule as above)
+        $currentMonthSplit = \App\Support\Payout::sum(
+            (clone $confirmedBookingsQuery)
+                ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
+                ->get(\App\Support\Payout::COLUMNS)
+        );
+        $currentMonthRevenue = $currentMonthSplit['platform_total'];
 
         if ($currentMonthRevenue <= 0 && $adminPlatformRevenue > 0) {
             $currentMonthRevenue = $adminPlatformRevenue;
@@ -159,14 +143,14 @@ class DashboardController extends Controller
 
             $monthlyLabels[] = $month->format('M Y');
 
-            $mRev = (float) Booking::where(function($q) {
+            $mSplit = \App\Support\Payout::sum(Booking::where(function($q) {
                 $q->where('payment_status', 'paid')
                   ->orWhereIn('status', ['confirmed', 'completed']);
             })
             ->whereNotIn('status', ['cancelled'])
             ->whereNotIn('payment_status', ['refunded', 'refund_initiated'])
             ->whereBetween('created_at', [$monthStart, $monthEnd])
-            ->sum(DB::raw('COALESCE(total_payable, total_amount)'));
+            ->get(\App\Support\Payout::COLUMNS));
 
             $mCount = Booking::where(function($q) {
                 $q->where('payment_status', 'paid')
@@ -176,8 +160,7 @@ class DashboardController extends Controller
             ->whereBetween('created_at', [$monthStart, $monthEnd])
             ->count();
 
-            $mBase = $mRev > 0 ? round($mRev / 1.18, 2) : 0.00;
-            $monthlyIncomeData[]   = round($mBase * 0.34, 2);
+            $monthlyIncomeData[]   = $mSplit['platform_profit']; // 34% platform fee (without GST)
             $monthlyBookingsData[] = $mCount;
         }
 
@@ -306,17 +289,16 @@ class DashboardController extends Controller
         $endOfMonth   = Carbon::now()->endOfMonth();
         $daysRemainingInMonth = max(1, Carbon::now()->daysInMonth - Carbon::now()->day);
 
-        $currentMonthGross = (float) Booking::where(function($q) {
+        $currentMonthSplit = \App\Support\Payout::sum(Booking::where(function($q) {
             $q->where('payment_status', 'paid')
               ->orWhereIn('status', ['confirmed', 'completed']);
         })
         ->whereNotIn('status', ['cancelled'])
         ->whereNotIn('payment_status', ['refunded', 'refund_initiated'])
         ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
-        ->sum(DB::raw('COALESCE(total_payable, total_amount)'));
+        ->get(\App\Support\Payout::COLUMNS));
 
-        $currentMonthBase = $currentMonthGross > 0 ? round($currentMonthGross / 1.18, 2) : 0.00;
-        $currentMonthRevenue = round($currentMonthBase * 0.34, 2);
+        $currentMonthRevenue = $currentMonthSplit['platform_profit']; // 34% platform fee (without GST)
 
         $remainingShortfall = max(0, $targetGoal - $currentMonthRevenue);
         $goalPercentage = $targetGoal > 0 ? min(100, round(($currentMonthRevenue / $targetGoal) * 100, 1)) : 0;
