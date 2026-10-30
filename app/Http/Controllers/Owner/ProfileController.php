@@ -73,10 +73,11 @@ class ProfileController extends Controller
         $profile = OwnerProfile::where('user_id', $user->id)->first();
 
         // 1. Resolve and normalize all input aliases
-        $hotelName = trim((string)($request->input('hotel_name') ?? $request->input('name') ?? $profile?->hotel_name ?? ''));
-        $ownerName = trim((string)($request->input('owner_name') ?? $user->name ?? $profile?->owner_name ?? ''));
+        // strip_tags: no HTML in names/address (shown in the admin panel)
+        $hotelName = trim(strip_tags((string)($request->input('hotel_name') ?? $request->input('name') ?? $profile?->hotel_name ?? '')));
+        $ownerName = trim(strip_tags((string)($request->input('owner_name') ?? $user->name ?? $profile?->owner_name ?? '')));
         $phoneInput= trim((string)($request->input('phone') ?? $request->input('mobile') ?? $user->phone ?? ''));
-        $address   = trim((string)($request->input('address') ?? $profile?->address ?? ''));
+        $address   = trim(strip_tags((string)($request->input('address') ?? $profile?->address ?? '')));
         $city      = trim((string)($request->input('city') ?? $profile?->city ?? ''));
         $state     = trim((string)($request->input('state') ?? $profile?->state ?? ''));
         $pincode   = trim((string)($request->input('pincode') ?? $request->input('pin_code') ?? $request->input('postal_code') ?? $request->input('zip') ?? $profile?->pincode ?? ''));

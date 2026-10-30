@@ -75,7 +75,7 @@ class ReviewController extends Controller
             'hotel_id'   => $request->hotel_id,
             'booking_id' => $bookingId,
             'rating'     => $request->rating,
-            'comment'    => $request->comment,
+            'comment'    => $request->comment !== null ? trim(strip_tags($request->comment)) : null, // no HTML (shown in admin panel)
         ]);
 
         // Update hotel rating & review count

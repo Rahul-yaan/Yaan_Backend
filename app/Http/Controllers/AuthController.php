@@ -38,7 +38,7 @@ class AuthController extends Controller
         }
         $request->merge(['role' => $role]);
 
-        $name  = trim($request->input('name', ''));
+        $name  = trim(strip_tags((string) $request->input('name', ''))); // no HTML in names (shown in admin panel)
         $email = trim(strtolower($request->input('email', '')));
         $phone = trim($request->input('phone', ''));
 
@@ -495,8 +495,9 @@ class AuthController extends Controller
 
         // 1. Update Name
         $name = $request->input('name') ?? $request->input('full_name') ?? $request->input('user_name');
-        if ($name !== null && trim($name) !== '') {
-            $user->name = trim($name);
+        $name = $name !== null ? trim(strip_tags((string) $name)) : null; // no HTML in names
+        if ($name !== null && $name !== '') {
+            $user->name = $name;
         }
 
         // 2. Update Email if changed and valid

@@ -17,6 +17,18 @@ function esc(str) {
         .replace(/'/g, '&#39;');
 }
 
+// Only allow URLs we trust in src/href: https, our own /storage files (or same server),
+// or inline PNG/JPEG/WEBP images. Anything else (javascript:, data:text/html, svg...) becomes ''.
+function safeUrl(u) {
+    if (u === null || u === undefined) return '';
+    const s = String(u).trim();
+    const sameServer = typeof location !== 'undefined' && s.startsWith(location.origin + '/');
+    if (sameServer || /^(https:\/\/|\/storage\/|data:image\/(png|jpe?g|webp);base64,)/i.test(s)) {
+        return esc(s);
+    }
+    return '';
+}
+
 function jsArg(str) {
     if (str === null || str === undefined) return "''";
     return JSON.stringify(String(str)).replace(/'/g, "\\'");
@@ -476,8 +488,8 @@ function renderTopHotels(topHotels) {
             <div style="display:flex; align-items:center; gap:8px;">
                 <span style="font-weight:800; color:var(--primary); font-size:13px;">#${index + 1}</span>
                 <div>
-                    <strong style="color:var(--text-primary); display:block;">${h.name}</strong>
-                    <span style="font-size:11px; color:var(--text-muted);">${h.city || 'Location'} • <i class="fa-solid fa-star" style="color:#facc15;"></i> ${h.rating || '4.5'}</span>
+                    <strong style="color:var(--text-primary); display:block;">${esc(h.name)}</strong>
+                    <span style="font-size:11px; color:var(--text-muted);">${esc(h.city || 'Location')} • <i class="fa-solid fa-star" style="color:#facc15;"></i> ${esc(h.rating || '4.5')}</span>
                 </div>
             </div>
             <div style="text-align:right;">
@@ -498,10 +510,10 @@ function renderRecentBookings(bookings) {
         <div class="sub-card">
             <i class="fa-solid fa-receipt"></i>
             <div style="flex:1">
-                <strong>${b.hotel ? b.hotel.name : 'Hotel'}</strong>
-                <span>${b.user ? b.user.name : 'Guest'} • ₹${b.total_payable || b.total_amount}</span>
+                <strong>${esc(b.hotel ? b.hotel.name : 'Hotel')}</strong>
+                <span>${esc(b.user ? b.user.name : 'Guest')} • ₹${esc(b.total_payable || b.total_amount)}</span>
             </div>
-            <span class="badge ${b.status}">${b.status}</span>
+            <span class="badge ${esc(b.status)}">${esc(b.status)}</span>
         </div>
     `).join('');
 }
@@ -517,10 +529,10 @@ function renderRecentHotels(hotels) {
         <div class="sub-card">
             <i class="fa-solid fa-hotel"></i>
             <div style="flex:1">
-                <strong>${h.name}</strong>
-                <span>${h.city} • ₹${h.price_per_night}/night</span>
+                <strong>${esc(h.name)}</strong>
+                <span>${esc(h.city)} • ₹${esc(h.price_per_night)}/night</span>
             </div>
-            <span class="badge ${h.status}">${h.status}</span>
+            <span class="badge ${esc(h.status)}">${esc(h.status)}</span>
         </div>
     `).join('');
 }
@@ -583,7 +595,7 @@ async function populateHotelCitiesDropdown(hotels) {
             if (cities.length > 0) {
                 const currentVal = citySelect.value;
                 citySelect.innerHTML = `<option value="">All Cities (${cities.length})</option>` +
-                    cities.map(c => `<option value="${c}" ${currentVal === c ? 'selected' : ''}>${c}</option>`).join('');
+                    cities.map(c => `<option value="${esc(c)}" ${currentVal === c ? 'selected' : ''}>${esc(c)}</option>`).join('');
                 loadedCitiesList = true;
             }
         }
@@ -615,8 +627,8 @@ function getHotelPhotosOnly(hotel) {
                 return; // Exclude legacy KYC documents
             }
             const url = getHotelImageUrl(img);
-            if (url && !images.some(i => i.url === url)) {
-                images.push({ 
+            if (url && safeUrl(url) && !images.some(i => i.url === url)) {
+                images.push({
                     id: img.id || null, 
                     url: url, 
                     label: img.is_primary ? 'Primary Photo' : 'Hotel Photo' 
@@ -629,7 +641,7 @@ function getHotelPhotosOnly(hotel) {
         const rawPath = typeof hotel.primary_image === 'string' ? hotel.primary_image : (hotel.primary_image.image_path || hotel.primary_image.url || '');
         if (!rawPath || !rawPath.includes('kyc_docs/')) {
             const url = getHotelImageUrl(hotel.primary_image);
-            if (url && !images.some(i => i.url === url)) {
+            if (url && safeUrl(url) && !images.some(i => i.url === url)) {
                 images.unshift({ 
                     id: hotel.primary_image.id || null, 
                     url: url, 
@@ -710,7 +722,7 @@ async function loadHotelsData() {
                 <div class="empty-state" style="padding:40px 20px; text-align:center; grid-column:1/-1;">
                     <i class="fa-solid fa-hotel-slash" style="font-size:36px; color:var(--text-muted); margin-bottom:12px;"></i>
                     <h3 style="margin:0 0 6px 0; font-size:16px;">No Hotels Found</h3>
-                    <p style="color:var(--text-muted); font-size:13px; margin:0;">No hotel listings match your current search ("${search || 'all'}"), city ("${city || 'all'}"), state ("${state || 'all'}"), or status filter.</p>
+                    <p style="color:var(--text-muted); font-size:13px; margin:0;">No hotel listings match your current search ("${esc(search || 'all')}"), city ("${esc(city || 'all')}"), state ("${esc(state || 'all')}"), or status filter.</p>
                 </div>
             `;
             return;
@@ -731,8 +743,8 @@ async function loadHotelsData() {
                     <div>
                         <div style="position:relative; height:160px; border-radius:8px; overflow:hidden; margin-bottom:12px; background:#0f172a;" id="card-img-container-${h.id}">
                             ${primaryImgObj ? `
-                                <img src="${primaryImgObj.url}" alt="${h.name}" 
-                                     data-photos='${JSON.stringify(hotelPhotos).replace(/'/g, "&apos;")}' 
+                                <img src="${safeUrl(primaryImgObj.url)}" alt="${esc(h.name)}"
+                                     data-photos="${esc(JSON.stringify(hotelPhotos))}"
                                      data-photo-index="0" 
                                      style="width:100%; height:100%; object-fit:cover;" 
                                      onerror="handleCardImageFallback(this, ${h.id})">
@@ -741,7 +753,7 @@ async function loadHotelsData() {
                                     <span>No Hotel Photo Uploaded</span>
                                 </div>
                                 <span class="photo-label-badge" style="position:absolute; bottom:6px; right:8px; background:rgba(0,0,0,0.8); color:#38bdf8; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:700;">
-                                    ${primaryImgObj.label}
+                                    ${esc(primaryImgObj.label)}
                                 </span>
                             ` : `
                                 <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:var(--text-muted); font-size:12px;">
@@ -753,22 +765,22 @@ async function loadHotelsData() {
                                 ${statusText}
                             </span>
                             <div style="position:absolute; bottom:6px; left:8px; background:rgba(0,0,0,0.75); color:#f59e0b; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700;">
-                                <i class="fa-solid fa-star"></i> ${h.rating || '4.5'} (${h.review_count || 0})
+                                <i class="fa-solid fa-star"></i> ${esc(h.rating || '4.5')} (${esc(h.review_count || 0)})
                             </div>
                         </div>
 
-                        <h4 style="margin:0 0 4px 0; font-size:16px; color:var(--text-primary); font-weight:700;">${h.name}</h4>
+                        <h4 style="margin:0 0 4px 0; font-size:16px; color:var(--text-primary); font-weight:700;">${esc(h.name)}</h4>
                         <div style="font-size:12px; color:#38bdf8; font-weight:600; margin-bottom:6px;">
-                            <i class="fa-solid fa-location-dot"></i> ${h.city || 'N/A'} • <span style="color:var(--text-muted); font-weight:normal;">${h.address || ''}</span>
+                            <i class="fa-solid fa-location-dot"></i> ${esc(h.city || 'N/A')} • <span style="color:var(--text-muted); font-weight:normal;">${esc(h.address || '')}</span>
                         </div>
                         <div style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
-                            <i class="fa-solid fa-user-tie"></i> Owner: <strong>${h.owner ? h.owner.name : 'N/A'}</strong> (${h.owner ? h.owner.phone : 'N/A'})
+                            <i class="fa-solid fa-user-tie"></i> Owner: <strong>${esc(h.owner ? h.owner.name : 'N/A')}</strong> (${esc(h.owner ? h.owner.phone : 'N/A')})
                         </div>
                     </div>
 
                     <div style="border-top:1px solid var(--border); padding-top:10px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
                         <div>
-                            <span style="font-size:15px; font-weight:700; color:var(--success);">₹${h.price_per_night}</span>
+                            <span style="font-size:15px; font-weight:700; color:var(--success);">₹${esc(h.price_per_night)}</span>
                             <small style="font-size:10px; color:var(--text-muted);">/ night</small>
                             <div style="font-size:10px; color:var(--text-muted);">${h.available_rooms || 0} / ${h.total_rooms || 0} Rooms Available</div>
                         </div>
@@ -787,7 +799,7 @@ async function loadHotelsData() {
             `;
         }).join('');
     } catch (err) {
-        container.innerHTML = `<div class="empty-state text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading hotels'}</div>`;
+        container.innerHTML = `<div class="empty-state text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${esc(err.message || 'Error loading hotels')}</div>`;
     }
 }
 
@@ -836,13 +848,13 @@ async function openHotelDetailsModal(id) {
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
                 <div>
                     <h3 style="margin:0; font-size:18px; color:var(--text-primary);">
-                        ${h.name}
+                        ${esc(h.name)}
                         <span class="badge ${isApproved ? 'confirmed' : (isPending ? 'pending' : 'failed')}" style="margin-left:8px;">
                             ${isApproved ? 'APPROVED' : (isPending ? 'PENDING APPROVAL' : 'REJECTED / SUSPENDED')}
                         </span>
                     </h3>
                     <div style="font-size:12px; color:#38bdf8; font-weight:600; margin-top:2px;">
-                        <i class="fa-solid fa-location-dot"></i> ${h.city || 'N/A'} • ${h.address || 'N/A'}
+                        <i class="fa-solid fa-location-dot"></i> ${esc(h.city || 'N/A')} • ${esc(h.address || 'N/A')}
                     </div>
                 </div>
                 <div style="display:flex; gap:6px;">
@@ -873,11 +885,11 @@ async function openHotelDetailsModal(id) {
                     <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap:10px; max-height:220px; overflow-y:auto;">
                         ${hotelPhotos.map(img => `
                             <div class="photo-card-item" style="position:relative; height:130px; border-radius:8px; overflow:hidden; background:#0f172a; border:1px solid var(--border);">
-                                <a href="${img.url}" target="_blank">
-                                    <img src="${img.url}" alt="${img.label}" style="width:100%; height:100%; object-fit:cover;" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1000&q=80';">
+                                <a href="${safeUrl(img.url)}" target="_blank" rel="noopener">
+                                    <img src="${safeUrl(img.url)}" alt="${esc(img.label)}" style="width:100%; height:100%; object-fit:cover;" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1000&q=80';">
                                 </a>
                                 <span style="position:absolute; bottom:6px; left:6px; background:rgba(0,0,0,0.85); color:#38bdf8; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:700;">
-                                    ${img.label}
+                                    ${esc(img.label)}
                                 </span>
                                 ${img.id ? `
                                     <button onclick="deleteAdminHotelPhoto(${h.id}, ${img.id})" style="position:absolute; top:6px; right:6px; background:rgba(225,29,72,0.9); color:#fff; border:none; width:22px; height:22px; border-radius:50%; cursor:pointer; font-size:10px; display:flex; align-items:center; justify-content:center;" title="Delete Image">
@@ -943,22 +955,22 @@ async function openHotelDetailsModal(id) {
 
             <!-- Specs Grid -->
             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px; background:var(--bg-dark); padding:12px; border-radius:8px; border:1px solid var(--border); margin-bottom:14px; font-size:12px;">
-                <div><strong>Price Per Night:</strong> <br><span style="color:var(--success); font-weight:700; font-size:14px;">₹${h.price_per_night}</span></div>
-                <div><strong>Room Capacity:</strong> <br><span style="color:#38bdf8; font-weight:700;">${h.available_rooms || 0} / ${h.total_rooms || 0} Available Slots</span></div>
-                <div><strong>Rating & Reviews:</strong> <br><span style="color:#f59e0b; font-weight:700;"><i class="fa-solid fa-star"></i> ${h.rating || '4.5'} (${h.review_count || 0})</span></div>
+                <div><strong>Price Per Night:</strong> <br><span style="color:var(--success); font-weight:700; font-size:14px;">₹${esc(h.price_per_night)}</span></div>
+                <div><strong>Room Capacity:</strong> <br><span style="color:#38bdf8; font-weight:700;">${esc(h.available_rooms || 0)} / ${esc(h.total_rooms || 0)} Available Slots</span></div>
+                <div><strong>Rating & Reviews:</strong> <br><span style="color:#f59e0b; font-weight:700;"><i class="fa-solid fa-star"></i> ${esc(h.rating || '4.5')} (${esc(h.review_count || 0)})</span></div>
             </div>
 
             <!-- Owner Info & Description -->
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:14px; font-size:12px;">
                 <div style="background:var(--bg-dark); padding:12px; border-radius:8px; border:1px solid var(--border);">
                     <h5 style="margin:0 0 6px 0; font-size:13px; color:var(--info);"><i class="fa-solid fa-user-tie"></i> Hotel Owner Info</h5>
-                    <div><strong>Name:</strong> ${h.owner ? h.owner.name : 'N/A'}</div>
-                    <div><strong>Email:</strong> ${h.owner ? h.owner.email : 'N/A'}</div>
-                    <div><strong>Phone:</strong> ${h.owner ? h.owner.phone : 'N/A'}</div>
+                    <div><strong>Name:</strong> ${esc(h.owner ? h.owner.name : 'N/A')}</div>
+                    <div><strong>Email:</strong> ${esc(h.owner ? h.owner.email : 'N/A')}</div>
+                    <div><strong>Phone:</strong> ${esc(h.owner ? h.owner.phone : 'N/A')}</div>
                 </div>
                 <div style="background:var(--bg-dark); padding:12px; border-radius:8px; border:1px solid var(--border);">
                     <h5 style="margin:0 0 6px 0; font-size:13px; color:var(--primary);"><i class="fa-solid fa-concierge-bell"></i> Description</h5>
-                    <div style="color:var(--text-secondary); line-height:1.4;">${h.description || 'No detailed description provided by owner.'}</div>
+                    <div style="color:var(--text-secondary); line-height:1.4;">${esc(h.description || 'No detailed description provided by owner.')}</div>
                 </div>
             </div>
 
@@ -972,9 +984,9 @@ async function openHotelDetailsModal(id) {
                         <div style="background:var(--bg-dark); padding:10px 12px; border-radius:6px; border:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; font-size:12px; gap:10px;">
                             <div>
                                 <div style="font-size:13px; font-weight:700; color:var(--text-primary); margin-bottom:3px;">
-                                    <i class="fa-solid fa-user" style="color:var(--primary);"></i> ${b.user ? b.user.name : (b.logistics_name || 'Guest Driver')} 
+                                    <i class="fa-solid fa-user" style="color:var(--primary);"></i> ${esc(b.user ? b.user.name : (b.logistics_name || 'Guest Driver'))}
                                     <span style="color:#38bdf8; font-weight:600; margin-left:6px; font-size:12px;">
-                                        <i class="fa-solid fa-phone"></i> ${b.user ? (b.user.phone || b.logistics_number || 'N/A') : (b.logistics_number || 'N/A')}
+                                        <i class="fa-solid fa-phone"></i> ${esc(b.user ? (b.user.phone || b.logistics_number || 'N/A') : (b.logistics_number || 'N/A'))}
                                     </span>
                                 </div>
                                 <div style="font-size:11px; color:var(--text-secondary); display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
@@ -986,7 +998,7 @@ async function openHotelDetailsModal(id) {
                             <div style="text-align:right; flex-shrink:0;">
                                 <strong style="color:var(--success); font-size:14px;">₹${(b.total_payable || b.total_amount || 0).toLocaleString('en-IN')}</strong><br>
                                 <span class="badge ${b.status === 'confirmed' ? 'confirmed' : (b.payment_status === 'refunded' ? 'failed' : 'pending')}" style="font-size:10px; margin-top:2px;">
-                                    ${b.payment_status === 'refunded' ? 'REFUNDED' : b.status.toUpperCase()}
+                                    ${b.payment_status === 'refunded' ? 'REFUNDED' : esc(String(b.status || '').toUpperCase())}
                                 </span>
                             </div>
                         </div>
@@ -999,7 +1011,7 @@ async function openHotelDetailsModal(id) {
                 <div style="background:var(--bg-dark); padding:12px; border-radius:8px; border:1px solid var(--border); font-size:12px; margin-bottom:14px;">
                     <h5 style="margin:0 0 8px 0; font-size:13px; color:#a855f7;"><i class="fa-solid fa-wifi"></i> Hotel Amenities</h5>
                     <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                        ${h.amenities.map(a => `<span style="background:rgba(168,85,247,0.15); color:#c084fc; padding:4px 8px; border-radius:4px; border:1px solid rgba(168,85,247,0.3); font-weight:600;"><i class="fa-solid fa-check"></i> ${a.name}</span>`).join('')}
+                        ${h.amenities.map(a => `<span style="background:rgba(168,85,247,0.15); color:#c084fc; padding:4px 8px; border-radius:4px; border:1px solid rgba(168,85,247,0.3); font-weight:600;"><i class="fa-solid fa-check"></i> ${esc(a.name)}</span>`).join('')}
                     </div>
                 </div>
             ` : ''}
@@ -1008,7 +1020,7 @@ async function openHotelDetailsModal(id) {
             <div style="background:var(--bg-dark); padding:12px; border-radius:8px; border:1px solid var(--border); font-size:12px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                     <h5 style="margin:0; font-size:13px; color:#f59e0b;"><i class="fa-solid fa-star"></i> Customer Reviews (${(h.reviews || []).length})</h5>
-                    <span style="color:#f59e0b; font-weight:700;"><i class="fa-solid fa-star"></i> ${h.rating || '0.0'} / 5.0 (${h.review_count || (h.reviews || []).length} reviews)</span>
+                    <span style="color:#f59e0b; font-weight:700;"><i class="fa-solid fa-star"></i> ${esc(h.rating || '0.0')} / 5.0 (${esc(h.review_count || (h.reviews || []).length)} reviews)</span>
                 </div>
                 ${(!h.reviews || h.reviews.length === 0) ? `
                     <div style="font-size:12px; color:var(--text-muted);">No reviews posted for this hotel yet.</div>
@@ -1017,10 +1029,10 @@ async function openHotelDetailsModal(id) {
                         ${h.reviews.map(r => `
                             <div style="background:var(--bg-card); padding:10px 12px; border-radius:6px; border:1px solid var(--border);">
                                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                                    <strong><i class="fa-solid fa-user" style="color:var(--primary);"></i> ${r.user ? r.user.name : (r.user_name || 'Customer')}</strong>
-                                    <span class="badge approved" style="font-size:11px;"><i class="fa-solid fa-star"></i> ${r.rating} / 5</span>
+                                    <strong><i class="fa-solid fa-user" style="color:var(--primary);"></i> ${esc(r.user ? r.user.name : (r.user_name || 'Customer'))}</strong>
+                                    <span class="badge approved" style="font-size:11px;"><i class="fa-solid fa-star"></i> ${esc(r.rating)} / 5</span>
                                 </div>
-                                <p style="margin:4px 0; color:var(--text-secondary); font-size:12px; line-height:1.4;">"${r.comment || 'No text comment provided.'}"</p>
+                                <p style="margin:4px 0; color:var(--text-secondary); font-size:12px; line-height:1.4;">"${esc(r.comment || 'No text comment provided.')}"</p>
                                 <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; font-size:11px; color:var(--text-muted);">
                                     <span>${formatDateTimeClean(r.created_at)}</span>
                                     <button class="btn-sm btn-danger" style="padding:2px 8px; font-size:10px;" onclick="deleteReview(${r.id}); openHotelDetailsModal(${h.id});">
@@ -1034,7 +1046,7 @@ async function openHotelDetailsModal(id) {
             </div>
         `;
     } catch (err) {
-        body.innerHTML = `<div style="padding:20px; text-align:center; color:var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Failed to load hotel details'}</div>`;
+        body.innerHTML = `<div style="padding:20px; text-align:center; color:var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i> ${esc(err.message || 'Failed to load hotel details')}</div>`;
     }
 }
 
@@ -1131,7 +1143,7 @@ async function populateOwnerCitiesDropdown() {
             if (cities.length > 0) {
                 const currentVal = citySelect.value;
                 citySelect.innerHTML = `<option value="">All Cities (${cities.length})</option>` +
-                    cities.map(c => `<option value="${c}" ${currentVal === c ? 'selected' : ''}>${c}</option>`).join('');
+                    cities.map(c => `<option value="${esc(c)}" ${currentVal === c ? 'selected' : ''}>${esc(c)}</option>`).join('');
                 loadedOwnerCitiesList = true;
             }
         }
@@ -1162,7 +1174,7 @@ async function loadOwnersData() {
                 <div class="empty-state" style="padding:40px 20px; text-align:center; grid-column:1/-1;">
                     <i class="fa-solid fa-user-slash" style="font-size:36px; color:var(--text-muted); margin-bottom:12px;"></i>
                     <h3 style="margin:0 0 6px 0; font-size:16px;">No Hotel Owners Found</h3>
-                    <p style="color:var(--text-muted); font-size:13px; margin:0;">No hotel owner accounts match your current search ("${search || 'all'}"), city ("${city || 'all'}"), or verification filter.</p>
+                    <p style="color:var(--text-muted); font-size:13px; margin:0;">No hotel owner accounts match your current search ("${esc(search || 'all')}"), city ("${esc(city || 'all')}"), or verification filter.</p>
                 </div>
             `;
             return;
@@ -1197,7 +1209,7 @@ async function loadOwnersData() {
                     <div class="data-card-header" style="margin-bottom:10px;">
                         <div class="data-card-title">
                             <h4 style="font-size:16px; color:var(--text-primary); margin:0;">
-                                <i class="fa-solid fa-user-tie" style="color:var(--primary);"></i> ${o.name}
+                                <i class="fa-solid fa-user-tie" style="color:var(--primary);"></i> ${esc(o.name)}
                             </h4>
                             <div class="data-card-sub" style="font-size:11px; margin-top:2px;">Joined: ${joinedDate}</div>
                         </div>
@@ -1207,10 +1219,10 @@ async function loadOwnersData() {
                     </div>
 
                     <div style="font-size:12px; color:var(--text-secondary); display:flex; flex-direction:column; gap:6px; background:var(--bg-dark); padding:12px; border-radius:6px; border:1px solid var(--border); margin-bottom:12px;">
-                        <div><i class="fa-solid fa-hotel" style="color:var(--success); font-size:12px; margin-right:4px;"></i> <strong>Hotel Property:</strong> <span style="color:var(--text-primary); font-weight:700;">${profile.hotel_name || 'N/A'}</span></div>
-                        <div><i class="fa-solid fa-location-dot" style="color:#38bdf8; font-size:12px; margin-right:4px;"></i> <strong>Location:</strong> ${profile.city || 'N/A'}${profile.state ? ', ' + profile.state : ''}</div>
-                        <div><i class="fa-solid fa-building-user" style="color:#a855f7; font-size:12px; margin-right:4px;"></i> <strong>Listings:</strong> ${o.hotels_count || 0} Registered Hotels</div>
-                        ${isRejected && profile.rejection_reason ? `<div style="color:#f87171;"><i class="fa-solid fa-circle-exclamation"></i> <strong>Rejection Reason:</strong> ${profile.rejection_reason}</div>` : ''}
+                        <div><i class="fa-solid fa-hotel" style="color:var(--success); font-size:12px; margin-right:4px;"></i> <strong>Hotel Property:</strong> <span style="color:var(--text-primary); font-weight:700;">${esc(profile.hotel_name || 'N/A')}</span></div>
+                        <div><i class="fa-solid fa-location-dot" style="color:#38bdf8; font-size:12px; margin-right:4px;"></i> <strong>Location:</strong> ${esc(profile.city || 'N/A')}${profile.state ? ', ' + esc(profile.state) : ''}</div>
+                        <div><i class="fa-solid fa-building-user" style="color:#a855f7; font-size:12px; margin-right:4px;"></i> <strong>Listings:</strong> ${esc(o.hotels_count || 0)} Registered Hotels</div>
+                        ${isRejected && profile.rejection_reason ? `<div style="color:#f87171;"><i class="fa-solid fa-circle-exclamation"></i> <strong>Rejection Reason:</strong> ${esc(profile.rejection_reason)}</div>` : ''}
                     </div>
                 </div>
 
@@ -1230,7 +1242,7 @@ async function loadOwnersData() {
             `;
         }).join('');
     } catch (err) {
-        container.innerHTML = `<div class="empty-state text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading owners'}</div>`;
+        container.innerHTML = `<div class="empty-state text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${esc(err.message || 'Error loading owners')}</div>`;
     }
 }
 
@@ -1278,7 +1290,7 @@ async function openKycModal(id) {
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
                 <div>
                     <h3 style="margin:0; font-size:20px; font-weight:700; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
-                        <i class="fa-solid fa-user-tie" style="color:var(--primary);"></i> ${owner.name}
+                        <i class="fa-solid fa-user-tie" style="color:var(--primary);"></i> ${esc(owner.name)}
                         <span class="badge ${isVerified ? 'confirmed' : (owner.owner_profile?.status === 'rejected' ? 'cancelled' : 'pending')}" style="font-size:11px; padding:4px 10px; border-radius:6px; font-weight:700; ${isVerified ? '' : (owner.owner_profile?.status === 'rejected' ? 'background:#ef4444; color:#fff;' : 'background:#f59e0b; color:#000;')}">
                             ${isVerified ? 'Verified Owner' : (owner.owner_profile?.status === 'rejected' ? 'KYC Rejected' : 'Pending KYC Verification')}
                         </span>
@@ -1299,19 +1311,19 @@ async function openKycModal(id) {
             <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:10px; background:var(--bg-dark); padding:12px 14px; border-radius:8px; border:1px solid var(--border); margin-bottom:16px; font-size:12px;">
                 <div>
                     <span style="color:var(--text-muted); font-size:11px; display:block; font-weight:600;">Email Address</span>
-                    <strong style="color:#38bdf8; font-size:13px;"><i class="fa-solid fa-envelope"></i> ${owner.email || 'N/A'}</strong>
+                    <strong style="color:#38bdf8; font-size:13px;"><i class="fa-solid fa-envelope"></i> ${esc(owner.email || 'N/A')}</strong>
                 </div>
                 <div>
                     <span style="color:var(--text-muted); font-size:11px; display:block; font-weight:600;">Phone Number</span>
-                    <strong style="color:var(--text-primary); font-size:13px;"><i class="fa-solid fa-phone"></i> ${owner.phone || 'N/A'}</strong>
+                    <strong style="color:var(--text-primary); font-size:13px;"><i class="fa-solid fa-phone"></i> ${esc(owner.phone || 'N/A')}</strong>
                 </div>
                 <div>
                     <span style="color:var(--text-muted); font-size:11px; display:block; font-weight:600;">Primary Hotel</span>
-                    <strong style="color:var(--success); font-size:13px;"><i class="fa-solid fa-hotel"></i> ${profile.hotel_name || (hotels[0] ? hotels[0].name : 'N/A')}</strong>
+                    <strong style="color:var(--success); font-size:13px;"><i class="fa-solid fa-hotel"></i> ${esc(profile.hotel_name || (hotels[0] ? hotels[0].name : 'N/A'))}</strong>
                 </div>
                 <div>
                     <span style="color:var(--text-muted); font-size:11px; display:block; font-weight:600;">GSTIN / Tax ID</span>
-                    <strong style="color:#c084fc; font-size:13px;"><i class="fa-solid fa-file-invoice"></i> ${profile.gst_number || 'Not Provided'}</strong>
+                    <strong style="color:#c084fc; font-size:13px;"><i class="fa-solid fa-file-invoice"></i> ${esc(profile.gst_number || 'Not Provided')}</strong>
                 </div>
             </div>
 
@@ -1344,9 +1356,9 @@ async function openKycModal(id) {
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:16px;">
                 ${hotels.length === 0 ? `<div style="color:var(--text-muted); font-size:12px;">No hotel listings created by this owner yet.</div>` : hotels.map(h => `
                     <div style="background:var(--bg-dark); padding:10px; border-radius:6px; border:1px solid var(--border); font-size:12px;">
-                        <strong style="color:var(--text-primary); font-size:13px;">${h.name}</strong> • ${h.city || ''}<br>
-                        <span style="color:var(--success); font-weight:700;">₹${h.price_per_night} / night</span> • ${h.total_rooms || 0} Rooms<br>
-                        <span class="badge ${h.status === 'approved' ? 'confirmed' : 'pending'}" style="font-size:10px; margin-top:4px;">${h.status.toUpperCase()}</span>
+                        <strong style="color:var(--text-primary); font-size:13px;">${esc(h.name)}</strong> • ${esc(h.city || '')}<br>
+                        <span style="color:var(--success); font-weight:700;">₹${esc(h.price_per_night)} / night</span> • ${esc(h.total_rooms || 0)} Rooms<br>
+                        <span class="badge ${h.status === 'approved' ? 'confirmed' : 'pending'}" style="font-size:10px; margin-top:4px;">${esc(String(h.status || '').toUpperCase())}</span>
                     </div>
                 `).join('')}
             </div>
@@ -1361,11 +1373,11 @@ async function openKycModal(id) {
                         <div style="background:var(--bg-dark); padding:10px 12px; border-radius:6px; border:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; font-size:12px; gap:10px;">
                             <div>
                                 <div style="font-size:13px; font-weight:700; color:var(--text-primary); margin-bottom:3px;">
-                                    <i class="fa-solid fa-user" style="color:var(--primary);"></i> ${b.user ? b.user.name : (b.logistics_name || 'Guest Driver')} 
+                                    <i class="fa-solid fa-user" style="color:var(--primary);"></i> ${esc(b.user ? b.user.name : (b.logistics_name || 'Guest Driver'))}
                                     <span style="color:#38bdf8; font-weight:600; margin-left:6px; font-size:12px;">
-                                        <i class="fa-solid fa-phone"></i> ${b.user ? (b.user.phone || b.logistics_number || 'N/A') : (b.logistics_number || 'N/A')}
+                                        <i class="fa-solid fa-phone"></i> ${esc(b.user ? (b.user.phone || b.logistics_number || 'N/A') : (b.logistics_number || 'N/A'))}
                                     </span>
-                                    <span style="color:var(--text-muted); font-size:11px; margin-left:6px;">(${b.hotel ? b.hotel.name : 'N/A'})</span>
+                                    <span style="color:var(--text-muted); font-size:11px; margin-left:6px;">(${esc(b.hotel ? b.hotel.name : 'N/A')})</span>
                                 </div>
                                 <div style="font-size:11px; color:var(--text-secondary); display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
                                     <span><i class="fa-solid fa-calendar-day" style="color:var(--info);"></i> Check-in: <strong>${formatDateClean(b.check_in || b.booking_date)}</strong></span>
@@ -1376,7 +1388,7 @@ async function openKycModal(id) {
                             <div style="text-align:right; flex-shrink:0;">
                                 <strong style="color:var(--success); font-size:14px;">₹${(b.total_payable || b.total_amount || 0).toLocaleString('en-IN')}</strong><br>
                                 <span class="badge ${b.status === 'confirmed' ? 'confirmed' : (b.payment_status === 'refunded' ? 'failed' : 'pending')}" style="font-size:10px; margin-top:2px;">
-                                    ${b.payment_status === 'refunded' ? 'REFUNDED' : b.status.toUpperCase()}
+                                    ${b.payment_status === 'refunded' ? 'REFUNDED' : esc(String(b.status || '').toUpperCase())}
                                 </span>
                             </div>
                         </div>
@@ -1387,11 +1399,11 @@ async function openKycModal(id) {
             <!-- Business & Bank Legal Details -->
             <h4 style="margin:0 0 8px 0; font-size:14px; color:var(--primary);"><i class="fa-solid fa-file-contract"></i> Legal & Bank Account Details</h4>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; background:var(--bg-dark); padding:12px; border-radius:8px; border:1px solid var(--border); font-size:12px; margin-bottom:16px;">
-                <div><strong>GST Number:</strong> ${profile.gst_number || 'N/A'}</div>
-                <div><strong>FSSAI Number:</strong> ${profile.fssai_number || 'N/A'}</div>
-                <div><strong>Bank Name:</strong> ${profile.bank_name || 'N/A'}</div>
-                <div><strong>Account Number:</strong> ${profile.account_number || 'N/A'}</div>
-                <div><strong>IFSC Code:</strong> ${profile.ifsc_code || 'N/A'}</div>
+                <div><strong>GST Number:</strong> ${esc(profile.gst_number || 'N/A')}</div>
+                <div><strong>FSSAI Number:</strong> ${esc(profile.fssai_number || 'N/A')}</div>
+                <div><strong>Bank Name:</strong> ${esc(profile.bank_name || 'N/A')}</div>
+                <div><strong>Account Number:</strong> ${esc(profile.account_number || 'N/A')}</div>
+                <div><strong>IFSC Code:</strong> ${esc(profile.ifsc_code || 'N/A')}</div>
             </div>
 
             <!-- Documents Preview -->
@@ -1418,7 +1430,7 @@ async function openKycModal(id) {
         `;
         loadKycDocuments(body, owner.id);
     } catch (err) {
-        body.innerHTML = `<div style="padding:20px; text-align:center; color:var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Failed to load owner KYC data'}</div>`;
+        body.innerHTML = `<div style="padding:20px; text-align:center; color:var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i> ${esc(err.message || 'Failed to load owner KYC data')}</div>`;
     }
 }
 
@@ -1553,30 +1565,30 @@ async function loadBookingsData() {
                     <td><strong style="color:#38bdf8; font-size:13px;">#${b.id}</strong></td>
                     <td>
                         <div>
-                            <strong style="color:var(--text-primary); font-size:13px;"><i class="fa-solid fa-user" style="color:var(--primary); font-size:11px;"></i> ${b.user ? b.user.name : (b.logistics_name || 'Guest Driver')}</strong><br>
-                            <small style="color:#38bdf8; font-weight:600;"><i class="fa-solid fa-phone" style="font-size:10px;"></i> ${b.user ? (b.user.phone || b.logistics_number || 'N/A') : (b.logistics_number || 'N/A')}</small>
+                            <strong style="color:var(--text-primary); font-size:13px;"><i class="fa-solid fa-user" style="color:var(--primary); font-size:11px;"></i> ${esc(b.user ? b.user.name : (b.logistics_name || 'Guest Driver'))}</strong><br>
+                            <small style="color:#38bdf8; font-weight:600;"><i class="fa-solid fa-phone" style="font-size:10px;"></i> ${esc(b.user ? (b.user.phone || b.logistics_number || 'N/A') : (b.logistics_number || 'N/A'))}</small>
                         </div>
                     </td>
                     <td>
                         <div>
-                            <strong style="color:var(--text-primary); font-size:13px;"><i class="fa-solid fa-hotel" style="color:var(--success); font-size:11px;"></i> ${b.hotel ? b.hotel.name : 'N/A'}</strong><br>
-                            <small style="color:var(--text-muted); font-weight:600;"><i class="fa-solid fa-location-dot" style="color:#38bdf8; font-size:10px;"></i> ${b.hotel ? (b.hotel.city || 'N/A') : 'N/A'}</small>
+                            <strong style="color:var(--text-primary); font-size:13px;"><i class="fa-solid fa-hotel" style="color:var(--success); font-size:11px;"></i> ${esc(b.hotel ? b.hotel.name : 'N/A')}</strong><br>
+                            <small style="color:var(--text-muted); font-weight:600;"><i class="fa-solid fa-location-dot" style="color:#38bdf8; font-size:10px;"></i> ${esc(b.hotel ? (b.hotel.city || 'N/A') : 'N/A')}</small>
                         </div>
                     </td>
                     <td>
                         <div style="font-size:12px; line-height:1.4;">
-                            <span style="color:var(--info); font-weight:600;"><i class="fa-solid fa-calendar-day" style="font-size:10px;"></i> In:</span> ${formatDateClean(b.check_in || b.booking_date)}<br>
-                            <span style="color:var(--success); font-weight:600;"><i class="fa-solid fa-calendar-check" style="font-size:10px;"></i> Out:</span> ${formatDateClean(b.check_out)}
+                            <span style="color:var(--info); font-weight:600;"><i class="fa-solid fa-calendar-day" style="font-size:10px;"></i> In:</span> ${esc(formatDateClean(b.check_in || b.booking_date))}<br>
+                            <span style="color:var(--success); font-weight:600;"><i class="fa-solid fa-calendar-check" style="font-size:10px;"></i> Out:</span> ${esc(formatDateClean(b.check_out))}
                         </div>
                     </td>
                     <td>
                         <div style="font-size:11px; color:var(--text-secondary); white-space:nowrap;">
-                            <i class="fa-solid fa-clock" style="color:var(--warning); font-size:10px;"></i> ${formatDateTimeClean(b.created_at || b.booking_date)}
+                            <i class="fa-solid fa-clock" style="color:var(--warning); font-size:10px;"></i> ${esc(formatDateTimeClean(b.created_at || b.booking_date))}
                         </div>
                     </td>
                     <td><strong style="color:var(--success); font-size:14px;">₹${(b.total_payable || b.total_amount || 0).toLocaleString('en-IN')}</strong></td>
-                    <td><span class="badge ${payBadgeClass}" style="${isRefunded ? 'background:#e11d48; color:#ffffff;' : ''}; text-transform:uppercase; font-size:10px; font-weight:700;">${payText.toUpperCase()}</span></td>
-                    <td><span class="badge ${b.status === 'confirmed' ? 'confirmed' : (b.status === 'cancelled' ? 'failed' : 'pending')}" style="text-transform:uppercase; font-size:10px; font-weight:700;">${(b.status || 'PENDING').toUpperCase()}</span></td>
+                    <td><span class="badge ${esc(payBadgeClass)}" style="${esc(isRefunded ? 'background:#e11d48; color:#ffffff;' : '')}; text-transform:uppercase; font-size:10px; font-weight:700;">${esc(payText.toUpperCase())}</span></td>
+                    <td><span class="badge ${esc(b.status === 'confirmed' ? 'confirmed' : (b.status === 'cancelled' ? 'failed' : 'pending'))}" style="text-transform:uppercase; font-size:10px; font-weight:700;">${esc((b.status || 'PENDING').toUpperCase())}</span></td>
                     <td>
                         <select onchange="updateBookingStatus(${b.id}, this.value)" style="padding:6px 10px; font-size:12px; border-radius:6px; background:#0f172a; border:1px solid var(--border); color:#fff; cursor:pointer;">
                             <option value="">Update Status...</option>
@@ -1590,7 +1602,7 @@ async function loadBookingsData() {
             `;
         }).join('');
     } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="9" class="text-center text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading bookings'}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${esc(err.message || 'Error loading bookings')}</td></tr>`;
     }
 }
 
@@ -1683,34 +1695,34 @@ async function loadUsersData() {
                     <td><strong>#${u.id}</strong></td>
                     <td>
                         <div style="font-weight:700; color:var(--text-primary); font-size:14px;">
-                            <i class="fa-solid fa-circle-user" style="color:var(--primary); margin-right:4px;"></i> ${u.name || 'Customer'}
+                            <i class="fa-solid fa-circle-user" style="color:var(--primary); margin-right:4px;"></i> ${esc(u.name || 'Customer')}
                         </div>
-                        <small class="text-muted" style="font-size:11px;">Joined: ${joinedDate}</small>
+                        <small class="text-muted" style="font-size:11px;">Joined: ${esc(joinedDate)}</small>
                     </td>
                     <td>
                         <div style="font-size:12px; font-weight:600; color:#38bdf8;">
-                            <i class="fa-solid fa-envelope" style="font-size:11px;"></i> ${u.email || 'N/A'}
+                            <i class="fa-solid fa-envelope" style="font-size:11px;"></i> ${esc(u.email || 'N/A')}
                         </div>
                         <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">
-                            <i class="fa-solid fa-phone" style="font-size:11px;"></i> ${u.phone || 'N/A'}
+                            <i class="fa-solid fa-phone" style="font-size:11px;"></i> ${esc(u.phone || 'N/A')}
                         </div>
                     </td>
                     <td>
-                        <span class="badge ${u.bookings_count > 0 ? 'confirmed' : 'pending'}" style="font-size:11px;">
-                            <i class="fa-solid fa-receipt"></i> ${u.bookings_count || 0} Bookings
+                        <span class="badge ${esc(u.bookings_count > 0 ? 'confirmed' : 'pending')}" style="font-size:11px;">
+                            <i class="fa-solid fa-receipt"></i> ${esc(u.bookings_count || 0)} Bookings
                         </span>
                     </td>
                     <td>
-                        <span class="badge ${isActive ? 'confirmed' : 'failed'}" style="font-size:11px; ${!isActive ? 'background:#e11d48; color:#ffffff;' : ''}">
-                            <i class="fa-solid ${isActive ? 'fa-circle-check' : 'fa-ban'}"></i>
-                            ${isActive ? 'Active' : 'Disabled'}
+                        <span class="badge ${esc(isActive ? 'confirmed' : 'failed')}" style="font-size:11px; ${esc(!isActive ? 'background:#e11d48; color:#ffffff;' : '')}">
+                            <i class="fa-solid ${esc(isActive ? 'fa-circle-check' : 'fa-ban')}"></i>
+                            ${esc(isActive ? 'Active' : 'Disabled')}
                         </span>
                     </td>
                     <td>
                         <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                            <button class="btn-sm" style="background:${isActive ? '#f59e0b' : '#10b981'}; color:#ffffff; font-weight:600;" onclick="toggleUserStatus(${u.id}, ${!isActive}, '${(u.name || '').replace(/'/g, "\\'")}')">
-                                <i class="fa-solid ${isActive ? 'fa-ban' : 'fa-circle-check'}"></i>
-                                ${isActive ? 'Disable' : 'Activate'}
+                            <button class="btn-sm" style="background:${esc(isActive ? '#f59e0b' : '#10b981')}; color:#ffffff; font-weight:600;" onclick="toggleUserStatus(${u.id}, ${esc(!isActive)}, ${esc(jsArg(u.name || ''))})">
+                                <i class="fa-solid ${esc(isActive ? 'fa-ban' : 'fa-circle-check')}"></i>
+                                ${esc(isActive ? 'Disable' : 'Activate')}
                             </button>
                             <button class="btn-sm" style="background:#4f46e5; color:#ffffff;" onclick="openUserDetailsModal(${u.id})">
                                 <i class="fa-solid fa-eye"></i> Details
@@ -1721,7 +1733,7 @@ async function loadUsersData() {
             `;
         }).join('');
     } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading users'}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${esc(err.message || 'Error loading users')}</td></tr>`;
     }
 }
 
@@ -1765,26 +1777,26 @@ async function openUserDetailsModal(id) {
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
                 <div>
                     <h3 style="margin:0; font-size:18px; color:var(--text-primary);">
-                        <i class="fa-solid fa-user-circle" style="color:var(--primary);"></i> ${u.name}
-                        <span class="badge ${isActive ? 'confirmed' : 'failed'}" style="margin-left:8px; ${!isActive ? 'background:#e11d48; color:#fff;' : ''}">
-                            ${isActive ? 'Active Customer' : 'Account Disabled'}
+                        <i class="fa-solid fa-user-circle" style="color:var(--primary);"></i> ${esc(u.name)}
+                        <span class="badge ${esc(isActive ? 'confirmed' : 'failed')}" style="margin-left:8px; ${esc(!isActive ? 'background:#e11d48; color:#fff;' : '')}">
+                            ${esc(isActive ? 'Active Customer' : 'Account Disabled')}
                         </span>
                     </h3>
                     <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">Customer Account ID: #${u.id}</div>
                 </div>
-                <button class="btn-sm" style="background:${isActive ? '#f59e0b' : '#10b981'}; color:#fff;" onclick="toggleUserStatus(${u.id}, ${!isActive}, '${(u.name || '').replace(/'/g, "\\'")}'); closeUserModal();">
-                    <i class="fa-solid ${isActive ? 'fa-ban' : 'fa-circle-check'}"></i> ${isActive ? 'Disable Account' : 'Activate Account'}
+                <button class="btn-sm" style="background:${esc(isActive ? '#f59e0b' : '#10b981')}; color:#fff;" onclick="toggleUserStatus(${u.id}, ${esc(!isActive)}, ${esc(jsArg(u.name || ''))}); closeUserModal();">
+                    <i class="fa-solid ${esc(isActive ? 'fa-ban' : 'fa-circle-check')}"></i> ${esc(isActive ? 'Disable Account' : 'Activate Account')}
                 </button>
             </div>
 
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; background:var(--bg-dark); padding:14px; border-radius:8px; border:1px solid var(--border); margin-bottom:16px;">
-                <div><strong>Email Address:</strong> <br><span style="color:#38bdf8; font-weight:600;"><i class="fa-solid fa-envelope"></i> ${u.email || 'N/A'}</span></div>
-                <div><strong>Phone Number:</strong> <br><span style="color:var(--text-primary); font-weight:600;"><i class="fa-solid fa-phone"></i> ${u.phone || 'N/A'}</span></div>
-                <div><strong>Total Bookings:</strong> <br><span style="color:var(--success); font-weight:700;">${u.bookings_count || 0} Bookings Made</span></div>
+                <div><strong>Email Address:</strong> <br><span style="color:#38bdf8; font-weight:600;"><i class="fa-solid fa-envelope"></i> ${esc(u.email || 'N/A')}</span></div>
+                <div><strong>Phone Number:</strong> <br><span style="color:var(--text-primary); font-weight:600;"><i class="fa-solid fa-phone"></i> ${esc(u.phone || 'N/A')}</span></div>
+                <div><strong>Total Bookings:</strong> <br><span style="color:var(--success); font-weight:700;">${esc(u.bookings_count || 0)} Bookings Made</span></div>
                 <div><strong>Joined Date:</strong> <br><span>${u.created_at ? new Date(u.created_at).toLocaleString('en-IN') : 'N/A'}</span></div>
             </div>
 
-            <h4 style="margin:0 0 10px 0; font-size:14px; color:var(--info);"><i class="fa-solid fa-clock-rotate-left"></i> Recent Booking History (${(u.bookings || []).length})</h4>
+            <h4 style="margin:0 0 10px 0; font-size:14px; color:var(--info);"><i class="fa-solid fa-clock-rotate-left"></i> Recent Booking History (${esc((u.bookings || []).length)})</h4>
             ${(u.bookings || []).length === 0 ? `
                 <div style="padding:12px; background:var(--bg-dark); border-radius:6px; font-size:12px; color:var(--text-muted);">No booking history found for this customer.</div>
             ` : `
@@ -1792,13 +1804,13 @@ async function openUserDetailsModal(id) {
                     ${(u.bookings || []).map(b => `
                         <div style="background:var(--bg-dark); padding:10px 12px; border-radius:6px; border:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; font-size:12px;">
                             <div>
-                                <strong>Booking #${b.id}</strong> • ${b.hotel ? b.hotel.name : 'Hotel'} (${b.hotel ? b.hotel.city : ''})<br>
-                                <small class="text-muted">Check-in: ${b.check_in || 'N/A'} to ${b.check_out || 'N/A'}</small>
+                                <strong>Booking #${b.id}</strong> • ${esc(b.hotel ? b.hotel.name : 'Hotel')} (${esc(b.hotel ? b.hotel.city : '')})<br>
+                                <small class="text-muted">Check-in: ${esc(b.check_in || 'N/A')} to ${esc(b.check_out || 'N/A')}</small>
                             </div>
                             <div style="text-align:right;">
-                                <strong style="color:var(--text-primary);">₹${b.total_payable || b.total_amount}</strong><br>
-                                <span class="badge ${b.status === 'confirmed' ? 'confirmed' : (b.payment_status === 'refunded' ? 'failed' : 'pending')}" style="font-size:10px;">
-                                    ${b.payment_status === 'refunded' ? 'REFUNDED' : b.status.toUpperCase()}
+                                <strong style="color:var(--text-primary);">₹${esc(b.total_payable || b.total_amount)}</strong><br>
+                                <span class="badge ${esc(b.status === 'confirmed' ? 'confirmed' : (b.payment_status === 'refunded' ? 'failed' : 'pending'))}" style="font-size:10px;">
+                                    ${b.payment_status === 'refunded' ? 'REFUNDED' : esc(String(b.status || '').toUpperCase())}
                                 </span>
                             </div>
                         </div>
@@ -1807,7 +1819,7 @@ async function openUserDetailsModal(id) {
             `}
         `;
     } catch (err) {
-        body.innerHTML = `<div style="padding:20px; text-align:center; color:var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Failed to load customer details'}</div>`;
+        body.innerHTML = `<div style="padding:20px; text-align:center; color:var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i> ${esc(err.message || 'Failed to load customer details')}</div>`;
     }
 }
 
@@ -1839,16 +1851,16 @@ async function loadReviewsData() {
             <div class="data-card">
                 <div class="data-card-header">
                     <div class="data-card-title">
-                        <h4><i class="fa-solid fa-hotel" style="color:var(--primary);"></i> ${r.hotel ? r.hotel.name : 'Hotel'} ${r.hotel && r.hotel.city ? `<small style="font-weight:normal; color:var(--text-muted);">(${r.hotel.city})</small>` : ''}</h4>
-                        <div class="data-card-sub"><i class="fa-solid fa-user" style="color:var(--info);"></i> by ${r.user ? r.user.name : (r.user_name || 'Anonymous')} ${r.user && r.user.email ? `(${r.user.email})` : ''}</div>
+                        <h4><i class="fa-solid fa-hotel" style="color:var(--primary);"></i> ${esc(r.hotel ? r.hotel.name : 'Hotel')} ${r.hotel && r.hotel.city ? `<small style="font-weight:normal; color:var(--text-muted);">(${esc(r.hotel.city)})</small>` : ''}</h4>
+                        <div class="data-card-sub"><i class="fa-solid fa-user" style="color:var(--info);"></i> by ${esc(r.user ? r.user.name : (r.user_name || 'Anonymous'))} ${r.user && r.user.email ? `(${esc(r.user.email)})` : ''}</div>
                     </div>
-                    <span class="badge approved"><i class="fa-solid fa-star"></i> ${r.rating || 5} / 5</span>
+                    <span class="badge approved"><i class="fa-solid fa-star"></i> ${esc(r.rating || 5)} / 5</span>
                 </div>
                 <p style="font-size:13px; color: var(--text-secondary); line-height: 1.4; margin: 10px 0;">
-                    "${r.comment || r.review || 'No text comment provided.'}"
+                    "${esc(r.comment || r.review || 'No text comment provided.')}"
                 </p>
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-top: auto; pt-2;">
-                    <span style="font-size:11px; color:var(--text-muted);"><i class="fa-solid fa-clock"></i> ${formatDateTimeClean(r.created_at)}</span>
+                    <span style="font-size:11px; color:var(--text-muted);"><i class="fa-solid fa-clock"></i> ${esc(formatDateTimeClean(r.created_at))}</span>
                     <button class="btn-sm btn-danger" onclick="deleteReview(${r.id})">
                         <i class="fa-solid fa-trash"></i> Moderate & Delete
                     </button>
@@ -1856,7 +1868,7 @@ async function loadReviewsData() {
             </div>
         `).join('');
     } catch (err) {
-        container.innerHTML = `<div class="empty-state text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading reviews'}</div>`;
+        container.innerHTML = `<div class="empty-state text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${esc(err.message || 'Error loading reviews')}</div>`;
     }
 }
 
@@ -2033,7 +2045,7 @@ async function loadTransactionsData() {
                         </span>
                     </td>
                     <td>
-                        <strong style="font-size:14px; color:var(--text-primary);">₹${t.total_payable || t.total_amount || 0}</strong>
+                        <strong style="font-size:14px; color:var(--text-primary);">₹${esc(t.total_payable || t.total_amount || 0)}</strong>
                     </td>
                     <td>
                         <span class="badge ${statusBadgeClass}">${statusText}</span>
@@ -2073,7 +2085,7 @@ async function loadTransactionsData() {
             `;
         }).join('');
     } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="9" class="text-center text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading transactions'}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${esc(err.message || 'Error loading transactions')}</td></tr>`;
     }
 }
 
@@ -2125,7 +2137,7 @@ async function openTransactionModal(txnId) {
                     </div>
                 </div>
                 <div style="text-align:right;">
-                    <div style="font-size:22px; font-weight:700; color:var(--text-primary);">₹${t.total_payable || t.total_amount || 0}</div>
+                    <div style="font-size:22px; font-weight:700; color:var(--text-primary);">₹${esc(t.total_payable || t.total_amount || 0)}</div>
                     <div style="font-size:11px; color:var(--text-muted);">${esc(t.payment_method || 'Online Payment')}</div>
                 </div>
             </div>
@@ -2199,7 +2211,7 @@ async function openTransactionModal(txnId) {
             </div>
         `;
     } catch (err) {
-        modalBody.innerHTML = `<div class="empty-state text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading transaction details'}</div>`;
+        modalBody.innerHTML = `<div class="empty-state text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${esc(err.message || 'Error loading transaction details')}</div>`;
     }
 }
 
@@ -2235,20 +2247,20 @@ async function openInvoiceModal(txnId) {
                     <div>
                         <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
                             <i class="fa-solid fa-hotel" style="font-size:28px; color:var(--primary);"></i>
-                            <h2 style="margin:0; font-size:22px; font-weight:800; color:#0f172a;">${comp.name || 'Yaan Platform'}</h2>
+                            <h2 style="margin:0; font-size:22px; font-weight:800; color:#0f172a;">${esc(comp.name || 'Yaan Platform')}</h2>
                         </div>
                         <div style="font-size:12px; color:#475569; line-height:1.4;">
-                            <div>${comp.address}</div>
-                            <div>${comp.city} • Email: ${comp.email}</div>
-                            <div><strong>GSTIN:</strong> ${comp.gstin}</div>
+                            <div>${esc(comp.address)}</div>
+                            <div>${esc(comp.city)} • Email: ${esc(comp.email)}</div>
+                            <div><strong>GSTIN:</strong> ${esc(comp.gstin)}</div>
                         </div>
                     </div>
                     <div style="text-align:right;">
-                        <span class="badge ${pay.is_refunded || pay.status === 'REFUNDED' ? 'failed' : (pay.status === 'PAID' || pay.status === 'CONFIRMED' ? 'confirmed' : 'pending')}" style="font-size:12px; padding:6px 12px; text-transform:uppercase; ${pay.is_refunded || pay.status === 'REFUNDED' ? 'background:#fee2e2; color:#991b1b; border:1px solid #fca5a5;' : (pay.status === 'PAID' || pay.status === 'CONFIRMED' ? 'background:#ecfdf5; color:#047857; border:1px solid #a7f3d0;' : '')}">
-                            ${pay.is_refunded || pay.status === 'REFUNDED' ? 'REFUNDED (RAZORPAY)' : pay.status}
+                        <span class="badge ${esc(pay.is_refunded || pay.status === 'REFUNDED' ? 'failed' : (pay.status === 'PAID' || pay.status === 'CONFIRMED' ? 'confirmed' : 'pending'))}" style="font-size:12px; padding:6px 12px; text-transform:uppercase; ${esc(pay.is_refunded || pay.status === 'REFUNDED' ? 'background:#fee2e2; color:#991b1b; border:1px solid #fca5a5;' : (pay.status === 'PAID' || pay.status === 'CONFIRMED' ? 'background:#ecfdf5; color:#047857; border:1px solid #a7f3d0;' : ''))}">
+                            ${esc(pay.is_refunded || pay.status === 'REFUNDED' ? 'REFUNDED (RAZORPAY)' : pay.status)}
                         </span>
-                        <h3 style="margin:8px 0 2px 0; font-size:18px; color:var(--primary); font-family:monospace;">${inv.invoice_number}</h3>
-                        <div style="font-size:12px; color:#64748b;">Date: <strong>${inv.invoice_date}</strong></div>
+                        <h3 style="margin:8px 0 2px 0; font-size:18px; color:var(--primary); font-family:monospace;">${esc(inv.invoice_number)}</h3>
+                        <div style="font-size:12px; color:#64748b;">Date: <strong>${esc(inv.invoice_date)}</strong></div>
                     </div>
                 </div>
 
@@ -2259,17 +2271,17 @@ async function openInvoiceModal(txnId) {
                     <div style="background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0;">
                         <h4 style="margin:0 0 6px 0; font-size:13px; color:var(--primary);"><i class="fa-solid fa-user"></i> Billed To (Customer)</h4>
                         <div style="font-size:12px; display:flex; flex-direction:column; gap:2px; color:#334155;">
-                            <div><strong style="color:#0f172a;">${cust.name}</strong></div>
-                            <div>Email: ${cust.email}</div>
-                            <div>Phone: ${cust.phone}</div>
+                            <div><strong style="color:#0f172a;">${esc(cust.name)}</strong></div>
+                            <div>Email: ${esc(cust.email)}</div>
+                            <div>Phone: ${esc(cust.phone)}</div>
                         </div>
                     </div>
                     <div style="background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0;">
                         <h4 style="margin:0 0 6px 0; font-size:13px; color:var(--primary);"><i class="fa-solid fa-building-user"></i> Hotel & Stay Details</h4>
                         <div style="font-size:12px; display:flex; flex-direction:column; gap:2px; color:#334155;">
-                            <div><strong style="color:#0f172a;">${hotel.name}</strong> (${hotel.city})</div>
-                            <div>${hotel.address}</div>
-                            <div>Check-in: <strong>${stay.check_in}</strong> to <strong>${stay.check_out}</strong></div>
+                            <div><strong style="color:#0f172a;">${esc(hotel.name)}</strong> (${esc(hotel.city)})</div>
+                            <div>${esc(hotel.address)}</div>
+                            <div>Check-in: <strong>${esc(stay.check_in)}</strong> to <strong>${esc(stay.check_out)}</strong></div>
                         </div>
                     </div>
                 </div>
@@ -2278,8 +2290,8 @@ async function openInvoiceModal(txnId) {
                 <div style="background:#f8fafc; padding:10px 12px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:16px;">
                     <div style="font-size:12px; font-weight:700; color:var(--info); margin-bottom:4px;"><i class="fa-solid fa-truck"></i> Vehicle & Transport Details</div>
                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; font-size:12px; color:#334155;">
-                        <div><strong>Truck No:</strong> ${logi.truck_no} (${logi.truck_type})</div>
-                        <div><strong>Logistics Partner:</strong> ${logi.logistics_name} (${logi.logistics_number})</div>
+                        <div><strong>Truck No:</strong> ${esc(logi.truck_no)} (${esc(logi.truck_type)})</div>
+                        <div><strong>Logistics Partner:</strong> ${esc(logi.logistics_name)} (${esc(logi.logistics_number)})</div>
                     </div>
                 </div>
 
@@ -2296,10 +2308,10 @@ async function openInvoiceModal(txnId) {
                     <tbody>
                         <tr>
                             <td style="color:#0f172a;">
-                                <strong>${hotel.name} Booking</strong><br>
-                                <small style="color:#64748b;">Accommodation & Parking for ${stay.check_in} to ${stay.check_out}</small>
+                                <strong>${esc(hotel.name)} Booking</strong><br>
+                                <small style="color:#64748b;">Accommodation & Parking for ${esc(stay.check_in)} to ${esc(stay.check_out)}</small>
                             </td>
-                            <td style="text-align:center; color:#0f172a;">${stay.total_nights}</td>
+                            <td style="text-align:center; color:#0f172a;">${esc(stay.total_nights)}</td>
                             <td style="text-align:right; color:#0f172a;">₹${(price.price_per_night || 0).toFixed(2)}</td>
                             <td style="text-align:right; color:#0f172a;">₹${(price.subtotal || 0).toFixed(2)}</td>
                         </tr>
@@ -2310,16 +2322,16 @@ async function openInvoiceModal(txnId) {
                 <div style="display:grid; grid-template-columns:1.2fr 1fr; gap:16px; margin-bottom:16px;">
                     <div style="background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0; font-size:12px; display:flex; flex-direction:column; gap:4px; color:#334155;">
                         <h4 style="margin:0 0 6px 0; font-size:13px; color:#7c3aed;"><i class="fa-solid fa-shield-halved"></i> Payment & Audit Identifier</h4>
-                        <div><strong>Method:</strong> ${pay.payment_method || 'Razorpay / Online'}</div>
-                        <div><strong>Date/Time:</strong> ${pay.region_time || 'N/A'}</div>
+                        <div><strong>Method:</strong> ${esc(pay.payment_method || 'Razorpay / Online')}</div>
+                        <div><strong>Date/Time:</strong> ${esc(pay.region_time || 'N/A')}</div>
                         ${pay.is_refunded || pay.status === 'REFUNDED' ? `
                             <div style="background:#fef2f2; border:1px solid #fca5a5; padding:8px 10px; border-radius:6px; margin-top:6px; color:#991b1b;">
                                 <div style="font-weight:700; font-size:12px; margin-bottom:2px;">
                                     <i class="fa-solid fa-arrow-rotate-left"></i> Payment Refunded via Razorpay
                                 </div>
-                                ${pay.refund_id ? `<div><strong>Razorpay Refund ID:</strong> <span style="font-family:monospace; font-weight:700;">${pay.refund_id}</span></div>` : ''}
-                                ${pay.refund_time_formatted ? `<div><strong>Refund Date & Time:</strong> <span>${pay.refund_time_formatted}</span></div>` : ''}
-                                ${pay.cancellation_reason ? `<div style="font-size:11px; margin-top:2px;"><strong>Reason / Note:</strong> ${pay.cancellation_reason}</div>` : ''}
+                                ${pay.refund_id ? `<div><strong>Razorpay Refund ID:</strong> <span style="font-family:monospace; font-weight:700;">${esc(pay.refund_id)}</span></div>` : ''}
+                                ${pay.refund_time_formatted ? `<div><strong>Refund Date & Time:</strong> <span>${esc(pay.refund_time_formatted)}</span></div>` : ''}
+                                ${pay.cancellation_reason ? `<div style="font-size:11px; margin-top:2px;"><strong>Reason / Note:</strong> ${esc(pay.cancellation_reason)}</div>` : ''}
                             </div>
                         ` : ''}
                     </div>
@@ -2384,23 +2396,23 @@ async function openInvoiceModal(txnId) {
                                 <tbody>
                                     ${inv.all_customer_sales.map(cs => `
                                         <tr>
-                                            <td>${cs.sr_no}</td>
-                                            <td><strong>${cs.name}</strong></td>
-                                            <td>${cs.phone}</td>
-                                            <td>${cs.email}</td>
-                                            <td>${cs.booking_date}</td>
-                                            <td>${cs.booking_time}</td>
-                                            <td><span class="badge" style="background:#3b82f6; color:#fff; font-size:9px;">${cs.month}</span></td>
-                                            <td><span style="font-family:monospace; color:var(--primary);">${cs.order_no}</span></td>
-                                            <td><strong>${cs.hotel_name}</strong></td>
-                                            <td>${cs.hotel_id}</td>
-                                            <td>${cs.truck_no}</td>
-                                            <td>${cs.truck_type}</td>
+                                            <td>${esc(cs.sr_no)}</td>
+                                            <td><strong>${esc(cs.name)}</strong></td>
+                                            <td>${esc(cs.phone)}</td>
+                                            <td>${esc(cs.email)}</td>
+                                            <td>${esc(cs.booking_date)}</td>
+                                            <td>${esc(cs.booking_time)}</td>
+                                            <td><span class="badge" style="background:#3b82f6; color:#fff; font-size:9px;">${esc(cs.month)}</span></td>
+                                            <td><span style="font-family:monospace; color:var(--primary);">${esc(cs.order_no)}</span></td>
+                                            <td><strong>${esc(cs.hotel_name)}</strong></td>
+                                            <td>${esc(cs.hotel_id)}</td>
+                                            <td>${esc(cs.truck_no)}</td>
+                                            <td>${esc(cs.truck_type)}</td>
                                             <td>₹${(cs.total_amount || 0).toFixed(2)}</td>
                                             <td>₹${(cs.sgst || 0).toFixed(2)}</td>
                                             <td>₹${(cs.cgst || 0).toFixed(2)}</td>
                                             <td style="color:var(--success); font-weight:700;">₹${(cs.total_payable || 0).toFixed(2)}</td>
-                                            <td><span style="font-family:monospace; font-size:9px;">${cs.payment_id}</span></td>
+                                            <td><span style="font-family:monospace; font-size:9px;">${esc(cs.payment_id)}</span></td>
                                         </tr>
                                     `).join('')}
                                 </tbody>
@@ -2443,19 +2455,19 @@ async function openInvoiceModal(txnId) {
                                 <tbody>
                                     ${inv.all_gst_income_reports.map(rep => `
                                         <tr>
-                                            <td>${rep.sr_no}</td>
-                                            <td>${rep.mobile_no || 'N/A'}</td>
-                                            <td>${rep.email_id || 'N/A'}</td>
-                                            <td><span style="font-family:monospace; color:var(--primary); font-weight:700;">${rep.hotel_id}</span></td>
-                                            <td><strong>${rep.hotel_name}</strong></td>
-                                            <td>${rep.hotel_owner_name}</td>
-                                            <td>${rep.city}</td>
-                                            <td>${rep.state}</td>
-                                            <td>${rep.gst_no}</td>
-                                            <td>${rep.fssai_no}</td>
-                                            <td>${rep.bank_name}</td>
-                                            <td>${rep.account_no}</td>
-                                            <td>${rep.ifsc_code}</td>
+                                            <td>${esc(rep.sr_no)}</td>
+                                            <td>${esc(rep.mobile_no || 'N/A')}</td>
+                                            <td>${esc(rep.email_id || 'N/A')}</td>
+                                            <td><span style="font-family:monospace; color:var(--primary); font-weight:700;">${esc(rep.hotel_id)}</span></td>
+                                            <td><strong>${esc(rep.hotel_name)}</strong></td>
+                                            <td>${esc(rep.hotel_owner_name)}</td>
+                                            <td>${esc(rep.city)}</td>
+                                            <td>${esc(rep.state)}</td>
+                                            <td>${esc(rep.gst_no)}</td>
+                                            <td>${esc(rep.fssai_no)}</td>
+                                            <td>${esc(rep.bank_name)}</td>
+                                            <td>${esc(rep.account_no)}</td>
+                                            <td>${esc(rep.ifsc_code)}</td>
                                             <td>₹${(rep.total_amount || 0).toFixed(2)}</td>
                                             <td style="color:#f59e0b;">₹${(rep.gst_18_percent || 0).toFixed(2)}</td>
                                             <td><strong>₹${(rep.total_amount_with_gst || 0).toFixed(2)}</strong></td>
@@ -2476,7 +2488,7 @@ async function openInvoiceModal(txnId) {
             </div>
         `;
     } catch (err) {
-        modalBody.innerHTML = `<div class="empty-state text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error generating invoice'}</div>`;
+        modalBody.innerHTML = `<div class="empty-state text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${esc(err.message || 'Error generating invoice')}</div>`;
     }
 }
 
@@ -2757,7 +2769,7 @@ function showToast(message, type = 'info') {
     if (type === 'success') icon = 'fa-circle-check';
     if (type === 'danger') icon = 'fa-triangle-exclamation';
 
-    toast.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${message}</span>`;
+    toast.innerHTML = `<i class="fa-solid ${esc(icon)}"></i> <span>${esc(message)}</span>`;
     container.appendChild(toast);
 
     setTimeout(() => {
@@ -2807,14 +2819,14 @@ async function loadBannersData() {
             return `
     <div class="data-card" style="display:flex; flex-direction:column; justify-content:space-between; overflow:hidden;">
         <div style="height: 140px; width: 100%; background:#0f172a; border-radius:8px; overflow:hidden; position:relative; margin-bottom:12px;">
-            <img src="${imgUrl}" alt="${b.title}" style="width:100%; height:100%; object-fit:cover;" onerror="this.src='${fallbackImage}'">
+            <img src="${safeUrl(imgUrl) || fallbackImage}" alt="${esc(b.title)}" style="width:100%; height:100%; object-fit:cover;" onerror="this.src='${fallbackImage}'">
             <div style="position:absolute; top:8px; right:8px;">${statusBadge}</div>
         </div>
 
         <div style="flex:1;">
             <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px; gap:8px;">
-                <h4 style="margin:0; font-size:15px; color:var(--text-primary); font-weight:700;">${b.title}</h4>
-                ${b.discount_percentage ? `<span style="background:var(--success); color:#fff; font-weight:700; padding:2px 8px; border-radius:4px; font-size:11px; flex-shrink:0;">${b.discount_percentage}% OFF</span>` : ''}
+                <h4 style="margin:0; font-size:15px; color:var(--text-primary); font-weight:700;">${esc(b.title)}</h4>
+                ${b.discount_percentage ? `<span style="background:var(--success); color:#fff; font-weight:700; padding:2px 8px; border-radius:4px; font-size:11px; flex-shrink:0;">${esc(b.discount_percentage)}% OFF</span>` : ''}
             </div>
 
             <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;">
@@ -2823,18 +2835,18 @@ async function loadBannersData() {
             </div>
 
             <p style="font-size:12px; color:var(--text-secondary); line-height:1.4; margin: 6px 0 10px 0;">
-                ${b.description || 'No detailed description provided.'}
+                ${esc(b.description || 'No detailed description provided.')}
             </p>
 
             ${b.discount_code ? `
                 <div style="background:var(--bg-dark); border:1px dashed var(--primary); padding:6px 10px; border-radius:6px; font-size:12px; font-weight:700; color:var(--primary); display:inline-block; margin-bottom:10px;">
-                    <i class="fa-solid fa-ticket"></i> CODE: ${b.discount_code}
+                    <i class="fa-solid fa-ticket"></i> CODE: ${esc(b.discount_code)}
                 </div>
             ` : ''}
 
             ${b.expires_at ? `
                 <div style="font-size:11px; color:var(--text-muted); margin-bottom:10px;">
-                    <i class="fa-solid fa-hourglass-half"></i> Expires: <strong>${formatDateClean(b.expires_at)}</strong>
+                    <i class="fa-solid fa-hourglass-half"></i> Expires: <strong>${esc(formatDateClean(b.expires_at))}</strong>
                 </div>
             ` : ''}
         </div>
@@ -2851,7 +2863,7 @@ async function loadBannersData() {
     `;
         }).join('');
     } catch (err) {
-        container.innerHTML = `<div class="empty-state text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message || 'Error loading banners'}</div>`;
+        container.innerHTML = `<div class="empty-state text-danger"><i class="fa-solid fa-triangle-exclamation"></i> ${esc(err.message || 'Error loading banners')}</div>`;
     }
 }
 
@@ -3108,17 +3120,17 @@ async function runAiAgentAnalysis() {
                     <div style="background:var(--bg-dark); border:1px solid var(--border); padding:12px 14px; border-radius:8px; display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
                         <div style="flex:1;">
                             <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-                                <span class="ai-step-badge">STEP ${s.step} • ${s.priority}</span>
-                                <span style="font-size:11px; color:#c084fc; font-weight:700;">${s.category}</span>
+                                <span class="ai-step-badge">STEP ${esc(s.step)} • ${esc(s.priority)}</span>
+                                <span style="font-size:11px; color:#c084fc; font-weight:700;">${esc(s.category)}</span>
                             </div>
-                            <h5 style="margin:2px 0 4px 0; font-size:14px; color:#fff; font-weight:700;">${s.title}</h5>
-                            <p style="margin:0 0 8px 0; font-size:12px; color:var(--text-secondary); line-height:1.4;">${s.rationale}</p>
+                            <h5 style="margin:2px 0 4px 0; font-size:14px; color:#fff; font-weight:700;">${esc(s.title)}</h5>
+                            <p style="margin:0 0 8px 0; font-size:12px; color:var(--text-secondary); line-height:1.4;">${esc(s.rationale)}</p>
                             <div style="font-size:11px; color:var(--success); font-weight:700;">
-                                <i class="fa-solid fa-coins"></i> Estimated Unlock: ${s.estimated_value}
+                                <i class="fa-solid fa-coins"></i> Estimated Unlock: ${esc(s.estimated_value)}
                             </div>
                         </div>
                         <button class="btn-sm" style="background:linear-gradient(135deg, #6366f1, #38bdf8); color:#fff; font-weight:700; flex-shrink:0; margin-top:4px;" onclick="navigateToTabFromAi('${s.action_tab}')">
-                            ${s.action_label} <i class="fa-solid fa-arrow-right"></i>
+                            ${esc(s.action_label)} <i class="fa-solid fa-arrow-right"></i>
                         </button>
                     </div>
                 `).join('');
@@ -3129,17 +3141,17 @@ async function runAiAgentAnalysis() {
         if (marketContainer && data.market_conditions) {
             const m = data.market_conditions;
             marketContainer.innerHTML = `
-                <div style="margin-bottom:6px;"><strong>Season Trend:</strong> ${m.season_trend}</div>
-                <div style="margin-bottom:6px;"><strong>High Demand Cities:</strong> ${(m.demand_surge_cities || []).join(', ')}</div>
-                <div style="margin-bottom:6px;"><strong>Optimal Price Range:</strong> ${m.pricing_sweet_spot}</div>
+                <div style="margin-bottom:6px;"><strong>Season Trend:</strong> ${esc(m.season_trend)}</div>
+                <div style="margin-bottom:6px;"><strong>High Demand Cities:</strong> ${esc((m.demand_surge_cities || []).join(', '))}</div>
+                <div style="margin-bottom:6px;"><strong>Optimal Price Range:</strong> ${esc(m.pricing_sweet_spot)}</div>
                 <div style="margin-top:8px; padding:8px 10px; background:rgba(99,102,241,0.1); border-left:3px solid #6366f1; border-radius:4px; color:#e2e8f0;">
-                    <i class="fa-solid fa-robot" style="color:#6366f1;"></i> <strong>AI Recommendation:</strong> ${m.strategic_recommendation}
+                    <i class="fa-solid fa-robot" style="color:#6366f1;"></i> <strong>AI Recommendation:</strong> ${esc(m.strategic_recommendation)}
                 </div>
             `;
         }
     } catch (err) {
         if (stepsContainer) {
-            stepsContainer.innerHTML = `<div class="empty-state text-danger"><i class="fa-solid fa-triangle-exclamation"></i> Error loading AI insights: ${err.message}</div>`;
+            stepsContainer.innerHTML = `<div class="empty-state text-danger"><i class="fa-solid fa-triangle-exclamation"></i> Error loading AI insights: ${esc(err.message)}</div>`;
         }
     }
 }

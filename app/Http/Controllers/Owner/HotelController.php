@@ -244,6 +244,8 @@ class HotelController extends Controller
             ], 422);
         }
 
+        $this->stripHtmlFromHotelText($request);
+
         $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
             'name'           => 'required|string|max:200',
             'description'    => 'nullable|string',
@@ -361,6 +363,8 @@ class HotelController extends Controller
             ], 422);
         }
 
+        $this->stripHtmlFromHotelText($request);
+
         $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
             'name'           => 'sometimes|string|max:200',
             'description'    => 'nullable|string',
@@ -396,6 +400,13 @@ class HotelController extends Controller
             'latitude', 'longitude', 'price_per_night',
             'discount_price', 'total_rooms',
         ]);
+
+        // A name/address that was only HTML is now empty: keep the saved value
+        foreach (['name', 'address'] as $field) {
+            if (array_key_exists($field, $updateData) && trim((string) $updateData[$field]) === '') {
+                unset($updateData[$field]);
+            }
+        }
 
         // Security Fix (2.4): Ignore status change unless hotel was already approved, active, or inactive
         if ($request->has('status')) {
@@ -459,6 +470,18 @@ class HotelController extends Controller
         $hotel->delete();
 
         return response()->json(['message' => 'Hotel deleted successfully.']);
+    }
+
+    /**
+     * Remove HTML from hotel text fields. They are shown in the admin panel and both apps.
+     */
+    private function stripHtmlFromHotelText(Request $request): void
+    {
+        foreach (['name', 'address', 'description', 'city'] as $field) {
+            if (is_string($request->input($field))) {
+                $request->merge([$field => trim(strip_tags($request->input($field)))]);
+            }
+        }
     }
 
     private function processUploadedImages(Request $request, Hotel $hotel)
