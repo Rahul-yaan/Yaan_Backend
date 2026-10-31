@@ -56,9 +56,12 @@ class PayoutSplitTest extends TestCase
 
         $dash = $this->getJson('/api/admin/dashboard')->assertOk();
         $this->assertEquals(32.99, $dash->json('metrics.hotel_owners_revenue'));
-        $this->assertEquals(17.01, $dash->json('metrics.platform_revenue'));
+        // Dashboard card and target goal show the platform fee without GST
+        $this->assertEquals(14.41, $dash->json('metrics.platform_revenue'));
+        $this->assertEquals(14.41, $dash->json('platform_revenue'));
+        $this->assertEquals(17.01, $dash->json('metrics.platform_fee_collected'));
         $this->assertEquals(50.00, $dash->json('metrics.total_revenue'));
-        $this->assertEquals(17.01, $dash->json('goals.current_month_revenue'));
+        $this->assertEquals(14.41, $dash->json('goals.current_month_revenue'));
 
         $ai = $this->getJson('/api/admin/dashboard/ai-analysis')->assertOk();
         $this->assertEquals(14.41, $ai->json('summary.current_month_revenue'));

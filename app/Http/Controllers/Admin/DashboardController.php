@@ -102,8 +102,10 @@ class DashboardController extends Controller
             $totalRevenue = $split['customer_paid'];
         }
 
-        // 2. Admin Platform Fee Collection (34% fee + its GST). Example: base ₹42.37 -> ₹14.41 + ₹2.60
-        $adminPlatformRevenue = $split['platform_total'];
+        // 2. Platform revenue = 34% fee only, without GST. Example: base ₹42.37 -> ₹14.41
+        //    (fee + its GST, ₹17.01, is still sent as platform_fee_collected)
+        $adminPlatformRevenue = $split['platform_profit'];
+        $platformFeeWithGst   = $split['platform_total'];
 
         // 3. Hotel Owners Payout (66% share + its GST). Example: base ₹42.37 -> ₹27.96 + ₹5.03
         $hotelOwnersRevenue = $split['owner_total'];
@@ -112,13 +114,13 @@ class DashboardController extends Controller
         $startOfMonth = Carbon::now()->startOfMonth();
         $endOfMonth   = Carbon::now()->endOfMonth();
 
-        // Platform fee + its GST for this month's bookings (same split rule as above)
+        // Platform fee (without GST) for this month's bookings, used for the target goal
         $currentMonthSplit = \App\Support\Payout::sum(
             (clone $confirmedBookingsQuery)
                 ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
                 ->get(\App\Support\Payout::COLUMNS)
         );
-        $currentMonthRevenue = $currentMonthSplit['platform_total'];
+        $currentMonthRevenue = $currentMonthSplit['platform_profit'];
 
         if ($currentMonthRevenue <= 0 && $adminPlatformRevenue > 0) {
             $currentMonthRevenue = $adminPlatformRevenue;
@@ -217,11 +219,11 @@ class DashboardController extends Controller
             'total_revenue'          => (float) $totalRevenue,         // Gross Customer Payments (e.g. ₹112.10)
             'gross_revenue'          => (float) $totalRevenue,
             'total_customer_paid'    => (float) $totalRevenue,
-            'platform_revenue'       => (float) $adminPlatformRevenue,         // Primary platform gross revenue alias
+            'platform_revenue'       => (float) $adminPlatformRevenue,  // 34% platform fee without GST (shown on dashboard)
             'total_platform_revenue' => (float) $adminPlatformRevenue,
-            'admin_platform_revenue' => (float) $adminPlatformRevenue, // 34% Admin Share (e.g. ₹32.30)
+            'admin_platform_revenue' => (float) $adminPlatformRevenue,
             'platform_fee'           => (float) $adminPlatformRevenue,
-            'platform_fee_collected' => (float) $adminPlatformRevenue,
+            'platform_fee_collected' => (float) $platformFeeWithGst,    // 34% fee + its GST
             'hotel_owners_revenue'   => (float) $hotelOwnersRevenue,   // 66% Owner Share (e.g. ₹62.70)
             'conversion_rate'        => $conversionRate,
         ];
